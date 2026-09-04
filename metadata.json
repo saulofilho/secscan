@@ -1,0 +1,8 @@
+{
+  "name": "Remix SecScan - JavaScript Secret \u0026 API Path Scanner",
+  "description": "Ferramenta avançada de análise estática (SAST) e dashboard web para detecção automatizada de chaves expostas, tokens e caminhos de API em JavaScript/TypeScript, com regras regex personalizadas, exportação JSON/CSV/SARIF e fluxos de CI/CD para GitHub Actions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
