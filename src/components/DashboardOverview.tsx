@@ -26,7 +26,11 @@ import {
   BellRing,
   Settings,
   FolderTree,
-  BookOpen
+  BookOpen,
+  Boxes,
+  Cloud,
+  KeyRound,
+  FileCode
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -553,24 +557,28 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        {/* Metric 5: API Endpoints */}
-        <div className="bg-[#0A0A0A] p-6 border border-[#222] flex flex-col justify-between">
+        {/* Metric 5: API Endpoints & LinkFinder */}
+        <button
+          onClick={() => onNavigateToTab('endpoints')}
+          className="bg-[#0A0A0A] p-6 border border-[#222] hover:border-[#3366FF] text-left transition-all flex flex-col justify-between group cursor-pointer"
+        >
           <div>
             <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] font-black tracking-[0.2em] text-[#666] uppercase">Surface Endpoints</span>
+              <span className="text-[10px] font-black tracking-[0.2em] text-[#666] group-hover:text-[#3366FF] uppercase">LinkFinder APIs</span>
               <Route className="w-4 h-4 text-[#3366FF]" />
             </div>
             <div className="text-5xl font-black tracking-tighter text-white mb-1">
               {apiEndpoints.length}
             </div>
             <div className="text-[11px] font-mono text-[#666] uppercase tracking-wide">
-              REST Routes Mapped
+              Endpoints Mapped
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-[#1A1A1A] text-[10px] font-mono text-[#AAA]">
-            {apiEndpoints.filter(e => e.isInternalOrAdmin).length} Admin / Internal
+          <div className="mt-4 pt-3 border-t border-[#1A1A1A] text-[10px] font-mono text-[#AAA] flex items-center justify-between w-full">
+            <span>{apiEndpoints.filter(e => e.isInternalOrAdmin).length} Admin / Internal</span>
+            <span className="text-[#3366FF] group-hover:underline text-[9px]">Ver LinkFinder &rarr;</span>
           </div>
-        </div>
+        </button>
 
         {/* Metric 6: Shannon Entropy */}
         <div className="bg-[#0A0A0A] p-6 border border-[#222] flex flex-col justify-between">
@@ -1030,6 +1038,105 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               Bloquear merges automaticamente em GitHub Actions / GitLab CI com flag estrita --fail-on critical.
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* PortSwigger Reconnaissance Suite: LinkFinder & JS-Miner Hub */}
+      <div className="bg-[#080808] border border-[#222] p-6 lg:p-7 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#1A1A1A]">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <span className="text-[10px] font-black tracking-[0.25em] text-[#FF3E00] uppercase">
+                // PORTSWIGGER EXTENSIONS SUITE
+              </span>
+              <span className="text-[10px] font-mono text-[#00FF41] bg-[#00FF41]/10 px-2 py-0.5 border border-[#00FF41]/30 uppercase font-bold">
+                LINKFINDER + JS-MINER ACTIVE
+              </span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white mt-1 flex items-center gap-2">
+              <Boxes className="w-5 h-5 text-[#FF3E00]" />
+              <span>JavaScript Reconnaissance Hub</span>
+            </h2>
+            <p className="text-xs font-mono text-[#888] mt-1 max-w-3xl">
+              Integração completa dos recursos de reconhecimento e mineração de ativos JavaScript: descoberta profunda de rotas e parâmetros (LinkFinder), detecção de buckets de nuvem (AWS S3, Google Cloud, Azure), decodificação de JWTs expostos, mapeamento de dependências vulneráveis e identificação de DOM sinks.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => onNavigateToTab('endpoints')}
+              className="px-4 py-2 bg-[#111] hover:bg-[#222] border border-[#333] text-white font-mono text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Route className="w-3.5 h-3.5 text-[#3366FF]" />
+              <span>LinkFinder ({apiEndpoints.length})</span>
+            </button>
+            <button
+              onClick={() => onNavigateToTab('jsminer')}
+              className="px-4 py-2 bg-[#FF3E00] hover:bg-white hover:text-black border border-[#FF3E00] text-white font-mono text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Boxes className="w-3.5 h-3.5" />
+              <span>JS Miner ({report.jsMiner?.totalAssetsCount ?? 0})</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Reconnaissance Highlights Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <button
+            onClick={() => onNavigateToTab('jsminer')}
+            className="p-4 bg-[#0D0D0D] border border-[#1F1F1F] hover:border-[#FF3E00] text-left transition-all group cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono text-[#888] uppercase">Cloud Storage</span>
+              <Cloud className="w-4 h-4 text-[#FF3E00]" />
+            </div>
+            <div className="text-2xl font-black font-mono text-white mt-2">
+              {report.jsMiner?.cloudBuckets.length ?? 0}
+            </div>
+            <span className="text-[10px] font-mono text-[#666] block mt-0.5">S3, GCS, Azure Blobs</span>
+          </button>
+
+          <button
+            onClick={() => onNavigateToTab('jsminer')}
+            className="p-4 bg-[#0D0D0D] border border-[#1F1F1F] hover:border-[#FF7A00] text-left transition-all group cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono text-[#888] uppercase">Exposed JWTs</span>
+              <KeyRound className="w-4 h-4 text-[#FF7A00]" />
+            </div>
+            <div className="text-2xl font-black font-mono text-white mt-2">
+              {report.jsMiner?.jwtTokens.length ?? 0}
+            </div>
+            <span className="text-[10px] font-mono text-[#666] block mt-0.5">Claims & Permissões</span>
+          </button>
+
+          <button
+            onClick={() => onNavigateToTab('jsminer')}
+            className="p-4 bg-[#0D0D0D] border border-[#1F1F1F] hover:border-[#00FF41] text-left transition-all group cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono text-[#888] uppercase">Source Maps</span>
+              <FileCode className="w-4 h-4 text-[#00FF41]" />
+            </div>
+            <div className="text-2xl font-black font-mono text-white mt-2">
+              {report.jsMiner?.sourceMaps.length ?? 0}
+            </div>
+            <span className="text-[10px] font-mono text-[#666] block mt-0.5">.map Uncompiled Code</span>
+          </button>
+
+          <button
+            onClick={() => onNavigateToTab('jsminer')}
+            className="p-4 bg-[#0D0D0D] border border-[#1F1F1F] hover:border-[#EF4444] text-left transition-all group cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono text-[#888] uppercase">DOM Sinks</span>
+              <Flame className="w-4 h-4 text-[#EF4444]" />
+            </div>
+            <div className="text-2xl font-black font-mono text-white mt-2">
+              {report.jsMiner?.dangerousSinks.length ?? 0}
+            </div>
+            <span className="text-[10px] font-mono text-[#666] block mt-0.5">eval, innerHTML, XSS</span>
+          </button>
         </div>
       </div>
 

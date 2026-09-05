@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { DashboardOverview } from './components/DashboardOverview';
 import { ScannerView } from './components/ScannerView';
 import { ApiPathsView } from './components/ApiPathsView';
+import { JsMinerView } from './components/JsMinerView';
 import { CustomRulesView } from './components/CustomRulesView';
 import { CliTerminalView } from './components/CliTerminalView';
 import { CiCdIntegrationView } from './components/CiCdIntegrationView';
@@ -328,6 +329,12 @@ export default function App() {
         {activeTab === 'endpoints' && (
           <ApiPathsView
             endpoints={report.apiEndpoints}
+          />
+        )}
+
+        {activeTab === 'jsminer' && (
+          <JsMinerView
+            jsMiner={report.jsMiner}
           />
         )}
 

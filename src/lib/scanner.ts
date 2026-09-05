@@ -8,8 +8,16 @@ import {
   SeverityLevel,
   FileCriticalityLevel,
   FileCriticalityInfo,
-  IgnorePatternItem
+  IgnorePatternItem,
+  JsMinerResults,
+  SourceMapFinding,
+  CloudBucketFinding,
+  JwtTokenFinding,
+  BundledDependencyFinding,
+  DangerousSinkFinding
 } from '../types';
+import { extractLinkFinderEndpoints } from './linkFinderEngine';
+import { analyzeWithJsMiner } from './jsMinerEngine';
 
 export const DEFAULT_GLOBAL_IGNORE_PATTERNS: IgnorePatternItem[] = [
   {
@@ -439,6 +447,11 @@ export function scanSourceFiles(
   const scanId = 'scan-' + Math.random().toString(36).substring(2, 9);
   const findings: ScanFinding[] = [];
   const apiEndpoints: ApiEndpointFinding[] = [];
+  const allSourceMaps: SourceMapFinding[] = [];
+  const allCloudBuckets: CloudBucketFinding[] = [];
+  const allJwtTokens: JwtTokenFinding[] = [];
+  const allDependencies: BundledDependencyFinding[] = [];
+  const allDangerousSinks: DangerousSinkFinding[] = [];
 
   let scannedCount = 0;
   let ignoredCount = 0;
@@ -543,28 +556,40 @@ export function scanSourceFiles(
       }
     }
 
-    // Extract API Endpoints & Methods
-    // Look for routes like /api/..., axios.get(...), fetch(...), app.get(...)
-    const apiRegex = /(?:app\.(get|post|put|delete|patch)|router\.(get|post|put|delete|patch)|axios\.(get|post|put|delete|patch)|fetch)\s*\(\s*['"`]([^'"`]+)['"`]/gi;
-    let apiMatch: RegExpExecArray | null;
-    while ((apiMatch = apiRegex.exec(file.content)) !== null) {
-      const method = (apiMatch[1] || apiMatch[2] || apiMatch[3] || 'GET').toUpperCase() as ApiEndpointFinding['method'];
-      const rawPath = apiMatch[4];
-      if (rawPath && (rawPath.startsWith('/') || rawPath.startsWith('http'))) {
-        const { line, lineContent } = getLineAndColumn(file.content, apiMatch.index);
-        const isInternalOrAdmin = /admin|internal|superadmin|debug|token|actuator|secret/i.test(rawPath);
-        apiEndpoints.push({
-          id: `endpoint-${apiEndpoints.length + 1}`,
-          file: file.path,
-          line,
-          method,
-          path: rawPath,
-          isInternalOrAdmin,
-          snippet: lineContent.trim()
-        });
+    // 1. LinkFinder Engine: Deep reconnaissance of endpoints, parameters, methods, and full URLs
+    const linkFinderEndpoints = extractLinkFinderEndpoints(file.path, file.content);
+    for (const ep of linkFinderEndpoints) {
+      const exists = apiEndpoints.some(
+        existing => existing.file === ep.file && existing.path === ep.path && existing.method === ep.method
+      );
+      if (!exists) {
+        apiEndpoints.push(ep);
       }
     }
+
+    // 2. JS-Miner Engine: Source Maps, Cloud Storage Buckets, JWTs, Bundled Libraries & DOM Sinks
+    const jsMinerRes = analyzeWithJsMiner(file.path, file.content);
+    allSourceMaps.push(...jsMinerRes.sourceMaps);
+    allCloudBuckets.push(...jsMinerRes.cloudBuckets);
+    allJwtTokens.push(...jsMinerRes.jwtTokens);
+    allDependencies.push(...jsMinerRes.dependencies);
+    allDangerousSinks.push(...jsMinerRes.dangerousSinks);
   }
+
+  // Construct JS Miner Results
+  const jsMiner: JsMinerResults = {
+    sourceMaps: allSourceMaps,
+    cloudBuckets: allCloudBuckets,
+    jwtTokens: allJwtTokens,
+    dependencies: allDependencies,
+    dangerousSinks: allDangerousSinks,
+    totalAssetsCount:
+      allSourceMaps.length +
+      allCloudBuckets.length +
+      allJwtTokens.length +
+      allDependencies.length +
+      allDangerousSinks.length
+  };
 
   // Calculate Metrics
   const criticalCount = findings.filter(f => f.severity === 'CRITICAL').length;
@@ -614,6 +639,7 @@ export function scanSourceFiles(
     ignoredFilesCount: ignoredCount,
     findings,
     apiEndpoints,
+    jsMiner,
     metrics: {
       criticalCount,
       highCount,
@@ -625,7 +651,12 @@ export function scanSourceFiles(
       impactLevel,
       totalWeightedRisk,
       criticalityDistribution,
-      averageEntropy
+      averageEntropy,
+      linkFinderTotalEndpoints: apiEndpoints.length,
+      jsMinerTotalAssets: jsMiner.totalAssetsCount,
+      jsMinerCloudBucketsCount: jsMiner.cloudBuckets.length,
+      jsMinerSourceMapsCount: jsMiner.sourceMaps.length,
+      jsMinerDangerousSinksCount: jsMiner.dangerousSinks.length
     },
     durationMs
   };

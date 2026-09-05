@@ -8,6 +8,7 @@ import {
   SlidersHorizontal, 
   Route, 
   CloudCog, 
+  Boxes,
   CheckCircle2, 
   AlertTriangle,
   RotateCcw,
@@ -50,7 +51,8 @@ export const Header: React.FC<HeaderProps> = ({
   const navItems = [
     { id: 'dashboard', label: 'Dashboard & Métricas', icon: ShieldAlert },
     { id: 'scanner', label: 'Inspetor de Código', icon: FileCode2, badge: report.findings.length },
-    { id: 'endpoints', label: 'Caminhos de API', icon: Route, badge: report.apiEndpoints.length },
+    { id: 'endpoints', label: 'LinkFinder (APIs)', icon: Route, badge: report.apiEndpoints.length },
+    { id: 'jsminer', label: 'JS Miner', icon: Boxes, badge: report.jsMiner?.totalAssetsCount },
     { id: 'rules', label: 'Regras Regex', icon: SlidersHorizontal },
     { id: 'cli', label: 'Terminal CLI', icon: Terminal },
     { id: 'cicd', label: 'CI/CD & Cloud', icon: CloudCog },

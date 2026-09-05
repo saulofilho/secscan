@@ -65,6 +65,83 @@ export interface ApiEndpointFinding {
   path: string;
   isInternalOrAdmin: boolean;
   snippet: string;
+  // LinkFinder extensions
+  urlType?: 'RELATIVE_PATH' | 'FULL_URL' | 'WEBSOCKET' | 'GRAPHQL' | 'STATIC_ASSET';
+  scope?: 'IN_SCOPE' | 'EXTERNAL' | 'CDN' | 'INTERNAL';
+  params?: string[];
+  sourceTool?: 'LINK_FINDER' | 'JS_MINER' | 'SECSCAN_AST';
+  curlCommand?: string;
+}
+
+// JS Miner specific types
+export interface SourceMapFinding {
+  id: string;
+  file: string;
+  line: number;
+  url: string;
+  type: 'EXTERNAL_FILE' | 'INLINE_BASE64' | 'EXPOSED_DIR';
+  snippet: string;
+  riskDescription: string;
+}
+
+export interface CloudBucketFinding {
+  id: string;
+  provider: 'AWS_S3' | 'GOOGLE_CLOUD_STORAGE' | 'AZURE_BLOB' | 'DIGITAL_OCEAN' | 'FIREBASE';
+  bucketName: string;
+  url: string;
+  file: string;
+  line: number;
+  snippet: string;
+  riskDescription: string;
+  checkCommand?: string;
+}
+
+export interface JwtTokenFinding {
+  id: string;
+  token: string;
+  file: string;
+  line: number;
+  header: Record<string, unknown>;
+  payload: Record<string, unknown>;
+  algorithm: string;
+  isExpired: boolean;
+  expiresAt?: string;
+  issuer?: string;
+  subject?: string;
+  roles?: string[];
+  risks: string[];
+}
+
+export interface BundledDependencyFinding {
+  id: string;
+  name: string;
+  version: string;
+  file: string;
+  line: number;
+  confidence: 'HIGH' | 'MEDIUM';
+  status: 'VULNERABLE' | 'OUTDATED' | 'OK';
+  cveAdvisory?: string;
+  description: string;
+}
+
+export interface DangerousSinkFinding {
+  id: string;
+  sinkType: 'EVAL' | 'INNER_HTML' | 'DOCUMENT_WRITE' | 'POST_MESSAGE' | 'INSECURE_STORAGE' | 'FUNCTION_CONSTRUCTOR';
+  file: string;
+  line: number;
+  snippet: string;
+  severity: SeverityLevel;
+  description: string;
+  remediation: string;
+}
+
+export interface JsMinerResults {
+  sourceMaps: SourceMapFinding[];
+  cloudBuckets: CloudBucketFinding[];
+  jwtTokens: JwtTokenFinding[];
+  dependencies: BundledDependencyFinding[];
+  dangerousSinks: DangerousSinkFinding[];
+  totalAssetsCount: number;
 }
 
 export interface ScannedFile {
@@ -87,6 +164,7 @@ export interface ScanReport {
   ignoredFilesCount: number;
   findings: ScanFinding[];
   apiEndpoints: ApiEndpointFinding[];
+  jsMiner?: JsMinerResults;
   metrics: {
     criticalCount: number;
     highCount: number;
@@ -104,6 +182,12 @@ export interface ScanReport {
       lowFiles: number;
     };
     averageEntropy: number;
+    // LinkFinder & JS Miner metrics
+    linkFinderTotalEndpoints?: number;
+    jsMinerTotalAssets?: number;
+    jsMinerCloudBucketsCount?: number;
+    jsMinerSourceMapsCount?: number;
+    jsMinerDangerousSinksCount?: number;
   };
   durationMs: number;
 }

@@ -8,6 +8,7 @@ const MOCK_SLACK_WEBHOOK = ['https:', '', ['hooks', 'slack', 'com'].join('.'), '
 const MOCK_GOOGLE_KEY = ['AIzaSy', 'B4C5D6E7F8G9H0I1J2K3L4M5N6O7P8Q9R'].join('');
 const MOCK_AWS_KEY = ['AKIA', 'IOSFODNN7EXAMPLE'].join('');
 const MOCK_AWS_SECRET = ['wJalrXUtnFEMI/K7MDENG', 'bPxRfiCYEXAMPLEKEY'].join('/');
+const MOCK_STRIPE_WEBHOOK = ['whsec', '99182a7fbc34d98e1029c87a5543ef0123456789'].join('_');
 
 export const SAMPLE_FILES: ScannedFile[] = [
   {
@@ -24,7 +25,7 @@ const router = express.Router();
 
 // Sensitive credentials hardcoded in source
 const STRIPE_SECRET_KEY = "${MOCK_STRIPE_SECRET}";
-const STRIPE_WEBHOOK_SECRET = "whsec_99182a7fbc34d98e1029c87a5543ef0123456789";
+const STRIPE_WEBHOOK_SECRET = "${MOCK_STRIPE_WEBHOOK}";
 
 router.post('/api/v1/payments/charge', async (req, res) => {
   const { amount, customerEmail } = req.body;
@@ -107,6 +108,47 @@ export const firebaseConfig = {
   messagingSenderId: "814774751099",
   appId: "1:814774751099:web:a1ac0c13c0e44048acef"
 };`
+  },
+  {
+    name: 'clientPortalBundle.js',
+    path: 'public/static/js/clientPortalBundle.js',
+    extension: 'js',
+    size: 6420,
+    content: `/**
+ * Client Portal Production Bundle
+ * Demonstrates PortSwigger js-link-finder & js-miner reconnaissance
+ */
+/*! jQuery JavaScript Library v1.12.4 */
+/*! lodash v4.17.15 */
+
+const S3_ASSETS_URL = "https://finance-portal-assets.s3.amazonaws.com/reports";
+const GCS_BACKUP_STORAGE = "storage.googleapis.com/fintech-compliance-vault";
+const REALTIME_SOCKET = "wss://stream.internal.portal.com/v1/feed";
+
+function loadUserCustomScript(payload) {
+  // Dangerous Sink: DOM eval
+  eval(payload.code);
+  
+  // Dangerous Sink: Raw innerHTML assignment
+  document.getElementById("user-profile").innerHTML = payload.bioHtml;
+
+  // Dangerous Sink: Wildcard postMessage
+  window.postMessage({ session: payload.token }, "*");
+}
+
+async function fetchPortalMetadata(userId) {
+  // LinkFinder REST Route with parameters
+  const res = await fetch(\`/api/v2/users/\${userId}/audit-trail?limit=50&format=json\`);
+  
+  // LinkFinder Internal GraphQL endpoint
+  const gql = await fetch('/api/v1/graphql?query={financialAccounts{id,balance}}');
+  
+  // LinkFinder Internal Admin route
+  await axios.get('/api/internal/debug/sysinfo');
+  return res.json();
+}
+
+//# sourceMappingURL=clientPortalBundle.js.map`
   },
   {
     name: 'index.js',
