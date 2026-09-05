@@ -32,18 +32,11 @@ import {
   KeyRound,
   FileCode
 } from 'lucide-react';
-import { 
-  ResponsiveContainer, 
-  Tooltip as RechartsTooltip, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis 
-} from 'recharts';
 import { ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem } from '../types';
 import { VulnerabilityHeatmap } from './VulnerabilityHeatmap';
 import { VulnerabilityTrendChart } from './VulnerabilityTrendChart';
 import { SeverityDonutChart } from './SeverityDonutChart';
+import { VulnerabilityTypeBarChart } from './VulnerabilityTypeBarChart';
 import { SecurityImpactPanel } from './SecurityImpactPanel';
 import { downloadSecurityReportPdf } from '../lib/pdfReportGenerator';
 import { SecurityGlossaryTooltip } from './SecurityGlossary';
@@ -146,28 +139,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       setIsGeneratingPdf(false);
     }
   };
-
-  // Category distribution
-  const categoryCounts: Record<string, number> = {};
-  findings.forEach(f => {
-    categoryCounts[f.category] = (categoryCounts[f.category] || 0) + 1;
-  });
-
-  const categoryLabels: Record<string, string> = {
-    CLOUD_CREDENTIAL: 'Nuvem (AWS/GCP)',
-    API_KEY: 'Chaves de API',
-    AUTH_TOKEN: 'Tokens / JWT',
-    DATABASE_URI: 'Banco de Dados',
-    PRIVATE_KEY: 'Chaves Privadas',
-    PASSWORD: 'Hardcoded Pass',
-    API_PATH: 'Rotas de API',
-    CUSTOM_REGEX: 'Regex Custom'
-  };
-
-  const categoryData = Object.entries(categoryCounts).map(([cat, count]) => ({
-    name: categoryLabels[cat] || cat,
-    count
-  }));
 
   // Score rating letter
   const getGrade = (score: number) => {
@@ -1148,49 +1119,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           onSelectSeverity={() => onNavigateToTab('scanner')} 
         />
 
-        {/* Categories Bar Chart */}
-        <div className="bg-[#080808] p-6 border border-[#222] lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-[11px] font-black tracking-[0.2em] text-white uppercase flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[#00FF41]" />
-                <span>Credential Categories Distribution</span>
-              </h2>
-              <p className="text-[10px] font-mono text-[#666] uppercase mt-0.5">Identified pattern signatures in repository</p>
-            </div>
-            <button
-              onClick={() => onNavigateToTab('scanner')}
-              className="text-[11px] font-black uppercase tracking-[0.15em] text-[#FF3E00] hover:underline"
-            >
-              Inspect Code &rarr;
-            </button>
-          </div>
-
-          <div className="h-56 mt-4">
-            {categoryData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={categoryData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{ fontSize: 10, fill: '#666', fontFamily: 'monospace' }} 
-                    angle={-15} 
-                    textAnchor="end" 
-                    interval={0}
-                  />
-                  <YAxis tick={{ fontSize: 10, fill: '#666', fontFamily: 'monospace' }} allowDecimals={false} />
-                  <RechartsTooltip 
-                    contentStyle={{ backgroundColor: '#111', borderColor: '#333', color: '#fff', fontSize: '11px', fontFamily: 'monospace' }}
-                    formatter={(val) => [`${val} ocorrência(s)`, 'Detecções']}
-                  />
-                  <Bar dataKey="count" fill="#FF3E00" />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-[#666] font-mono text-xs">
-                NO_CATEGORIZED_VULNERABILITIES
-              </div>
-            )}
-          </div>
+        {/* Recharts Bar Chart: Vulnerabilities by Type (Secret vs Path vs Asset) & Over Time */}
+        <div className="lg:col-span-2">
+          <VulnerabilityTypeBarChart 
+            report={report} 
+            onNavigateToTab={onNavigateToTab} 
+          />
         </div>
       </div>
 

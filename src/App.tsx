@@ -1,4 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  AlertTriangle, 
+  ShieldAlert, 
+  CheckCircle2, 
+  X 
+} from 'lucide-react';
 import { Header } from './components/Header';
 import { DashboardOverview } from './components/DashboardOverview';
 import { ScannerView } from './components/ScannerView';
@@ -18,6 +24,7 @@ import { scanSourceFiles, exportToJson, DEFAULT_GLOBAL_IGNORE_PATTERNS } from '.
 import { RegexRule, ScannedFile, ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem } from './types';
 import { SecurityGlossaryEntry } from './lib/securityGlossary';
 import { safeGetItem, safeSetItem } from './lib/storage';
+import { validateFileForSensitivePatterns, isForbiddenWorkspaceFile } from './lib/workspaceValidator';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -68,6 +75,11 @@ export default function App() {
   const [showIgnoreModal, setShowIgnoreModal] = useState<boolean>(false);
   const [showGlossaryModal, setShowGlossaryModal] = useState<boolean>(false);
   const [selectedGlossaryId, setSelectedGlossaryId] = useState<string | undefined>(undefined);
+  const [validationNotice, setValidationNotice] = useState<{
+    type: 'error' | 'warning' | 'success';
+    title: string;
+    message: string;
+  } | null>(null);
   const [showTour, setShowTour] = useState<boolean>(() => {
     return !safeGetItem('secscan_tour_completed');
   });
@@ -161,25 +173,45 @@ export default function App() {
     setShowGlossaryModal(true);
   };
 
-  // Handle file uploads
+  // Handle file uploads with pre-flight security validation
   const handleFileUpload = (uploadedFiles: FileList) => {
     const newScannedFiles: ScannedFile[] = [];
+    const blockedFiles: string[] = [];
+    const warningFiles: string[] = [];
     const readers: Promise<void>[] = [];
 
     Array.from(uploadedFiles).forEach((file) => {
+      // 1. Immediately check for forbidden file names (.env, .pem, id_rsa, etc.)
+      const nameCheck = isForbiddenWorkspaceFile(file.name);
+      if (nameCheck.isForbidden) {
+        blockedFiles.push(`${file.name} (${nameCheck.reason})`);
+        return;
+      }
+
       const promise = new Promise<void>((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => {
           const content = (e.target?.result as string) || '';
-          const path = (file as any).webkitRelativePath || file.name;
-          const ext = file.name.split('.').pop() || '';
-          newScannedFiles.push({
-            name: file.name,
-            path,
-            content,
-            size: file.size,
-            extension: ext
-          });
+          
+          // 2. Validate file content for real non-placeholder secrets
+          const validation = validateFileForSensitivePatterns(file.name, content);
+
+          if (validation.isForbiddenFile || validation.hasBlockers) {
+            blockedFiles.push(`${file.name} [${validation.findings.map(f => f.name).join(', ')}]`);
+          } else {
+            if (validation.hasWarnings) {
+              warningFiles.push(`${file.name} (${validation.findings.length} aviso(s))`);
+            }
+            const path = (file as any).webkitRelativePath || file.name;
+            const ext = file.name.split('.').pop() || '';
+            newScannedFiles.push({
+              name: file.name,
+              path,
+              content,
+              size: file.size,
+              extension: ext
+            });
+          }
           resolve();
         };
         reader.readAsText(file);
@@ -188,16 +220,48 @@ export default function App() {
     });
 
     Promise.all(readers).then(() => {
-      const merged = [...files, ...newScannedFiles];
-      setFiles(merged);
-      setSelectedFile(newScannedFiles[0] || files[0]);
-      executeScan(merged, rules);
-      setActiveTab('scanner');
+      if (blockedFiles.length > 0) {
+        setValidationNotice({
+          type: 'error',
+          title: 'Arquivos Sensíveis Bloqueados',
+          message: `Os seguintes arquivos não puderam ser adicionados por conterem variáveis de ambiente (.env) ou chaves privadas críticas: ${blockedFiles.join('; ')}`
+        });
+      } else if (warningFiles.length > 0) {
+        setValidationNotice({
+          type: 'warning',
+          title: 'Importação com Alertas de Padrões',
+          message: `Arquivos importados com potenciais tokens detectados: ${warningFiles.join('; ')}`
+        });
+      } else if (newScannedFiles.length > 0) {
+        setValidationNotice({
+          type: 'success',
+          title: 'Importação Segura Concluída',
+          message: `${newScannedFiles.length} arquivo(s) validado(s) com sucesso e adicionado(s) ao workspace.`
+        });
+      }
+
+      if (newScannedFiles.length > 0) {
+        const merged = [...files, ...newScannedFiles];
+        setFiles(merged);
+        setSelectedFile(newScannedFiles[0] || files[0]);
+        executeScan(merged, rules);
+        setActiveTab('scanner');
+      }
     });
   };
 
-  // Add custom file via paste
+  // Add custom file via paste with pre-flight security validation
   const handleAddCustomFile = (name: string, content: string) => {
+    const validation = validateFileForSensitivePatterns(name, content);
+    if (validation.isForbiddenFile || validation.hasBlockers) {
+      setValidationNotice({
+        type: 'error',
+        title: 'Arquivo Bloqueado',
+        message: validation.blockedReason || `Não é permitido adicionar arquivos de ambiente (.env) ou segredos críticos não mascarados (${validation.findings.map(f => f.name).join(', ')}).`
+      });
+      return;
+    }
+
     const newFile: ScannedFile = {
       name,
       path: `src/pasted/${name}`,
@@ -210,6 +274,11 @@ export default function App() {
     setFiles(updated);
     setSelectedFile(newFile);
     executeScan(updated, rules);
+    setValidationNotice({
+      type: 'success',
+      title: 'Arquivo Adicionado',
+      message: `O arquivo ${name} foi validado e inserido no workspace com sucesso.`
+    });
   };
 
   // Reset to initial sample repository
@@ -295,6 +364,46 @@ export default function App() {
 
       {/* Main Container Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">
+        {/* Workspace Ingestion & Security Validation Banner */}
+        {validationNotice && (
+          <div 
+            id="workspace-validation-notice"
+            className={`mb-6 p-4 rounded-xl border flex items-start justify-between gap-4 transition-all duration-200 ${
+              validationNotice.type === 'error'
+                ? 'bg-rose-950/40 border-rose-800/60 text-rose-200'
+                : validationNotice.type === 'warning'
+                ? 'bg-amber-950/40 border-amber-800/60 text-amber-200'
+                : 'bg-emerald-950/40 border-emerald-800/60 text-emerald-200'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              {validationNotice.type === 'error' ? (
+                <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+              ) : validationNotice.type === 'warning' ? (
+                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+              )}
+              <div>
+                <h4 className="text-sm font-semibold tracking-wide">
+                  {validationNotice.title}
+                </h4>
+                <p className="text-xs mt-1 leading-relaxed opacity-90">
+                  {validationNotice.message}
+                </p>
+              </div>
+            </div>
+            <button
+              id="btn-dismiss-validation-notice"
+              onClick={() => setValidationNotice(null)}
+              className="p-1.5 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+              title="Fechar aviso"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {activeTab === 'dashboard' && (
           <DashboardOverview
             report={report}

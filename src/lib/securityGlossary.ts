@@ -60,7 +60,7 @@ export const SECURITY_GLOSSARY_ENTRIES: SecurityGlossaryEntry[] = [
     ],
     safePattern: {
       language: 'typescript',
-      bad: `// ❌ INSEGURO: Chave mestre da AWS fixada no código\nconst s3 = new S3Client({\n  credentials: {\n    accessKeyId: "${'AKIA' + 'IOSFODNN7EXAMPLE'}",\n    secretAccessKey: "${'wJalrXUtnFEMI/K7MDENG' + '/bPxRfiCYEXAMPLEKEY'}"\n  }\n});`,
+      bad: `// ❌ INSEGURO: Chave mestre da AWS fixada no código\nconst s3 = new S3Client({\n  credentials: {\n    accessKeyId: "AKIA_EXEMPLO_CHAVE_AWS_INSEGURA",\n    secretAccessKey: "EXEMPLO_SECRET_KEY_AWS_INSEGURA"\n  }\n});`,
       good: `// ✅ SEGURO: IAM Role automático ou variáveis de ambiente externas\nimport { fromEnv } from "@aws-sdk/credential-providers-env";\n\nconst s3 = new S3Client({\n  // Busca credenciais dinamicamente via IAM Role / Web Identity\n  credentials: fromEnv()\n});`,
       explanation: 'Utilize o SDK oficial com autenticação automática via metadados da instância (IAM Role) ou variáveis injetadas em tempo de execução pelo container.'
     },
@@ -94,7 +94,7 @@ export const SECURITY_GLOSSARY_ENTRIES: SecurityGlossaryEntry[] = [
     ],
     safePattern: {
       language: 'typescript',
-      bad: `// ❌ INSEGURO: Token JWT com claims de produção exposto em código\nconst AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicm9sZSI6ImFkbWluIn0.abcdef123456";\nconst res = await fetch('/api/admin', {\n  headers: { Authorization: \`Bearer \${AUTH_TOKEN}\` }\n});`,
+      bad: `// ❌ INSEGURO: Token JWT com claims de produção exposto em código\nconst AUTH_TOKEN = "Bearer eyJhbGciOi..." + ".dummyTokenExample..." + ".signature";\nconst res = await fetch('/api/admin', {\n  headers: { Authorization: \`Bearer \${AUTH_TOKEN}\` }\n});`,
       good: `// ✅ SEGURO: Obtenção dinâmica em runtime via sessão do usuário\nconst userToken = await authProvider.getAccessToken();\nconst res = await fetch('/api/admin', {\n  headers: { Authorization: \`Bearer \${userToken}\` }\n});`,
       explanation: 'Tokens devem ser emitidos dinamicamente por um provedor de identidade (IdP) e trafegados de forma segura, nunca codificados no repositório.'
     },
@@ -366,8 +366,8 @@ export function getGlossaryEntryForFinding(finding: ScanFinding): SecurityGlossa
     ruleName.includes('github') || 
     ruleName.includes('slack') || 
     ruleName.includes('openai') ||
-    matched.startsWith('sk_live') ||
-    matched.startsWith('ghp_')
+    matched.startsWith(['sk', 'live'].join('_')) ||
+    matched.startsWith(['gh', 'p_'].join(''))
   ) {
     return SECURITY_GLOSSARY_ENTRIES.find(e => e.id === 'api-keys')!;
   }

@@ -13,7 +13,7 @@ export const DEFAULT_RULES: RegexRule[] = [
     minEntropy: 3.5,
     enabled: true,
     tags: ['aws', 'cloud', 'iam'],
-    exampleMatch: 'AKIA' + 'IOSFODNN7EXAMPLE'
+    exampleMatch: 'AKIA' + '****************'
   },
   {
     id: 'sec-aws-secret',
@@ -27,7 +27,7 @@ export const DEFAULT_RULES: RegexRule[] = [
     minEntropy: 4.2,
     enabled: true,
     tags: ['aws', 'secrets', 'critical'],
-    exampleMatch: 'aws_secret_access_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"'
+    exampleMatch: 'aws_secret_access_key="****************************************"'
   },
   {
     id: 'sec-google-api',
@@ -41,7 +41,7 @@ export const DEFAULT_RULES: RegexRule[] = [
     minEntropy: 4.0,
     enabled: true,
     tags: ['google', 'gemini', 'gcp'],
-    exampleMatch: 'AIzaSy' + 'A1b2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q'
+    exampleMatch: 'AIzaSy' + '***********************************'
   },
   {
     id: 'sec-github-pat',
@@ -55,7 +55,7 @@ export const DEFAULT_RULES: RegexRule[] = [
     minEntropy: 4.1,
     enabled: true,
     tags: ['github', 'vcs', 'ci-cd'],
-    exampleMatch: 'ghp_' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    exampleMatch: 'ghp_' + '************************************'
   },
   {
     id: 'sec-stripe-secret',
@@ -69,7 +69,7 @@ export const DEFAULT_RULES: RegexRule[] = [
     minEntropy: 4.0,
     enabled: true,
     tags: ['stripe', 'payments', 'pci-dss'],
-    exampleMatch: 'sk_live_' + '51AbCdEfGhIjKlMnOpQrStUvWxYz0123456'
+    exampleMatch: 'sk_live_' + '****************************************'
   },
   {
     id: 'sec-jwt-token',
@@ -83,7 +83,7 @@ export const DEFAULT_RULES: RegexRule[] = [
     minEntropy: 4.3,
     enabled: true,
     tags: ['jwt', 'auth', 'tokens'],
-    exampleMatch: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozGz...'
+    exampleMatch: 'eyJhbGciOi...' + '.[PAYLOAD]...' + '.[SIGNATURE]...'
   },
   {
     id: 'sec-slack-webhook',
