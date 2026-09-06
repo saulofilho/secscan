@@ -207,6 +207,148 @@ export function evaluateFileCriticality(filePath: string): FileCriticalityInfo {
   };
 }
 
+export interface FindingRiskEvaluation {
+  riskScore: number;
+  assignedSeverity: SeverityLevel;
+  baseRuleScore: number;
+  categoryAdjustment: number;
+  entropyAdjustment: number;
+  contextMultiplier: number;
+  factors: string[];
+}
+
+/**
+ * Calculates a dedicated 'Risk Score' (0 - 100) and assigns an authoritative severity level
+ * (Critical, High, Medium, Low) to each finding based on the matched rule, secret entropy,
+ * and filepath architectural exposure.
+ */
+export function calculateFindingRiskScore(
+  rule: RegexRule,
+  matchedSecret: string,
+  entropy: number,
+  filePath: string
+): FindingRiskEvaluation {
+  const factors: string[] = [];
+
+  // 1. Base Score from Rule Severity
+  let baseRuleScore = 35;
+  switch (rule.severity) {
+    case 'CRITICAL':
+      baseRuleScore = 75;
+      factors.push('Regra de Severidade Crítica (+75)');
+      break;
+    case 'HIGH':
+      baseRuleScore = 55;
+      factors.push('Regra de Alta Severidade (+55)');
+      break;
+    case 'MEDIUM':
+      baseRuleScore = 35;
+      factors.push('Regra de Severidade Média (+35)');
+      break;
+    case 'LOW':
+      baseRuleScore = 18;
+      factors.push('Regra de Baixa Severidade (+18)');
+      break;
+    case 'INFO':
+    default:
+      baseRuleScore = 10;
+      factors.push('Regra Informativa (+10)');
+      break;
+  }
+
+  // 2. Category Adjustment
+  let categoryAdjustment = 0;
+  switch (rule.category) {
+    case 'CLOUD_CREDENTIAL':
+      categoryAdjustment = 15;
+      factors.push('Credencial de Nuvem / IAM (+15)');
+      break;
+    case 'PRIVATE_KEY':
+      categoryAdjustment = 15;
+      factors.push('Chave Privada Criptográfica (+15)');
+      break;
+    case 'DATABASE_URI':
+      categoryAdjustment = 12;
+      factors.push('String de Conexão com DB (+12)');
+      break;
+    case 'AUTH_TOKEN':
+      categoryAdjustment = 10;
+      factors.push('Token de Autenticação / PAT (+10)');
+      break;
+    case 'PASSWORD':
+      categoryAdjustment = 10;
+      factors.push('Senha em Texto Plano (+10)');
+      break;
+    case 'API_KEY':
+      categoryAdjustment = 8;
+      factors.push('Chave de API Exposta (+8)');
+      break;
+    case 'CUSTOM_REGEX':
+      categoryAdjustment = 4;
+      factors.push('Regra Customizada (+4)');
+      break;
+    case 'API_PATH':
+    default:
+      categoryAdjustment = 2;
+      break;
+  }
+
+  // 3. Shannon Entropy Modifier
+  let entropyAdjustment = 0;
+  if (entropy >= 4.5) {
+    entropyAdjustment = 6;
+    factors.push(`Alta Aleatoriedade Criptográfica (H=${entropy.toFixed(2)}: +6)`);
+  } else if (entropy >= 4.0) {
+    entropyAdjustment = 3;
+    factors.push(`Entropia Elevada (H=${entropy.toFixed(2)}: +3)`);
+  } else if (entropy < 2.8 && entropy > 0) {
+    entropyAdjustment = -8;
+    factors.push(`Baixa Entropia / Possível Mock (H=${entropy.toFixed(2)}: -8)`);
+  }
+
+  // 4. File Context Exposure Multiplier
+  const fileCrit = evaluateFileCriticality(filePath);
+  let contextMultiplier = 1.0;
+  if (fileCrit.level === 'CRITICAL') {
+    contextMultiplier = 1.25;
+    factors.push('Exposição em Infraestrutura Crítica / .env (1.25x)');
+  } else if (fileCrit.level === 'HIGH') {
+    contextMultiplier = 1.10;
+    factors.push('Exposição em Camada de Backend / API (1.10x)');
+  } else if (fileCrit.level === 'LOW') {
+    contextMultiplier = 0.70;
+    factors.push('Ambiente de Testes / Documentação (0.70x)');
+  } else {
+    contextMultiplier = 1.00;
+  }
+
+  // 5. Final Score Calculation (Bounded 1 - 100)
+  const rawScore = (baseRuleScore + categoryAdjustment + entropyAdjustment) * contextMultiplier;
+  const riskScore = Math.min(100, Math.max(1, Math.round(rawScore)));
+
+  // 6. Assign Dynamic Severity Level based on Matched Rule & Risk Score
+  let assignedSeverity: SeverityLevel;
+  if (riskScore >= 80) {
+    assignedSeverity = 'CRITICAL';
+  } else if (riskScore >= 60) {
+    assignedSeverity = 'HIGH';
+  } else if (riskScore >= 35) {
+    assignedSeverity = 'MEDIUM';
+  } else {
+    assignedSeverity = 'LOW';
+  }
+
+  return {
+    riskScore,
+    assignedSeverity,
+    baseRuleScore,
+    categoryAdjustment,
+    entropyAdjustment,
+    contextMultiplier,
+    factors
+  };
+}
+
 /**
  * Calculates the bounded Security Impact Score (0 - 100) based on weighted finding severity and file criticality.
  * A score of 0 represents zero risk / nominal health.
@@ -516,7 +658,10 @@ export function scanSourceFiles(
 
         const { line, column, lineContent } = getLineAndColumn(file.content, match.index);
         const criticalityInfo = evaluateFileCriticality(file.path);
-        const baseSeverityWeight = SEVERITY_BASE_WEIGHTS[rule.severity] || 5;
+        
+        // Calculate dynamic Risk Score (0-100) and assign authoritative severity level based on the matched rule
+        const riskEval = calculateFindingRiskScore(rule, fullMatch, entropy, file.path);
+        const baseSeverityWeight = SEVERITY_BASE_WEIGHTS[riskEval.assignedSeverity] || 5;
         const weightedScore = Number((baseSeverityWeight * criticalityInfo.weight).toFixed(1));
 
         const findingId = `finding-${findings.length + 1}`;
@@ -525,7 +670,7 @@ export function scanSourceFiles(
           ruleId: rule.id,
           ruleName: rule.name,
           category: rule.category,
-          severity: rule.severity,
+          severity: riskEval.assignedSeverity,
           file: file.path,
           line,
           column,
@@ -538,19 +683,29 @@ export function scanSourceFiles(
           timestamp: new Date().toISOString(),
           fileCriticality: criticalityInfo.level,
           fileCriticalityWeight: criticalityInfo.weight,
-          weightedScore
+          weightedScore,
+          riskScore: riskEval.riskScore,
+          riskScoreDetails: {
+            baseRuleScore: riskEval.baseRuleScore,
+            categoryAdjustment: riskEval.categoryAdjustment,
+            entropyAdjustment: riskEval.entropyAdjustment,
+            contextMultiplier: riskEval.contextMultiplier,
+            finalScore: riskEval.riskScore,
+            assignedSeverity: riskEval.assignedSeverity,
+            factors: riskEval.factors
+          }
         };
 
         findings.push(finding);
         file.findingsCount = (file.findingsCount || 0) + 1;
 
-        if (rule.severity === 'CRITICAL' || rule.severity === 'HIGH') {
+        if (finding.severity === 'CRITICAL' || finding.severity === 'HIGH') {
           onLog?.({
             id: `log-${Date.now()}-${findingId}`,
             timestamp: new Date().toLocaleTimeString(),
             type: 'SECRET_DETECTED',
-            severity: rule.severity,
-            message: `[ALERTA ${rule.severity}] ${rule.name} detectado em ${file.path}:${line} (Impacto Ponderado: ${weightedScore} pts)`
+            severity: finding.severity,
+            message: `[ALERTA ${finding.severity}] ${rule.name} detectado em ${file.path}:${line} (Risk Score: ${riskEval.riskScore}/100 • ${riskEval.assignedSeverity})`
           });
         }
       }
@@ -621,6 +776,10 @@ export function scanSourceFiles(
   const totalEntropy = findings.reduce((acc, curr) => acc + curr.entropy, 0);
   const averageEntropy = findings.length > 0 ? Number((totalEntropy / findings.length).toFixed(2)) : 0;
 
+  const totalRiskScore = findings.reduce((acc, curr) => acc + (curr.riskScore ?? 0), 0);
+  const averageRiskScore = findings.length > 0 ? Math.round(totalRiskScore / findings.length) : 0;
+  const maxRiskScore = findings.reduce((max, curr) => Math.max(max, curr.riskScore ?? 0), 0);
+
   const durationMs = Math.round(performance.now() - startTime);
 
   onLog?.({
@@ -652,6 +811,8 @@ export function scanSourceFiles(
       totalWeightedRisk,
       criticalityDistribution,
       averageEntropy,
+      averageRiskScore,
+      maxRiskScore,
       linkFinderTotalEndpoints: apiEndpoints.length,
       jsMinerTotalAssets: jsMiner.totalAssetsCount,
       jsMinerCloudBucketsCount: jsMiner.cloudBuckets.length,

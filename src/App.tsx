@@ -1,9 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   AlertTriangle, 
   ShieldAlert, 
   CheckCircle2, 
-  X 
+  X,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  FileCode,
+  Terminal,
+  Filter,
+  Copy,
+  Check,
+  Trash2,
+  RefreshCw,
+  FileText
 } from 'lucide-react';
 import { Header } from './components/Header';
 import { DashboardOverview } from './components/DashboardOverview';
@@ -17,6 +28,8 @@ import { ExportModal } from './components/ExportModal';
 import { QuickTourModal } from './components/QuickTourModal';
 import { GlobalIgnoreModal } from './components/GlobalIgnoreModal';
 import { SecurityGlossaryModal } from './components/SecurityGlossary';
+import { SnippetHighlighter } from './components/SnippetHighlighter';
+import { WorkspaceFilesMetaPopover } from './components/WorkspaceFilesMetaPopover';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -24,7 +37,18 @@ import { scanSourceFiles, exportToJson, DEFAULT_GLOBAL_IGNORE_PATTERNS } from '.
 import { RegexRule, ScannedFile, ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem } from './types';
 import { SecurityGlossaryEntry } from './lib/securityGlossary';
 import { safeGetItem, safeSetItem } from './lib/storage';
-import { validateFileForSensitivePatterns, isForbiddenWorkspaceFile } from './lib/workspaceValidator';
+import { 
+  validateFileForSensitivePatterns, 
+  isForbiddenWorkspaceFile,
+  SensitivePatternFinding 
+} from './lib/workspaceValidator';
+
+export interface NoticeDetailItem {
+  fileName: string;
+  blockedReason?: string;
+  status: 'BLOCKED' | 'WARNING' | 'VALIDATED';
+  findings: SensitivePatternFinding[];
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -79,7 +103,82 @@ export default function App() {
     type: 'error' | 'warning' | 'success';
     title: string;
     message: string;
+    phase?: string;
+    details?: NoticeDetailItem[];
   } | null>(null);
+  const [isNoticeDetailsOpen, setIsNoticeDetailsOpen] = useState<boolean>(false);
+
+  const noticeSeverityDistribution = useMemo(() => {
+    if (!validationNotice?.details || validationNotice.details.length === 0) {
+      return { critical: 0, high: 0, warning: 0, total: 0 };
+    }
+    let critical = 0;
+    let high = 0;
+    let warning = 0;
+
+    validationNotice.details.forEach(detail => {
+      if (detail.blockedReason && (!detail.findings || detail.findings.length === 0)) {
+        critical += 1;
+      }
+      detail.findings?.forEach(f => {
+        if (f.severity === 'CRITICAL') {
+          critical += 1;
+        } else if (f.severity === 'HIGH') {
+          high += 1;
+        } else {
+          warning += 1;
+        }
+      });
+    });
+
+    const total = critical + high + warning;
+    return { critical, high, warning, total };
+  }, [validationNotice]);
+
+  const [noticeSeverityFilters, setNoticeSeverityFilters] = useState<{
+    CRITICAL: boolean;
+    HIGH: boolean;
+    WARNING: boolean;
+  }>({
+    CRITICAL: true,
+    HIGH: true,
+    WARNING: true,
+  });
+
+  const toggleNoticeSeverityFilter = (level: 'CRITICAL' | 'HIGH' | 'WARNING') => {
+    setNoticeSeverityFilters(prev => ({
+      ...prev,
+      [level]: !prev[level]
+    }));
+  };
+
+  const resetNoticeSeverityFilters = () => {
+    setNoticeSeverityFilters({
+      CRITICAL: true,
+      HIGH: true,
+      WARNING: true
+    });
+  };
+
+  const filteredNoticeDetails = useMemo(() => {
+    if (!validationNotice?.details) return [];
+    return validationNotice.details.map(detail => {
+      const showBlockedPolicy = detail.blockedReason ? noticeSeverityFilters.CRITICAL : false;
+      const visibleFindings = (detail.findings || []).filter(f => noticeSeverityFilters[f.severity as 'CRITICAL' | 'HIGH' | 'WARNING']);
+      const isCleanFile = !detail.blockedReason && (!detail.findings || detail.findings.length === 0);
+      const hiddenByFilterCount = ((detail.blockedReason && !noticeSeverityFilters.CRITICAL) ? 1 : 0) + 
+        (detail.findings || []).filter(f => !noticeSeverityFilters[f.severity as 'CRITICAL' | 'HIGH' | 'WARNING']).length;
+
+      return {
+        ...detail,
+        showBlockedPolicy,
+        visibleFindings,
+        isCleanFile,
+        hiddenByFilterCount,
+        hasVisibleContent: showBlockedPolicy || visibleFindings.length > 0 || (isCleanFile && (noticeSeverityFilters.CRITICAL || noticeSeverityFilters.HIGH || noticeSeverityFilters.WARNING))
+      };
+    });
+  }, [validationNotice?.details, noticeSeverityFilters]);
   const [showTour, setShowTour] = useState<boolean>(() => {
     return !safeGetItem('secscan_tour_completed');
   });
@@ -173,11 +272,185 @@ export default function App() {
     setShowGlossaryModal(true);
   };
 
+  // State and handlers for Validation Notice Copy Log, Clear All, and Files Metadata Popover
+  const [isLogCopied, setIsLogCopied] = useState<boolean>(false);
+  const [showFilesMetaPopover, setShowFilesMetaPopover] = useState<boolean>(false);
+
+  const handleCopyFindingsLog = useCallback(() => {
+    if (!validationNotice) return;
+
+    const lines: string[] = [];
+    lines.push(`=======================================================`);
+    lines.push(`WORKSPACE INGESTION VALIDATION AUDIT REPORT`);
+    lines.push(`Generated: ${new Date().toLocaleString()}`);
+    lines.push(`Status: ${validationNotice.phase || validationNotice.type.toUpperCase()}`);
+    lines.push(`Title: ${validationNotice.title}`);
+    lines.push(`Message: ${validationNotice.message}`);
+    lines.push(`=======================================================\n`);
+
+    if (!validationNotice.details || validationNotice.details.length === 0) {
+      lines.push(`Pre-Flight Ingestion: No violations detected.`);
+    } else {
+      validationNotice.details.forEach((detail, idx) => {
+        lines.push(`[${idx + 1}] File: ${detail.fileName} (Status: ${detail.status})`);
+        if (detail.blockedReason) {
+          lines.push(`    POLICY VIOLATION: ${detail.blockedReason}`);
+        }
+        if (detail.findings && detail.findings.length > 0) {
+          detail.findings.forEach((f, fIdx) => {
+            lines.push(`    - Finding #${fIdx + 1}: [${f.severity}] ${f.name} (Pattern: ${f.patternId}, Line: ${f.line})`);
+            lines.push(`      Description: ${f.description}`);
+            if (f.matchedPreview) {
+              lines.push(`      Preview: ${f.matchedPreview}`);
+            }
+            if (f.remediation) {
+              lines.push(`      Remediation: ${f.remediation}`);
+            }
+          });
+        } else if (!detail.blockedReason) {
+          lines.push(`    Clean: No sensitive secrets or tokens detected.`);
+        }
+        lines.push(``);
+      });
+    }
+
+    const logContent = lines.join('\n');
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(logContent).then(() => {
+        setIsLogCopied(true);
+        setTimeout(() => setIsLogCopied(false), 2000);
+      }).catch(() => {
+        const textarea = document.createElement('textarea');
+        textarea.value = logContent;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setIsLogCopied(true);
+        setTimeout(() => setIsLogCopied(false), 2000);
+      });
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = logContent;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setIsLogCopied(true);
+      setTimeout(() => setIsLogCopied(false), 2000);
+    }
+  }, [validationNotice]);
+
+  const handleClearAllFilesAndValidation = useCallback(() => {
+    setFiles([]);
+    setSelectedFile(null);
+    setValidationNotice(null);
+    setIsNoticeDetailsOpen(false);
+    executeScan([], rules, ignorePatterns);
+    const clearEvent: AuditLogEvent = {
+      id: `audit-clear-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'SCAN_COMPLETE',
+      message: 'All current files were removed and validation state was reset to empty.',
+      severity: 'LOW',
+      details: { action: 'CLEAR_ALL' }
+    };
+    setAuditLogs(prev => [clearEvent, ...prev].slice(0, 80));
+  }, [executeScan, rules, ignorePatterns]);
+
+  // Quick Rescan handler to re-run scanning engine and refresh validation without full reload
+  const handleQuickRescan = useCallback(() => {
+    if (files.length > 0) {
+      const noticeDetails: NoticeDetailItem[] = [];
+      const blockedFiles: string[] = [];
+      const warningFiles: string[] = [];
+
+      files.forEach((file) => {
+        const nameCheck = isForbiddenWorkspaceFile(file.name);
+        if (nameCheck.isForbidden) {
+          blockedFiles.push(`${file.name} (${nameCheck.reason})`);
+          noticeDetails.push({
+            fileName: file.name,
+            blockedReason: nameCheck.reason,
+            status: 'BLOCKED',
+            findings: []
+          });
+          return;
+        }
+
+        const validation = validateFileForSensitivePatterns(file.name, file.content);
+        if (validation.isForbiddenFile || validation.hasBlockers) {
+          blockedFiles.push(`${file.name} [${validation.findings.map(f => f.name).join(', ')}]`);
+          noticeDetails.push({
+            fileName: file.name,
+            blockedReason: validation.blockedReason,
+            status: 'BLOCKED',
+            findings: validation.findings
+          });
+        } else if (validation.hasWarnings) {
+          warningFiles.push(`${file.name} (${validation.findings.length} aviso(s))`);
+          noticeDetails.push({
+            fileName: file.name,
+            status: 'WARNING',
+            findings: validation.findings
+          });
+        } else {
+          noticeDetails.push({
+            fileName: file.name,
+            status: 'VALIDATED',
+            findings: []
+          });
+        }
+      });
+
+      if (blockedFiles.length > 0) {
+        setValidationNotice({
+          type: 'error',
+          title: 'Arquivos Sensíveis Bloqueados',
+          phase: 'Blocked',
+          message: `Violações detectadas durante a re-verificação: ${blockedFiles.join('; ')}`,
+          details: noticeDetails.filter(d => d.status === 'BLOCKED')
+        });
+      } else if (warningFiles.length > 0) {
+        setValidationNotice({
+          type: 'warning',
+          title: 'Varredura com Alertas de Padrões',
+          phase: 'Filtered',
+          message: `Re-análise concluída com potenciais tokens detectados: ${warningFiles.join('; ')}`,
+          details: noticeDetails.filter(d => d.status === 'WARNING')
+        });
+      } else {
+        setValidationNotice({
+          type: 'success',
+          title: 'Workspace Re-validado com Sucesso',
+          phase: 'Validated',
+          message: `${files.length} arquivo(s) re-analisado(s) pelo motor de varredura. Nenhuma violação crítica encontrada.`,
+          details: noticeDetails
+        });
+      }
+    }
+
+    // Trigger complete scan with engine
+    executeScan(files, rules, ignorePatterns);
+
+    // Audit log entry
+    const rescanEvent: AuditLogEvent = {
+      id: `audit-rescan-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'SCAN_START',
+      message: `Quick Rescan executado para ${files.length} arquivo(s) ativos no workspace.`,
+      severity: 'LOW',
+      details: { totalFiles: files.length, action: 'QUICK_RESCAN' }
+    };
+    setAuditLogs(prev => [rescanEvent, ...prev].slice(0, 80));
+  }, [files, rules, ignorePatterns, executeScan]);
+
   // Handle file uploads with pre-flight security validation
   const handleFileUpload = (uploadedFiles: FileList) => {
     const newScannedFiles: ScannedFile[] = [];
     const blockedFiles: string[] = [];
     const warningFiles: string[] = [];
+    const noticeDetails: NoticeDetailItem[] = [];
     const readers: Promise<void>[] = [];
 
     Array.from(uploadedFiles).forEach((file) => {
@@ -185,6 +458,12 @@ export default function App() {
       const nameCheck = isForbiddenWorkspaceFile(file.name);
       if (nameCheck.isForbidden) {
         blockedFiles.push(`${file.name} (${nameCheck.reason})`);
+        noticeDetails.push({
+          fileName: file.name,
+          blockedReason: nameCheck.reason,
+          status: 'BLOCKED',
+          findings: []
+        });
         return;
       }
 
@@ -198,9 +477,26 @@ export default function App() {
 
           if (validation.isForbiddenFile || validation.hasBlockers) {
             blockedFiles.push(`${file.name} [${validation.findings.map(f => f.name).join(', ')}]`);
+            noticeDetails.push({
+              fileName: file.name,
+              blockedReason: validation.blockedReason,
+              status: 'BLOCKED',
+              findings: validation.findings
+            });
           } else {
             if (validation.hasWarnings) {
               warningFiles.push(`${file.name} (${validation.findings.length} aviso(s))`);
+              noticeDetails.push({
+                fileName: file.name,
+                status: 'WARNING',
+                findings: validation.findings
+              });
+            } else {
+              noticeDetails.push({
+                fileName: file.name,
+                status: 'VALIDATED',
+                findings: []
+              });
             }
             const path = (file as any).webkitRelativePath || file.name;
             const ext = file.name.split('.').pop() || '';
@@ -209,7 +505,8 @@ export default function App() {
               path,
               content,
               size: file.size,
-              extension: ext
+              extension: ext,
+              lastModified: file.lastModified || Date.now()
             });
           }
           resolve();
@@ -224,19 +521,25 @@ export default function App() {
         setValidationNotice({
           type: 'error',
           title: 'Arquivos Sensíveis Bloqueados',
-          message: `Os seguintes arquivos não puderam ser adicionados por conterem variáveis de ambiente (.env) ou chaves privadas críticas: ${blockedFiles.join('; ')}`
+          phase: 'Blocked',
+          message: `Os seguintes arquivos não puderam ser adicionados por conterem variáveis de ambiente (.env) ou chaves privadas críticas: ${blockedFiles.join('; ')}`,
+          details: noticeDetails.filter(d => d.status === 'BLOCKED')
         });
       } else if (warningFiles.length > 0) {
         setValidationNotice({
           type: 'warning',
           title: 'Importação com Alertas de Padrões',
-          message: `Arquivos importados com potenciais tokens detectados: ${warningFiles.join('; ')}`
+          phase: 'Filtered',
+          message: `Arquivos importados com potenciais tokens detectados: ${warningFiles.join('; ')}`,
+          details: noticeDetails.filter(d => d.status === 'WARNING')
         });
       } else if (newScannedFiles.length > 0) {
         setValidationNotice({
           type: 'success',
           title: 'Importação Segura Concluída',
-          message: `${newScannedFiles.length} arquivo(s) validado(s) com sucesso e adicionado(s) ao workspace.`
+          phase: 'Validated',
+          message: `${newScannedFiles.length} arquivo(s) validado(s) com sucesso e adicionado(s) ao workspace.`,
+          details: noticeDetails
         });
       }
 
@@ -257,7 +560,14 @@ export default function App() {
       setValidationNotice({
         type: 'error',
         title: 'Arquivo Bloqueado',
-        message: validation.blockedReason || `Não é permitido adicionar arquivos de ambiente (.env) ou segredos críticos não mascarados (${validation.findings.map(f => f.name).join(', ')}).`
+        phase: 'Blocked',
+        message: validation.blockedReason || `Não é permitido adicionar arquivos de ambiente (.env) ou segredos críticos não mascarados (${validation.findings.map(f => f.name).join(', ')}).`,
+        details: [{
+          fileName: name,
+          blockedReason: validation.blockedReason,
+          status: 'BLOCKED',
+          findings: validation.findings
+        }]
       });
       return;
     }
@@ -277,7 +587,13 @@ export default function App() {
     setValidationNotice({
       type: 'success',
       title: 'Arquivo Adicionado',
-      message: `O arquivo ${name} foi validado e inserido no workspace com sucesso.`
+      phase: 'Validated',
+      message: `O arquivo ${name} foi validado e inserido no workspace com sucesso.`,
+      details: [{
+        fileName: name,
+        status: 'VALIDATED',
+        findings: []
+      }]
     });
   };
 
@@ -368,7 +684,7 @@ export default function App() {
         {validationNotice && (
           <div 
             id="workspace-validation-notice"
-            className={`mb-6 p-4 rounded-xl border flex items-start justify-between gap-4 transition-all duration-200 ${
+            className={`mb-6 p-3.5 sm:p-4.5 rounded-xl border flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 transition-all duration-200 ${
               validationNotice.type === 'error'
                 ? 'bg-rose-950/40 border-rose-800/60 text-rose-200'
                 : validationNotice.type === 'warning'
@@ -376,31 +692,497 @@ export default function App() {
                 : 'bg-emerald-950/40 border-emerald-800/60 text-emerald-200'
             }`}
           >
-            <div className="flex items-start gap-3">
-              {validationNotice.type === 'error' ? (
-                <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-              ) : validationNotice.type === 'warning' ? (
-                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-              ) : (
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-              )}
-              <div>
-                <h4 className="text-sm font-semibold tracking-wide">
-                  {validationNotice.title}
-                </h4>
-                <p className="text-xs mt-1 leading-relaxed opacity-90">
-                  {validationNotice.message}
-                </p>
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <div className="shrink-0 mt-0.5 flex items-center justify-center">
+                {validationNotice.type === 'error' ? (
+                  <ShieldAlert className="w-5 h-5 text-rose-400" />
+                ) : validationNotice.type === 'warning' ? (
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="text-sm font-semibold tracking-wide leading-snug">
+                    {validationNotice.title}
+                  </h4>
+
+                  {/* Dynamic Scan Status / Validation Phase Badge */}
+                  {isScanning ? (
+                    <span 
+                      id="badge-notice-phase-scanning"
+                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-400/40 shadow-sm"
+                    >
+                      <Loader2 className="w-3 h-3 animate-spin text-sky-400" />
+                      <span>Analyzing...</span>
+                    </span>
+                  ) : (
+                    <span 
+                      id="badge-notice-phase-status"
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider border shadow-sm ${
+                        validationNotice.type === 'error'
+                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                          : validationNotice.type === 'warning'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        validationNotice.type === 'error'
+                          ? 'bg-rose-400'
+                          : validationNotice.type === 'warning'
+                          ? 'bg-amber-400'
+                          : 'bg-emerald-400'
+                      }`} />
+                      <span>
+                        {validationNotice.phase || (
+                          validationNotice.type === 'error'
+                            ? 'Blocked'
+                            : validationNotice.type === 'warning'
+                            ? 'Filtered'
+                            : 'Validated'
+                        )}
+                      </span>
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-xs mt-1 leading-relaxed opacity-90 break-words flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span>{validationNotice.message}</span>
+                  <button
+                    id="btn-toggle-validation-details"
+                    onClick={() => setIsNoticeDetailsOpen(prev => !prev)}
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-white font-mono text-[10.5px] font-bold uppercase tracking-wider transition-all cursor-pointer border border-white/20 hover:border-white/40 shrink-0"
+                    title="Exibir/ocultar lista detalhada de regras e achados de validação"
+                  >
+                    <FileCode className="w-3 h-3 text-white/80" />
+                    <span>{isNoticeDetailsOpen ? 'ocultar detalhes' : 'ver detalhes'}</span>
+                    {isNoticeDetailsOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
+                </div>
+
+                {/* Expandable Drawer with Raw Validation Code Findings */}
+                {isNoticeDetailsOpen && (
+                  <div 
+                    id="workspace-validation-details-drawer"
+                    className="mt-3 pt-3 border-t border-white/15 w-full space-y-2.5 transition-all animate-in fade-in slide-in-from-top-1 duration-150"
+                  >
+                    <div className="flex flex-wrap items-center justify-between pb-1 border-b border-white/10 text-[10.5px] font-mono text-white/80 uppercase gap-2">
+                      <span className="flex items-center gap-1.5 font-bold">
+                        <Terminal className="w-3.5 h-3.5 text-white/70" />
+                        Código & Regras de Ingestão Segura
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9.5px] text-white/60">
+                          {validationNotice.details?.reduce((acc, d) => acc + (d.findings?.length || (d.blockedReason ? 1 : 0)), 0) || 0} achado(s)
+                        </span>
+                        <button
+                          id="btn-drawer-quick-rescan"
+                          type="button"
+                          onClick={handleQuickRescan}
+                          disabled={isScanning}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-sky-100 text-[10px] normal-case transition-colors cursor-pointer border border-sky-500/30 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Re-executar o motor de varredura no workspace atual"
+                        >
+                          <RefreshCw className={`w-3 h-3 text-sky-400 ${isScanning ? 'animate-spin' : ''}`} />
+                          <span>{isScanning ? 'Scanning...' : 'Quick Rescan'}</span>
+                        </button>
+                        <button
+                          id="btn-drawer-file-metadata"
+                          type="button"
+                          onClick={() => setShowFilesMetaPopover(prev => !prev)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 hover:text-indigo-100 text-[10px] normal-case transition-colors cursor-pointer border border-indigo-500/30 shadow-sm"
+                          title="Exibir metadados dos arquivos do workspace"
+                        >
+                          <FileText className="w-3 h-3 text-indigo-400" />
+                          <span>Metadata</span>
+                        </button>
+                        <button
+                          id="btn-drawer-copy-log"
+                          type="button"
+                          onClick={handleCopyFindingsLog}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-white text-[10px] normal-case transition-colors cursor-pointer border border-white/20 shadow-sm"
+                          title="Copiar lista de achados para a área de transferência"
+                        >
+                          {isLogCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-white/80" />}
+                          <span>{isLogCopied ? 'Copiado!' : 'Copy Log'}</span>
+                        </button>
+                        <button
+                          id="btn-drawer-clear-all"
+                          type="button"
+                          onClick={handleClearAllFilesAndValidation}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 hover:text-rose-100 text-[10px] normal-case transition-colors cursor-pointer border border-rose-500/30 shadow-sm"
+                          title="Remover todos os arquivos atuais e redefinir validação"
+                        >
+                          <Trash2 className="w-3 h-3 text-rose-400" />
+                          <span>Clear All</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Progress-style Bar Visualizing Finding Severities Distribution */}
+                    <div 
+                      id="validation-severity-progress-bar"
+                      className="p-2 rounded bg-black/40 border border-white/10 space-y-1.5 font-mono text-[10px]"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-1 text-[9.5px] text-white/70 uppercase">
+                        <span className="font-bold flex items-center gap-1 text-white/90">
+                          <span>Distribuição de Severidade</span>
+                          <span className="text-white/40">({noticeSeverityDistribution.total})</span>
+                        </span>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {noticeSeverityDistribution.critical > 0 && (
+                            <span className="inline-flex items-center gap-1 text-rose-300 font-bold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                              <span>{noticeSeverityDistribution.critical} crítico{noticeSeverityDistribution.critical > 1 ? 's' : ''}</span>
+                            </span>
+                          )}
+                          {noticeSeverityDistribution.high > 0 && (
+                            <span className="inline-flex items-center gap-1 text-amber-300 font-bold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                              <span>{noticeSeverityDistribution.high} alto{noticeSeverityDistribution.high > 1 ? 's' : ''}</span>
+                            </span>
+                          )}
+                          {noticeSeverityDistribution.warning > 0 && (
+                            <span className="inline-flex items-center gap-1 text-yellow-300 font-bold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                              <span>{noticeSeverityDistribution.warning} aviso{noticeSeverityDistribution.warning > 1 ? 's' : ''}</span>
+                            </span>
+                          )}
+                          {noticeSeverityDistribution.total === 0 && (
+                            <span className="inline-flex items-center gap-1 text-emerald-300 font-bold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              <span>Conforme (0 achados)</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Stacked Progress Bar */}
+                      <div 
+                        className="w-full h-2 rounded-full bg-white/10 overflow-hidden flex shadow-inner"
+                        role="progressbar"
+                        aria-label="Distribuição de severidade dos achados"
+                        aria-valuenow={noticeSeverityDistribution.total}
+                      >
+                        {noticeSeverityDistribution.total > 0 ? (
+                          <>
+                            {noticeSeverityDistribution.critical > 0 && (
+                              <div 
+                                className="h-full bg-rose-500 transition-all duration-300 hover:brightness-110"
+                                style={{ width: `${(noticeSeverityDistribution.critical / noticeSeverityDistribution.total) * 100}%` }}
+                                title={`Crítico: ${noticeSeverityDistribution.critical} (${Math.round((noticeSeverityDistribution.critical / noticeSeverityDistribution.total) * 100)}%)`}
+                              />
+                            )}
+                            {noticeSeverityDistribution.high > 0 && (
+                              <div 
+                                className="h-full bg-amber-500 transition-all duration-300 hover:brightness-110"
+                                style={{ width: `${(noticeSeverityDistribution.high / noticeSeverityDistribution.total) * 100}%` }}
+                                title={`Alto: ${noticeSeverityDistribution.high} (${Math.round((noticeSeverityDistribution.high / noticeSeverityDistribution.total) * 100)}%)`}
+                              />
+                            )}
+                            {noticeSeverityDistribution.warning > 0 && (
+                              <div 
+                                className="h-full bg-yellow-400 transition-all duration-300 hover:brightness-110"
+                                style={{ width: `${(noticeSeverityDistribution.warning / noticeSeverityDistribution.total) * 100}%` }}
+                                title={`Aviso: ${noticeSeverityDistribution.warning} (${Math.round((noticeSeverityDistribution.warning / noticeSeverityDistribution.total) * 100)}%)`}
+                              />
+                            )}
+                          </>
+                        ) : (
+                          <div 
+                            className="h-full w-full bg-emerald-500 transition-all duration-300"
+                            title="Sem violações de severidade encontradas (100% Validado)"
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Severity Filter Toggle Controls */}
+                    <div 
+                      id="workspace-validation-severity-filters"
+                      className="flex flex-wrap items-center justify-between gap-2 p-1.5 rounded bg-black/40 border border-white/10 text-[10px] font-mono"
+                    >
+                      <div className="flex items-center gap-1.5 text-white/70">
+                        <Filter className="w-3 h-3 text-white/60" />
+                        <span className="font-bold uppercase tracking-wider text-[9.5px]">Filtro de Severidade:</span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {/* Critical toggle */}
+                        <button
+                          id="btn-filter-severity-critical"
+                          type="button"
+                          onClick={() => toggleNoticeSeverityFilter('CRITICAL')}
+                          className={`px-2 py-0.5 rounded inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-all border cursor-pointer ${
+                            noticeSeverityFilters.CRITICAL
+                              ? 'bg-rose-500/25 text-rose-200 border-rose-500/50 shadow-sm'
+                              : 'bg-black/30 text-zinc-500 border-white/10 hover:text-rose-300 hover:border-rose-500/30 opacity-60'
+                          }`}
+                          title="Alternar exibição de achados Críticos"
+                          aria-pressed={noticeSeverityFilters.CRITICAL}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${noticeSeverityFilters.CRITICAL ? 'bg-rose-500' : 'bg-zinc-600'}`} />
+                          <span>Crítico</span>
+                          <span className="text-[9px] opacity-75">({noticeSeverityDistribution.critical})</span>
+                        </button>
+
+                        {/* High toggle */}
+                        <button
+                          id="btn-filter-severity-high"
+                          type="button"
+                          onClick={() => toggleNoticeSeverityFilter('HIGH')}
+                          className={`px-2 py-0.5 rounded inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-all border cursor-pointer ${
+                            noticeSeverityFilters.HIGH
+                              ? 'bg-amber-500/25 text-amber-200 border-amber-500/50 shadow-sm'
+                              : 'bg-black/30 text-zinc-500 border-white/10 hover:text-amber-300 hover:border-amber-500/30 opacity-60'
+                          }`}
+                          title="Alternar exibição de achados Altos"
+                          aria-pressed={noticeSeverityFilters.HIGH}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${noticeSeverityFilters.HIGH ? 'bg-amber-500' : 'bg-zinc-600'}`} />
+                          <span>Alto</span>
+                          <span className="text-[9px] opacity-75">({noticeSeverityDistribution.high})</span>
+                        </button>
+
+                        {/* Warning toggle */}
+                        <button
+                          id="btn-filter-severity-warning"
+                          type="button"
+                          onClick={() => toggleNoticeSeverityFilter('WARNING')}
+                          className={`px-2 py-0.5 rounded inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-all border cursor-pointer ${
+                            noticeSeverityFilters.WARNING
+                              ? 'bg-yellow-500/25 text-yellow-200 border-yellow-500/50 shadow-sm'
+                              : 'bg-black/30 text-zinc-500 border-white/10 hover:text-yellow-300 hover:border-yellow-500/30 opacity-60'
+                          }`}
+                          title="Alternar exibição de achados de Aviso"
+                          aria-pressed={noticeSeverityFilters.WARNING}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${noticeSeverityFilters.WARNING ? 'bg-yellow-400' : 'bg-zinc-600'}`} />
+                          <span>Aviso</span>
+                          <span className="text-[9px] opacity-75">({noticeSeverityDistribution.warning})</span>
+                        </button>
+
+                        {/* Quick reset/show all if any is toggled off */}
+                        {(!noticeSeverityFilters.CRITICAL || !noticeSeverityFilters.HIGH || !noticeSeverityFilters.WARNING) && (
+                          <button
+                            id="btn-filter-severity-reset"
+                            type="button"
+                            onClick={resetNoticeSeverityFilters}
+                            className="px-1.5 py-0.5 rounded text-[9.5px] font-mono text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-colors cursor-pointer"
+                            title="Mostrar todas as severidades"
+                          >
+                            Mostrar Todos
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {!noticeSeverityFilters.CRITICAL && !noticeSeverityFilters.HIGH && !noticeSeverityFilters.WARNING ? (
+                      <div className="p-3 rounded bg-black/50 border border-white/10 text-center space-y-1 font-mono text-xs text-white/70">
+                        <p>Nenhum nível de severidade selecionado nos filtros.</p>
+                        <button
+                          id="btn-filter-severity-enable-all"
+                          type="button"
+                          onClick={resetNoticeSeverityFilters}
+                          className="text-sky-300 hover:underline text-[11px] cursor-pointer"
+                        >
+                          Ativar todos os filtros de severidade
+                        </button>
+                      </div>
+                    ) : filteredNoticeDetails && filteredNoticeDetails.length > 0 ? (
+                      <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                        {filteredNoticeDetails.map((detail, dIdx) => (
+                          <div 
+                            key={`detail-${dIdx}`}
+                            className="p-2.5 rounded bg-black/50 border border-white/10 space-y-2 text-xs font-mono"
+                          >
+                            {/* File Header */}
+                            <div className="flex flex-wrap items-center justify-between gap-1.5 pb-1 border-b border-white/10">
+                              <div className="flex items-center gap-1.5 font-bold text-white">
+                                <FileCode className="w-3.5 h-3.5 text-white/70" />
+                                <span>{detail.fileName}</span>
+                              </div>
+                              <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider ${
+                                detail.status === 'BLOCKED'
+                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                  : detail.status === 'WARNING'
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                  : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              }`}>
+                                {detail.status}
+                              </span>
+                            </div>
+
+                            {/* Blocked Reason Policy */}
+                            {detail.showBlockedPolicy && detail.blockedReason && (
+                              <div className="text-[10.5px] text-rose-300 bg-rose-950/40 p-2 rounded border border-rose-800/40 space-y-0.5">
+                                <div className="font-bold uppercase tracking-wider flex items-center gap-1 text-[10px]">
+                                  <ShieldAlert className="w-3 h-3 text-rose-400 shrink-0" />
+                                  <span>Regra de Política: Arquivo Proibido</span>
+                                </div>
+                                <p className="opacity-90 leading-relaxed break-words">{detail.blockedReason}</p>
+                              </div>
+                            )}
+
+                            {/* Findings List */}
+                            {detail.visibleFindings && detail.visibleFindings.length > 0 ? (
+                              <div className="space-y-1.5 pt-0.5">
+                                {detail.visibleFindings.map((f, fIdx) => (
+                                  <div 
+                                    key={`finding-${fIdx}`}
+                                    className="p-2 rounded bg-black/60 border border-white/10 space-y-1"
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                      <span className="font-bold text-white flex items-center gap-1.5">
+                                        <span className={`w-1.5 h-1.5 rounded-full ${
+                                          f.severity === 'CRITICAL' ? 'bg-rose-500' : f.severity === 'HIGH' ? 'bg-amber-500' : 'bg-yellow-500'
+                                        }`} />
+                                        <span>{f.name}</span>
+                                        <span className="text-[9.5px] text-white/50">[{f.patternId}]</span>
+                                      </span>
+                                      <span className="text-[9.5px] text-white/60">Linha {f.line}</span>
+                                    </div>
+
+                                    <p className="text-[10.5px] text-white/80 leading-snug">{f.description}</p>
+
+                                    {/* Code preview snippet with syntax highlighter */}
+                                    {f.matchedPreview && (
+                                      <SnippetHighlighter
+                                        code={f.matchedPreview}
+                                        line={f.line}
+                                        severity={f.severity}
+                                      />
+                                    )}
+
+                                    {/* Remediation guidance */}
+                                    {f.remediation && (
+                                      <div className="text-[9.5px] text-emerald-300/90 flex items-start gap-1">
+                                        <span className="font-bold uppercase text-[8.5px] px-1 bg-emerald-950/50 rounded border border-emerald-800/40 shrink-0">Correção:</span>
+                                        <span className="leading-tight">{f.remediation}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            {/* Note when findings are filtered out */}
+                            {detail.hiddenByFilterCount > 0 && (
+                              <div className="text-[10px] text-zinc-400 italic flex items-center gap-1 pt-1">
+                                <Filter className="w-2.5 h-2.5 text-zinc-500" />
+                                <span>{detail.hiddenByFilterCount} achado(s) oculto(s) pelo filtro de severidade ativo.</span>
+                              </div>
+                            )}
+
+                            {/* Clean File indicator */}
+                            {detail.isCleanFile && (
+                              <div className="text-[10.5px] text-emerald-300 flex items-center gap-1.5">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                <span>Nenhum segredo ou token sensível detectado no arquivo.</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded bg-black/50 border border-white/10 text-xs font-mono text-white/80 space-y-1">
+                        <div className="text-[10.5px] text-white font-bold flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Pre-Flight Ingestion: Nenhuma violação detectada</span>
+                        </div>
+                        <p className="text-[10px] opacity-75 leading-relaxed">
+                          O arquivo passou pelas verificações de extensões proibidas (.env, .pem, chaves privadas) e análise de padrões de segredos em texto claro.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
-            <button
-              id="btn-dismiss-validation-notice"
-              onClick={() => setValidationNotice(null)}
-              className="p-1.5 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors"
-              title="Fechar aviso"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1.5 self-end sm:self-start shrink-0 flex-wrap justify-end">
+              <button
+                id="btn-validation-quick-rescan"
+                type="button"
+                onClick={handleQuickRescan}
+                disabled={isScanning}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-sky-100 font-mono text-[11px] font-semibold transition-colors cursor-pointer border border-sky-500/30 hover:border-sky-500/50 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Re-executar o motor de varredura no workspace atual sem recarregar a página"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-sky-400 ${isScanning ? 'animate-spin' : ''}`} />
+                <span>{isScanning ? 'Scanning...' : 'Quick Rescan'}</span>
+              </button>
+
+              <div className="relative">
+                <button
+                  id="btn-validation-file-metadata"
+                  type="button"
+                  onClick={() => setShowFilesMetaPopover(prev => !prev)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 hover:text-indigo-100 font-mono text-[11px] font-semibold transition-colors cursor-pointer border border-indigo-500/30 hover:border-indigo-500/50 shadow-sm"
+                  title="Exibir metadados dos arquivos do workspace (linhas de código, tamanho em KB e data de modificação)"
+                >
+                  <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>File Metadata</span>
+                  <span className="px-1.5 py-0.2 rounded bg-indigo-400/20 text-indigo-300 text-[9.5px]">
+                    {files.length}
+                  </span>
+                </button>
+
+                <WorkspaceFilesMetaPopover
+                  files={files}
+                  isOpen={showFilesMetaPopover}
+                  onClose={() => setShowFilesMetaPopover(false)}
+                  onSelectFile={(f) => {
+                    setSelectedFile(f);
+                    setActiveTab('scanner');
+                    setShowFilesMetaPopover(false);
+                  }}
+                />
+              </div>
+
+              <button
+                id="btn-validation-copy-log"
+                type="button"
+                onClick={handleCopyFindingsLog}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white font-mono text-[11px] font-semibold transition-colors cursor-pointer border border-white/20 hover:border-white/40 shadow-sm"
+                title="Copiar lista completa de achados para a área de transferência"
+              >
+                {isLogCopied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-300">Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-white/80" />
+                    <span>Copy Log</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                id="btn-validation-clear-all"
+                type="button"
+                onClick={handleClearAllFilesAndValidation}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 hover:text-rose-100 font-mono text-[11px] font-semibold transition-colors cursor-pointer border border-rose-500/30 hover:border-rose-500/50 shadow-sm"
+                title="Remover todos os arquivos atuais e redefinir o estado de validação"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span>Clear All</span>
+              </button>
+
+              <button
+                id="btn-dismiss-validation-notice"
+                onClick={() => setValidationNotice(null)}
+                className="p-1.5 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer flex items-center justify-center"
+                title="Fechar aviso"
+                aria-label="Fechar aviso"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
 

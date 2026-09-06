@@ -421,6 +421,9 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-mono px-2 py-0.5 bg-[#FF3E00]/15 text-[#FF3E00] border border-[#FF3E00]/40 font-bold">
+                        RISK SCORE: <strong className="text-white">{finding.riskScore ?? 80}</strong>/100
+                      </span>
                       <span className="text-[10px] font-mono px-2 py-0.5 bg-[#111] text-[#AAA] border border-[#222]">
                         ENTROPIA: <strong className="text-white">{finding.entropy}</strong>
                       </span>

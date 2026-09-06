@@ -21,6 +21,7 @@ export const SAMPLE_FILES: ScannedFile[] = [
     path: 'src/controllers/paymentController.js',
     extension: 'js',
     size: 1420,
+    lastModified: 1757134800000,
     content: `/**
  * Payment Controller - Handles Stripe & PayPal checkout
  * WARNING: Hardcoded keys detected for test demonstration
@@ -52,6 +53,7 @@ module.exports = router;`
     path: 'src/services/authService.ts',
     extension: 'ts',
     size: 2150,
+    lastModified: 1757142000000,
     content: `import axios from 'axios';
 
 export interface UserSession {
@@ -83,6 +85,7 @@ export class AuthService {
     path: 'config/cloudConfig.js',
     extension: 'js',
     size: 1680,
+    lastModified: 1757120400000,
     content: `// Cloud storage & database configuration
 module.exports = {
   aws: {
@@ -104,6 +107,7 @@ module.exports = {
     path: 'src/integrations/firebaseConfig.ts',
     extension: 'ts',
     size: 980,
+    lastModified: 1757116800000,
     content: `// Frontend Firebase Initialization
 export const firebaseConfig = {
   apiKey: "${MOCK_GOOGLE_KEY}",
@@ -119,6 +123,7 @@ export const firebaseConfig = {
     path: 'public/static/js/clientPortalBundle.js',
     extension: 'js',
     size: 6420,
+    lastModified: 1757149200000,
     content: `/**
  * Client Portal Production Bundle
  * Demonstrates PortSwigger js-link-finder & js-miner reconnaissance
@@ -160,6 +165,7 @@ async function fetchPortalMetadata(userId) {
     path: 'node_modules/lodash/index.js',
     extension: 'js',
     size: 24000,
+    lastModified: 1756500000000,
     content: `/**
  * Lodash v4.17.21
  * This is a third-party dependency file located inside node_modules/
@@ -174,6 +180,7 @@ module.exports = lodash;`
     path: 'dist/assets/app.bundle.min.js',
     extension: 'js',
     size: 45000,
+    lastModified: 1756800000000,
     content: `/* Minified third-party bundle artifact. Should be ignored automatically. */
 !function(e){var t={};function n(r){...}}([function(e,t,n){"use strict"}]);`
   },
@@ -182,6 +189,7 @@ module.exports = lodash;`
     path: 'src/services/secureVaultService.ts',
     extension: 'ts',
     size: 1120,
+    lastModified: 1757152800000,
     content: `/**
  * SECURE REFERENCE IMPLEMENTATION:
  * Zero hardcoded secrets, loads strictly from environment or AWS Secrets Manager.
@@ -199,6 +207,7 @@ export async function getVaultSecret(secretName: string): Promise<string> {
     path: 'tests/authService.test.ts',
     extension: 'ts',
     size: 1350,
+    lastModified: 1757145600000,
     content: `/**
  * Unit Test Suite for AuthService
  * Demonstrates how Global Ignore List excludes tests/* or *.test.*

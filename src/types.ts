@@ -55,6 +55,16 @@ export interface ScanFinding {
   fileCriticality?: FileCriticalityLevel;
   fileCriticalityWeight?: number;
   weightedScore?: number;
+  riskScore?: number;
+  riskScoreDetails?: {
+    baseRuleScore: number;
+    categoryAdjustment: number;
+    entropyAdjustment: number;
+    contextMultiplier: number;
+    finalScore: number;
+    assignedSeverity: SeverityLevel;
+    factors: string[];
+  };
 }
 
 export interface ApiEndpointFinding {
@@ -153,6 +163,7 @@ export interface ScannedFile {
   isIgnored?: boolean;
   ignoreReason?: string;
   findingsCount?: number;
+  lastModified?: number | string;
 }
 
 export interface ScanReport {
@@ -182,6 +193,8 @@ export interface ScanReport {
       lowFiles: number;
     };
     averageEntropy: number;
+    averageRiskScore?: number;
+    maxRiskScore?: number;
     // LinkFinder & JS Miner metrics
     linkFinderTotalEndpoints?: number;
     jsMinerTotalAssets?: number;

@@ -33,11 +33,15 @@ import {
   FileCode
 } from 'lucide-react';
 import { ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem } from '../types';
+import { BreachHeatmap } from './BreachHeatmap';
 import { VulnerabilityHeatmap } from './VulnerabilityHeatmap';
+import { VulnerabilitySeverityPieChart } from './VulnerabilitySeverityPieChart';
 import { VulnerabilityTrendChart } from './VulnerabilityTrendChart';
+import { ScanTrendLineChart } from './ScanTrendLineChart';
 import { SeverityDonutChart } from './SeverityDonutChart';
 import { VulnerabilityTypeBarChart } from './VulnerabilityTypeBarChart';
 import { SecurityImpactPanel } from './SecurityImpactPanel';
+import { FindingRiskScoreTable } from './FindingRiskScoreTable';
 import { downloadSecurityReportPdf } from '../lib/pdfReportGenerator';
 import { SecurityGlossaryTooltip } from './SecurityGlossary';
 import { SecurityGlossaryEntry } from '../lib/securityGlossary';
@@ -244,9 +248,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                       className="p-3 bg-[#080200] border border-[#FF3E00]/30 hover:border-[#FF3E00] hover:bg-[#200500] text-left transition-all group relative"
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[9px] font-mono bg-[#FF3E00]/20 text-[#FF3E00] px-1.5 py-0.5 border border-[#FF3E00]/40 font-bold uppercase">
-                          HIGH SEVERITY
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-mono bg-[#FF3E00]/20 text-[#FF3E00] px-1.5 py-0.5 border border-[#FF3E00]/40 font-bold uppercase">
+                            HIGH SEVERITY
+                          </span>
+                          <span className="text-[9px] font-mono bg-[#FF3E00] text-black px-1.5 py-0.5 font-black uppercase">
+                            RISK: {finding.riskScore ?? 75}/100
+                          </span>
+                        </div>
                         <span className="text-[9px] font-mono text-[#888] group-hover:text-white">
                           Linha {finding.line}
                         </span>
@@ -438,7 +447,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-[#1A1A1A] flex items-center justify-between text-[10px] font-mono text-[#AAA]">
-            <span>Carga: {metrics.totalWeightedRisk ?? 0} pts</span>
+            <span>Risk Médio: <strong className="text-white">{metrics.averageRiskScore ?? 0}</strong> pts</span>
             <span className={impactBadge.text}>{metrics.impactLevel ?? 'NOMINAL'}</span>
           </div>
         </div>
@@ -1128,11 +1137,45 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* D3 Vulnerability Density Heatmap */}
+      {/* Recharts Severity Distribution Pie Chart (Heatmap Complement) */}
+      <VulnerabilitySeverityPieChart
+        findings={findings}
+        report={report}
+        onSelectFinding={onSelectFinding}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+        onScrollToHeatmap={() => {
+          const el = document.getElementById('vulnerability-heatmap-section');
+          if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }}
+        onSelectSeverity={() => onNavigateToTab('scanner')}
+      />
+
+      {/* Real-time Recharts Vulnerability Density Heatmap */}
       <VulnerabilityHeatmap
         findings={findings}
         onSelectFinding={onSelectFinding}
         onNavigateToScanner={() => onNavigateToTab('scanner')}
+      />
+
+      {/* Breach Heatmap: Frequency of Sensitive Pattern Matches per File & Remediation Prioritization */}
+      <BreachHeatmap
+        findings={findings}
+        onSelectFinding={onSelectFinding}
+        onNavigateToFile={onNavigateToFile}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+      />
+
+      {/* Dynamic Finding Risk Score Matrix & Severity Scoring System */}
+      <FindingRiskScoreTable
+        findings={findings}
+        onSelectFinding={onSelectFinding}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+      />
+
+      {/* Recharts 7-Scan Vulnerability Trend Line Chart */}
+      <ScanTrendLineChart 
+        report={report} 
+        onNavigateToScanner={() => onNavigateToTab('scanner')} 
       />
 
       {/* D3 30-Day Historical Vulnerability Trend Line Chart */}
@@ -1211,7 +1254,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
                     <div className="mt-2.5 bg-[#000] text-zinc-300 px-3 py-2 border border-[#1A1A1A] text-xs font-mono flex items-center justify-between overflow-x-auto">
                       <span className="text-[#FF3E00] font-bold truncate">{finding.maskedSecret}</span>
-                      <span className="text-[10px] text-[#888] shrink-0 ml-3">H={finding.entropy}</span>
+                      <div className="flex items-center gap-2 shrink-0 ml-3 text-[10px]">
+                        <span className="px-1.5 py-0.5 bg-[#FF3E00]/15 text-[#FF3E00] border border-[#FF3E00]/30 font-bold">
+                          RISK: {finding.riskScore ?? 80}/100
+                        </span>
+                        <span className="text-[#888]">H={finding.entropy}</span>
+                      </div>
                     </div>
 
                     <p className="mt-2 text-[11px] font-mono text-[#AAA] line-clamp-1">

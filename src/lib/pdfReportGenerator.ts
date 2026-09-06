@@ -392,7 +392,7 @@ export function generateSecurityReportPdf(
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.5);
       doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-      doc.text(`Arquivo: ${finding.file}:${finding.line}   •   Entropia: ${finding.entropy.toFixed(2)} bits   •   Criticidade Arquivo: ${finding.fileCriticality ?? 'NORMAL'}`, marginX + 28, currentY + 10.5);
+      doc.text(`Arquivo: ${finding.file}:${finding.line}   •   Risk Score: ${finding.riskScore ?? 'N/A'}/100   •   Entropia: ${finding.entropy.toFixed(2)} bits   •   Criticidade: ${finding.fileCriticality ?? 'NORMAL'}`, marginX + 28, currentY + 10.5);
 
       // Masked Secret Snippet Box
       doc.setFillColor(245, 245, 245);
