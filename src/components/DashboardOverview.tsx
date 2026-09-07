@@ -49,6 +49,7 @@ import { SeverityDonutChart } from './SeverityDonutChart';
 import { VulnerabilityTypeBarChart } from './VulnerabilityTypeBarChart';
 import { SecurityImpactPanel } from './SecurityImpactPanel';
 import { FindingRiskScoreTable } from './FindingRiskScoreTable';
+import { RiskMatrix2x2 } from './RiskMatrix2x2';
 import { downloadSecurityReportPdf } from '../lib/pdfReportGenerator';
 import { SecurityGlossaryTooltip } from './SecurityGlossary';
 import { SecurityGlossaryEntry } from '../lib/securityGlossary';
@@ -355,6 +356,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             >
               <Activity className="w-3 h-3 text-[#00FF41]" />
               <span>TENDÊNCIA (5 SCANS) &darr;</span>
+            </button>
+            <button
+              id="dashboard-header-risk-matrix-btn"
+              onClick={() => {
+                const el = document.getElementById('risk-matrix-2x2-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="text-[10px] font-mono text-white hover:text-[#00FF41] bg-[#141414] hover:bg-[#1A1A1A] px-2 py-0.5 border border-[#333] hover:border-[#00FF41]/50 uppercase font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+              title="Visualizar Matriz de Risco 2x2 (Impact vs. Likelihood)"
+            >
+              <ShieldAlert className="w-3 h-3 text-[#FF3E00]" />
+              <span>MATRIZ 2x2 (RISCO) &darr;</span>
             </button>
             <button
               id="dashboard-header-recent-scans-btn"
@@ -1228,6 +1241,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         findings={findings}
         onSelectFinding={onSelectFinding}
         onNavigateToScanner={() => onNavigateToTab('scanner')}
+      />
+
+      {/* 2x2 Risk Matrix (Impact vs. Likelihood) Component */}
+      <RiskMatrix2x2
+        findings={findings}
+        onSelectFinding={onSelectFinding}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+        onNavigateToFile={onNavigateToFile}
       />
 
       {/* Visual Execution Time Speedometer Gauge (Current Scan vs. Average Scan Time) */}

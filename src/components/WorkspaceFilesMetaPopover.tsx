@@ -18,6 +18,10 @@ import {
   Zap,
   SlidersHorizontal,
   ChevronDown,
+  ChevronRight,
+  Folder,
+  FolderOpen,
+  FolderTree,
   Trash2,
   EyeOff,
   TrendingUp,
@@ -85,8 +89,29 @@ export interface FileMetadataItem {
   rawFile: ScannedFile;
 }
 
-type PopoverViewMode = 'LIST' | 'CHART';
-type SortOrder = 'SIZE_DESC' | 'SIZE_ASC' | 'LINES_DESC' | 'NAME_ASC';
+export interface DirectoryTreeNode {
+  id: string;
+  name: string;
+  fullPath: string;
+  depth: number;
+  subdirectories: DirectoryTreeNode[];
+  files: FileMetadataItem[];
+  allDescendantFiles: FileMetadataItem[];
+  totalBytes: number;
+  totalKb: string;
+  totalLines: number;
+}
+
+export interface ImpactColorConfig {
+  barColor: string;
+  textColor: string;
+  bgRgba: string;
+  border: string;
+  label: string;
+}
+
+export type PopoverViewMode = 'TREE' | 'LIST' | 'CHART';
+export type SortOrder = 'SIZE_DESC' | 'SIZE_ASC' | 'LINES_DESC' | 'NAME_ASC';
 
 /**
  * Formats a timestamp or date into a localized, professional date string.
@@ -123,6 +148,441 @@ function formatModifiedDate(timestamp?: number | string): { formatted: string; t
   };
 }
 
+/**
+ * Builds a hierarchical directory tree from a list of FileMetadataItem.
+ * Normalizes paths, creates nested directory nodes, computes recursive stats,
+ * and extracts root-level files.
+ */
+export function buildDirectoryTree(
+  files: FileMetadataItem[],
+  sortOrder: SortOrder = 'SIZE_DESC'
+): {
+  tree: DirectoryTreeNode[];
+  rootFiles: FileMetadataItem[];
+  allFolderPaths: string[];
+} {
+  const rootDirMap = new Map<string, any>();
+  const rootFiles: FileMetadataItem[] = [];
+  const allFolderPathsSet = new Set<string>();
+
+  files.forEach(file => {
+    const rawPath = file.path || file.name;
+    const normalized = rawPath.replace(/\\/g, '/').replace(/^\.?\//, '');
+    const parts = normalized.split('/').filter(Boolean);
+
+    if (parts.length <= 1) {
+      rootFiles.push(file);
+      return;
+    }
+
+    const folderParts = parts.slice(0, -1);
+    let currentMap = rootDirMap;
+    let accumulatedPath = '';
+
+    folderParts.forEach((part, depth) => {
+      accumulatedPath = accumulatedPath ? `${accumulatedPath}/${part}` : part;
+      allFolderPathsSet.add(accumulatedPath);
+
+      if (!currentMap.has(part)) {
+        currentMap.set(part, {
+          name: part,
+          fullPath: accumulatedPath,
+          depth,
+          subdirectoriesMap: new Map<string, any>(),
+          files: [] as FileMetadataItem[],
+        });
+      }
+
+      const node = currentMap.get(part);
+      if (depth === folderParts.length - 1) {
+        node.files.push(file);
+      }
+      currentMap = node.subdirectoriesMap;
+    });
+  });
+
+  function sortFiles(list: FileMetadataItem[]): FileMetadataItem[] {
+    return list.slice().sort((a, b) => {
+      switch (sortOrder) {
+        case 'SIZE_DESC':
+          return b.sizeBytes - a.sizeBytes;
+        case 'SIZE_ASC':
+          return a.sizeBytes - b.sizeBytes;
+        case 'LINES_DESC':
+          return b.totalLines - a.totalLines;
+        case 'NAME_ASC':
+          return a.name.localeCompare(b.name);
+        default:
+          return b.sizeBytes - a.sizeBytes;
+      }
+    });
+  }
+
+  function convertNode(rawNode: any): DirectoryTreeNode {
+    const subdirs: DirectoryTreeNode[] = Array.from(rawNode.subdirectoriesMap.values()).map(convertNode);
+    subdirs.sort((a, b) => a.name.localeCompare(b.name));
+
+    const sortedFiles = sortFiles(rawNode.files);
+
+    const allDescendantFiles: FileMetadataItem[] = [
+      ...sortedFiles,
+      ...subdirs.flatMap(s => s.allDescendantFiles)
+    ];
+
+    const totalBytes = allDescendantFiles.reduce((sum, f) => sum + f.sizeBytes, 0);
+    const totalLines = allDescendantFiles.reduce((sum, f) => sum + f.totalLines, 0);
+
+    return {
+      id: `dir:${rawNode.fullPath}`,
+      name: rawNode.name,
+      fullPath: rawNode.fullPath,
+      depth: rawNode.depth,
+      subdirectories: subdirs,
+      files: sortedFiles,
+      allDescendantFiles,
+      totalBytes,
+      totalKb: (totalBytes / 1024).toFixed(2),
+      totalLines
+    };
+  }
+
+  const tree: DirectoryTreeNode[] = Array.from(rootDirMap.values()).map(convertNode);
+  tree.sort((a, b) => a.name.localeCompare(b.name));
+
+  return {
+    tree,
+    rootFiles: sortFiles(rootFiles),
+    allFolderPaths: Array.from(allFolderPathsSet)
+  };
+}
+
+/**
+ * Checkbox component with indeterminate support for folder bulk actions
+ */
+const FolderCheckbox: React.FC<{
+  checked: boolean;
+  indeterminate: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  ariaLabel: string;
+}> = ({ checked, indeterminate, onChange, ariaLabel }) => {
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.indeterminate = indeterminate;
+    }
+  }, [indeterminate]);
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      onChange={onChange}
+      className="w-3.5 h-3.5 rounded border-zinc-600 bg-black/60 text-[#3366FF] focus:ring-[#3366FF] cursor-pointer accent-[#3366FF]"
+      aria-label={ariaLabel}
+    />
+  );
+};
+
+interface FileItemRowProps {
+  item: FileMetadataItem;
+  isSelected: boolean;
+  onToggleSelect: (path: string, e?: React.MouseEvent | React.ChangeEvent) => void;
+  onSelectFile?: (file: ScannedFile) => void;
+  onCopyFileMeta: (item: FileMetadataItem, e: React.MouseEvent) => void;
+  copiedItem: string | null;
+  getImpactColor: (impact: 'HEAVY' | 'MODERATE' | 'LIGHT') => ImpactColorConfig;
+  showFullPath?: boolean;
+}
+
+const FileItemRow: React.FC<FileItemRowProps> = ({
+  item,
+  isSelected,
+  onToggleSelect,
+  onSelectFile,
+  onCopyFileMeta,
+  copiedItem,
+  getImpactColor,
+  showFullPath = true
+}) => {
+  const impact = getImpactColor(item.scanImpact);
+  const sanitizedId = item.path.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+  return (
+    <div
+      onClick={() => onSelectFile && onSelectFile(item.rawFile)}
+      className={`p-2 rounded transition-all cursor-pointer group flex flex-col gap-1.5 border font-mono ${
+        isSelected
+          ? 'bg-[#3366FF]/10 border-[#3366FF]/40 shadow-xs'
+          : 'hover:bg-white/5 border-white/5 bg-black/20'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        {/* Item Checkbox for Batch Selection */}
+        <div
+          className="shrink-0 pt-0.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <label
+            htmlFor={`checkbox-file-${sanitizedId}`}
+            className="cursor-pointer block p-0.5 rounded hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
+            title={`Selecionar ${item.name} para ações em lote`}
+          >
+            <input
+              id={`checkbox-file-${sanitizedId}`}
+              type="checkbox"
+              checked={isSelected}
+              onChange={(e) => onToggleSelect(item.path, e)}
+              className="w-3.5 h-3.5 rounded border-zinc-600 bg-black/60 text-[#3366FF] focus:ring-[#3366FF] cursor-pointer accent-[#3366FF]"
+              aria-label={`Selecionar arquivo ${item.name}`}
+            />
+          </label>
+        </div>
+
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="px-1.5 py-0.2 rounded bg-white/10 text-white font-bold text-[9px] uppercase font-mono">
+              {item.extension}
+            </span>
+            <span 
+              className="font-bold text-white text-[11px] truncate group-hover:text-[#3366FF] transition-colors font-mono" 
+              title={item.path}
+            >
+              {item.name}
+            </span>
+
+            {/* Ignored Status Badge */}
+            {item.rawFile.isIgnored && (
+              <span
+                className="px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 text-[8.5px] font-mono flex items-center gap-1"
+                title={item.rawFile.ignoreReason || 'Arquivo ignorado no scanner'}
+              >
+                <EyeOff className="w-2.5 h-2.5 text-zinc-400" />
+                Ignorado
+              </span>
+            )}
+
+            {item.scanImpact === 'HEAVY' && (
+              <span className="px-1.5 py-0.2 rounded bg-[#FF3E00]/20 text-[#FF3E00] border border-[#FF3E00]/40 text-[8.5px] font-black uppercase flex items-center gap-0.5">
+                <AlertTriangle className="w-2.5 h-2.5" />
+                Grande
+              </span>
+            )}
+            {onSelectFile && (
+              <ArrowUpRight className="w-3 h-3 text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+            )}
+          </div>
+
+          {showFullPath && item.path !== item.name && (
+            <div className="text-[9px] text-zinc-500 truncate font-mono" title={item.path}>
+              {item.path}
+            </div>
+          )}
+        </div>
+
+        {/* Action: Copy this file's metadata */}
+        <div className="shrink-0 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={(e) => onCopyFileMeta(item, e)}
+            className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            title="Copiar metadados deste arquivo"
+          >
+            {copiedItem === item.path ? (
+              <Check className="w-3 h-3 text-emerald-400" />
+            ) : (
+              <Copy className="w-3 h-3" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Relative File Size Bar Visual */}
+      <div className="space-y-1 bg-black/40 p-1.5 rounded border border-white/5">
+        <div className="flex items-center justify-between text-[9px] font-mono">
+          <span className="text-zinc-400 flex items-center gap-1">
+            <HardDrive className="w-2.5 h-2.5 text-zinc-500" />
+            <span>Peso:</span>
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold" style={{ color: impact.barColor }}>
+              {item.sizeKb} KB
+            </span>
+            <span className="text-zinc-500">({item.relativePercent}%)</span>
+          </div>
+        </div>
+
+        <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-300"
+            style={{
+              width: `${item.relativePercent}%`,
+              backgroundColor: impact.barColor
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Metadata badges row: LOC and Last Modified */}
+      <div className="flex flex-wrap items-center gap-2 text-[9.5px] text-zinc-400 pt-0.5 font-mono">
+        <span className="flex items-center gap-1 text-sky-300">
+          <Code2 className="w-2.5 h-2.5" />
+          <strong>{item.totalLines}</strong> LOC
+        </span>
+
+        <span className="text-zinc-600">•</span>
+
+        <span className="flex items-center gap-1 text-zinc-400" title={`Timestamp: ${item.lastModifiedTimestamp}`}>
+          <Calendar className="w-2.5 h-2.5 text-zinc-500" />
+          <span>{item.lastModifiedFormatted}</span>
+        </span>
+      </div>
+    </div>
+  );
+};
+
+interface DirectoryTreeBranchProps {
+  node: DirectoryTreeNode;
+  depth: number;
+  expandedFolders: Set<string>;
+  onToggleFolder: (path: string) => void;
+  selectedPaths: Set<string>;
+  onToggleSelectFile: (path: string, e?: React.MouseEvent | React.ChangeEvent) => void;
+  onToggleSelectFolder: (node: DirectoryTreeNode, e?: React.MouseEvent | React.ChangeEvent) => void;
+  onSelectFile?: (file: ScannedFile) => void;
+  onCopyFileMeta: (item: FileMetadataItem, e: React.MouseEvent) => void;
+  copiedItem: string | null;
+  getImpactColor: (impact: 'HEAVY' | 'MODERATE' | 'LIGHT') => ImpactColorConfig;
+}
+
+const DirectoryTreeBranch: React.FC<DirectoryTreeBranchProps> = ({
+  node,
+  depth,
+  expandedFolders,
+  onToggleFolder,
+  selectedPaths,
+  onToggleSelectFile,
+  onToggleSelectFolder,
+  onSelectFile,
+  onCopyFileMeta,
+  copiedItem,
+  getImpactColor
+}) => {
+  const isExpanded = expandedFolders.has(node.fullPath);
+  const descendantPaths = node.allDescendantFiles.map(f => f.path);
+  const allSelected = descendantPaths.length > 0 && descendantPaths.every(p => selectedPaths.has(p));
+  const someSelected = !allSelected && descendantPaths.some(p => selectedPaths.has(p));
+
+  return (
+    <div className="space-y-1 select-none font-mono">
+      {/* Folder Header Row */}
+      <div 
+        onClick={() => onToggleFolder(node.fullPath)}
+        className="flex items-center justify-between p-1.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 transition-colors cursor-pointer group"
+      >
+        <div className="flex items-center gap-1.5 min-w-0">
+          {/* Caret icon button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFolder(node.fullPath);
+            }}
+            className="p-0.5 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            title={isExpanded ? 'Recolher pasta' : 'Expandir pasta'}
+          >
+            {isExpanded ? (
+              <ChevronDown className="w-3.5 h-3.5 text-amber-400" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 text-amber-400" />
+            )}
+          </button>
+
+          {/* Folder selection checkbox */}
+          <div onClick={(e) => e.stopPropagation()} className="pt-0.5">
+            <FolderCheckbox
+              checked={allSelected}
+              indeterminate={someSelected}
+              onChange={(e) => onToggleSelectFolder(node, e)}
+              ariaLabel={`Selecionar todos os arquivos da pasta ${node.name}`}
+            />
+          </div>
+
+          {/* Folder icon */}
+          {isExpanded ? (
+            <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" />
+          ) : (
+            <Folder className="w-4 h-4 text-amber-400 shrink-0" />
+          )}
+
+          {/* Folder name */}
+          <span className="font-bold text-white text-[11.5px] truncate">
+            {node.name}/
+          </span>
+
+          {depth > 0 && (
+            <span className="text-[9px] text-zinc-500 truncate hidden sm:inline">
+              ({node.fullPath})
+            </span>
+          )}
+        </div>
+
+        {/* Folder Stats Badges */}
+        <div className="flex items-center gap-2 text-[9.5px] shrink-0">
+          <span className="px-1.5 py-0.2 rounded bg-black/40 border border-white/5 text-zinc-300 font-bold">
+            {node.allDescendantFiles.length} {node.allDescendantFiles.length === 1 ? 'arq' : 'arqs'}
+          </span>
+          <span className="text-emerald-400 font-bold hidden xs:inline">
+            {node.totalKb} KB
+          </span>
+          <span className="text-sky-400 hidden md:inline">
+            {node.totalLines} LOC
+          </span>
+        </div>
+      </div>
+
+      {/* Expanded Directory Contents (Subdirectories and Files) */}
+      {isExpanded && (
+        <div className="ml-2.5 pl-2.5 border-l border-white/10 space-y-1.5 my-1">
+          {/* Subdirectories */}
+          {node.subdirectories.map(subdir => (
+            <DirectoryTreeBranch
+              key={subdir.id}
+              node={subdir}
+              depth={depth + 1}
+              expandedFolders={expandedFolders}
+              onToggleFolder={onToggleFolder}
+              selectedPaths={selectedPaths}
+              onToggleSelectFile={onToggleSelectFile}
+              onToggleSelectFolder={onToggleSelectFolder}
+              onSelectFile={onSelectFile}
+              onCopyFileMeta={onCopyFileMeta}
+              copiedItem={copiedItem}
+              getImpactColor={getImpactColor}
+            />
+          ))}
+
+          {/* Files in this directory */}
+          {node.files.map(file => (
+            <FileItemRow
+              key={file.path}
+              item={file}
+              isSelected={selectedPaths.has(file.path)}
+              onToggleSelect={onToggleSelectFile}
+              onSelectFile={onSelectFile}
+              onCopyFileMeta={onCopyFileMeta}
+              copiedItem={copiedItem}
+              getImpactColor={getImpactColor}
+              showFullPath={false}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const WorkspaceFilesMetaPopover: React.FC<WorkspaceFilesMetaPopoverProps> = ({
   files,
   isOpen,
@@ -132,7 +592,7 @@ export const WorkspaceFilesMetaPopover: React.FC<WorkspaceFilesMetaPopoverProps>
   onBatchDeleteFiles,
   previousWorkspaceSize
 }) => {
-  const [viewMode, setViewMode] = useState<PopoverViewMode>('LIST');
+  const [viewMode, setViewMode] = useState<PopoverViewMode>('TREE');
   const [sortOrder, setSortOrder] = useState<SortOrder>('SIZE_DESC');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
@@ -422,6 +882,64 @@ export const WorkspaceFilesMetaPopover: React.FC<WorkspaceFilesMetaPopoverProps>
     });
   }, [fileMetadataList, searchQuery, sortOrder]);
 
+  // Directory tree built from filtered files reflecting actual folder structure
+  const { tree: directoryTree, rootFiles, allFolderPaths } = useMemo(() => {
+    return buildDirectoryTree(filteredFiles, sortOrder);
+  }, [filteredFiles, sortOrder]);
+
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+
+  // Initialize and keep folders expanded
+  useEffect(() => {
+    if (allFolderPaths.length > 0 && expandedFolders.size === 0) {
+      setExpandedFolders(new Set(allFolderPaths));
+    }
+  }, [allFolderPaths]);
+
+  // When search query is entered, auto-expand all folders containing matching files
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      setExpandedFolders(new Set(allFolderPaths));
+    }
+  }, [searchQuery, allFolderPaths]);
+
+  const handleToggleFolder = (folderPath: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(folderPath)) {
+        next.delete(folderPath);
+      } else {
+        next.add(folderPath);
+      }
+      return next;
+    });
+  };
+
+  const handleExpandAllFolders = () => {
+    setExpandedFolders(new Set(allFolderPaths));
+  };
+
+  const handleCollapseAllFolders = () => {
+    setExpandedFolders(new Set());
+  };
+
+  const handleToggleSelectFolder = (node: DirectoryTreeNode, e?: React.MouseEvent | React.ChangeEvent) => {
+    if (e) e.stopPropagation();
+    const descendantPaths = node.allDescendantFiles.map(f => f.path);
+    const allSelected = descendantPaths.length > 0 && descendantPaths.every(p => selectedPaths.has(p));
+
+    setSelectedPaths(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        descendantPaths.forEach(p => next.delete(p));
+      } else {
+        descendantPaths.forEach(p => next.add(p));
+      }
+      return next;
+    });
+    setConfirmDelete(false);
+  };
+
   // Keep selected paths valid when files change
   useEffect(() => {
     setSelectedPaths(prev => {
@@ -579,7 +1097,7 @@ export const WorkspaceFilesMetaPopover: React.FC<WorkspaceFilesMetaPopoverProps>
     <div
       id="workspace-files-metadata-popover"
       ref={popoverRef}
-      className="absolute right-0 top-full mt-2 w-full sm:w-[580px] max-w-[96vw] bg-[#0A0C10] border-2 border-[#333] shadow-2xl rounded-lg z-50 overflow-hidden font-mono text-xs animate-in fade-in zoom-in-95 duration-150"
+      className="absolute right-0 top-full mt-2 w-full sm:w-[620px] max-w-[96vw] bg-[#0A0C10] border-2 border-[#333] shadow-2xl rounded-lg z-50 overflow-hidden font-mono text-xs animate-in fade-in zoom-in-95 duration-150"
     >
       {/* Popover Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-[#12151D] border-b border-white/10">
@@ -715,18 +1233,32 @@ export const WorkspaceFilesMetaPopover: React.FC<WorkspaceFilesMetaPopoverProps>
             )}
           </div>
 
-          {/* View Mode Toggle: Detailed List vs Horizontal SVG Bar Chart */}
+          {/* View Mode Toggle: Nested Tree vs Detailed List vs Horizontal SVG Bar Chart */}
           <div className="flex items-center gap-1 shrink-0 bg-black/40 p-0.5 rounded border border-white/10">
+            <button
+              id="btn-popover-view-tree"
+              type="button"
+              onClick={() => setViewMode('TREE')}
+              className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors flex items-center gap-1 cursor-pointer ${
+                viewMode === 'TREE'
+                  ? 'bg-[#3366FF] text-white shadow-xs'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+              title="Exibir Árvore de Diretórios Aninhada (Refletindo a estrutura real de pastas do projeto)"
+            >
+              <FolderTree className="w-3 h-3" />
+              <span>Árvore</span>
+            </button>
             <button
               id="btn-popover-view-list"
               type="button"
               onClick={() => setViewMode('LIST')}
               className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors flex items-center gap-1 cursor-pointer ${
                 viewMode === 'LIST'
-                  ? 'bg-[#3366FF] text-white'
+                  ? 'bg-[#3366FF] text-white shadow-xs'
                   : 'text-zinc-400 hover:text-white'
               }`}
-              title="Exibir em Lista Detalhada com barras relativas"
+              title="Exibir em Lista Plana com barras relativas"
             >
               <List className="w-3 h-3" />
               <span>Lista</span>
@@ -737,7 +1269,7 @@ export const WorkspaceFilesMetaPopover: React.FC<WorkspaceFilesMetaPopoverProps>
               onClick={() => setViewMode('CHART')}
               className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors flex items-center gap-1 cursor-pointer ${
                 viewMode === 'CHART'
-                  ? 'bg-[#3366FF] text-white'
+                  ? 'bg-[#3366FF] text-white shadow-xs'
                   : 'text-zinc-400 hover:text-white'
               }`}
               title="Exibir Gráfico de Barras Horizontais SVG Comparativo"
@@ -1035,172 +1567,125 @@ export const WorkspaceFilesMetaPopover: React.FC<WorkspaceFilesMetaPopoverProps>
             </div>
           )}
 
-          <div className="max-h-72 overflow-y-auto divide-y divide-white/5 scrollbar-thin p-1">
-            {filteredFiles.length === 0 ? (
-              <div className="p-8 text-center text-zinc-400 text-xs space-y-2">
-                <p>
-                  {searchQuery
-                    ? `Nenhum arquivo encontrado com o nome "${searchQuery}".`
-                    : 'Nenhum arquivo encontrado no workspace.'}
-                </p>
-                {searchQuery && (
+          {/* File View Area: Either Nested Directory Tree or Flat List */}
+          {filteredFiles.length === 0 ? (
+            <div className="p-8 text-center text-zinc-400 text-xs space-y-2">
+              <p>
+                {searchQuery
+                  ? `Nenhum arquivo encontrado com o nome "${searchQuery}".`
+                  : 'Nenhum arquivo encontrado no workspace.'}
+              </p>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="px-2.5 py-1 rounded bg-[#3366FF]/20 hover:bg-[#3366FF]/30 text-[#3366FF] border border-[#3366FF]/30 text-[10.5px] font-bold transition-colors cursor-pointer"
+                >
+                  Limpar filtro por nome
+                </button>
+              )}
+            </div>
+          ) : viewMode === 'TREE' ? (
+            /* Nested Directory Tree View reflecting actual project folder structure */
+            <div className="flex flex-col">
+              {/* Directory Tree Control Bar */}
+              <div className="px-3 py-1.5 bg-black/40 border-b border-white/5 flex items-center justify-between text-[10px] text-zinc-400 font-mono">
+                <div className="flex items-center gap-1.5 text-zinc-300">
+                  <FolderTree className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="font-semibold text-white">Estrutura de Diretórios</span>
+                  <span className="text-zinc-500">
+                    ({directoryTree.length} {directoryTree.length === 1 ? 'pasta raiz' : 'pastas raiz'}, {allFolderPaths.length} pastas totais)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
                   <button
+                    id="btn-tree-expand-all"
                     type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="px-2.5 py-1 rounded bg-[#3366FF]/20 hover:bg-[#3366FF]/30 text-[#3366FF] border border-[#3366FF]/30 text-[10.5px] font-bold transition-colors cursor-pointer"
+                    onClick={handleExpandAllFolders}
+                    className="hover:text-white text-zinc-400 text-[9.5px] uppercase font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Expandir todas as pastas da árvore"
                   >
-                    Limpar filtro por nome
+                    <FolderOpen className="w-3 h-3 text-amber-400" />
+                    <span>Expandir Todas</span>
                   </button>
+                  <span className="text-zinc-700">•</span>
+                  <button
+                    id="btn-tree-collapse-all"
+                    type="button"
+                    onClick={handleCollapseAllFolders}
+                    className="hover:text-white text-zinc-400 text-[9.5px] uppercase font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Recolher todas as pastas da árvore"
+                  >
+                    <Folder className="w-3 h-3 text-zinc-400" />
+                    <span>Recolher Todas</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Tree Items Scrollable Container */}
+              <div className="max-h-80 overflow-y-auto space-y-1.5 scrollbar-thin p-2">
+                {directoryTree.map((node) => (
+                  <DirectoryTreeBranch
+                    key={node.id}
+                    node={node}
+                    depth={0}
+                    expandedFolders={expandedFolders}
+                    onToggleFolder={handleToggleFolder}
+                    selectedPaths={selectedPaths}
+                    onToggleSelectFile={handleToggleSelectFile}
+                    onToggleSelectFolder={handleToggleSelectFolder}
+                    onSelectFile={onSelectFile}
+                    onCopyFileMeta={handleCopyFileMeta}
+                    copiedItem={copiedItem}
+                    getImpactColor={getImpactColor}
+                  />
+                ))}
+
+                {/* Root Files (Files located directly at project root without folder) */}
+                {rootFiles.length > 0 && (
+                  <div className="pt-2 border-t border-white/10 space-y-1">
+                    <div className="px-1.5 py-0.5 text-[10px] text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                      <HardDrive className="w-3 h-3 text-zinc-500" />
+                      <span>Arquivos na Raiz do Projeto ({rootFiles.length})</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {rootFiles.map((file) => (
+                        <FileItemRow
+                          key={file.path}
+                          item={file}
+                          isSelected={selectedPaths.has(file.path)}
+                          onToggleSelect={handleToggleSelectFile}
+                          onSelectFile={onSelectFile}
+                          onCopyFileMeta={handleCopyFileMeta}
+                          copiedItem={copiedItem}
+                          getImpactColor={getImpactColor}
+                          showFullPath={false}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
-            ) : (
-            filteredFiles.map((item) => {
-              const impact = getImpactColor(item.scanImpact);
-              const isSelected = selectedPaths.has(item.path);
-              const sanitizedId = item.path.replace(/[^a-zA-Z0-9_-]/g, '_');
-
-              return (
-                <div
+            </div>
+          ) : (
+            /* Flat Detailed List View */
+            <div className="max-h-80 overflow-y-auto divide-y divide-white/5 scrollbar-thin p-1 space-y-1">
+              {filteredFiles.map((item) => (
+                <FileItemRow
                   key={item.path}
-                  onClick={() => onSelectFile && onSelectFile(item.rawFile)}
-                  className={`p-2.5 rounded transition-all cursor-pointer group flex flex-col gap-2 border ${
-                    isSelected
-                      ? 'bg-[#3366FF]/10 border-[#3366FF]/40 shadow-sm'
-                      : 'hover:bg-white/5 border-transparent'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2.5">
-                    {/* Item Checkbox for Batch Selection */}
-                    <div
-                      className="shrink-0 pt-0.5"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <label
-                        htmlFor={`checkbox-file-${sanitizedId}`}
-                        className="cursor-pointer block p-0.5 rounded hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
-                        title={`Selecionar ${item.name} para ações em lote`}
-                      >
-                        <input
-                          id={`checkbox-file-${sanitizedId}`}
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => handleToggleSelectFile(item.path, e)}
-                          className="w-4 h-4 rounded border-zinc-600 bg-black/60 text-[#3366FF] focus:ring-[#3366FF] cursor-pointer accent-[#3366FF]"
-                          aria-label={`Selecionar arquivo ${item.name}`}
-                        />
-                      </label>
-                    </div>
-
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="px-1.5 py-0.2 rounded bg-white/10 text-white font-bold text-[9px] uppercase">
-                          {item.extension}
-                        </span>
-                        <span className="font-bold text-white text-[11.5px] truncate group-hover:text-[#3366FF] transition-colors" title={item.path}>
-                          {item.name}
-                        </span>
-
-                        {/* Ignored Status Badge */}
-                        {item.rawFile.isIgnored && (
-                          <span
-                            className="px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 text-[9px] font-mono flex items-center gap-1"
-                            title={item.rawFile.ignoreReason || 'Arquivo ignorado no scanner'}
-                          >
-                            <EyeOff className="w-2.5 h-2.5 text-zinc-400" />
-                            Ignorado
-                          </span>
-                        )}
-
-                        {item.scanImpact === 'HEAVY' && (
-                          <span className="px-1.5 py-0.2 rounded bg-[#FF3E00]/20 text-[#FF3E00] border border-[#FF3E00]/40 text-[9px] font-black uppercase flex items-center gap-0.5">
-                            <AlertTriangle className="w-2.5 h-2.5" />
-                            Arquivo Grande
-                          </span>
-                        )}
-                        {onSelectFile && (
-                          <ArrowUpRight className="w-3 h-3 text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        )}
-                      </div>
-
-                      {item.path !== item.name && (
-                        <div className="text-[9.5px] text-zinc-500 truncate" title={item.path}>
-                          {item.path}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Action: Copy this file's metadata */}
-                    <div className="shrink-0 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={(e) => handleCopyFileMeta(item, e)}
-                        className="p-1.5 rounded hover:bg-white/10 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                        title="Copiar metadados deste arquivo"
-                      >
-                        {copiedItem === item.path ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Horizontal Relative File Size Bar Visual */}
-                  <div className="space-y-1 bg-black/40 p-1.5 rounded border border-white/5">
-                    <div className="flex items-center justify-between text-[9.5px]">
-                      <span className="text-zinc-400 flex items-center gap-1">
-                        <HardDrive className="w-3 h-3 text-zinc-500" />
-                        <span>Peso Relativo no Scan:</span>
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold" style={{ color: impact.barColor }}>
-                          {item.sizeKb} KB
-                        </span>
-                        <span className="text-zinc-500">({item.relativePercent}% do teto)</span>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar Container */}
-                    <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-300"
-                        style={{
-                          width: `${item.relativePercent}%`,
-                          backgroundColor: impact.barColor
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Metadata badges row: LOC and Last Modified */}
-                  <div className="flex flex-wrap items-center gap-2 text-[10px] text-zinc-400 pt-0.5">
-                    <span className="flex items-center gap-1 text-sky-300">
-                      <Code2 className="w-3 h-3" />
-                      <strong>{item.totalLines}</strong> linhas
-                    </span>
-
-                    <span className="text-zinc-600">•</span>
-
-                    <span className="flex items-center gap-1 text-zinc-400" title={`Timestamp: ${item.lastModifiedTimestamp}`}>
-                      <Calendar className="w-3 h-3 text-zinc-500" />
-                      <span>{item.lastModifiedFormatted}</span>
-                    </span>
-
-                    {item.scanImpact === 'HEAVY' && (
-                      <>
-                        <span className="text-zinc-600">•</span>
-                        <span className="text-[#FF3E00] text-[9.5px] font-bold">
-                          ⚠️ Pode impactar latência de SAST
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })
+                  item={item}
+                  isSelected={selectedPaths.has(item.path)}
+                  onToggleSelect={handleToggleSelectFile}
+                  onSelectFile={onSelectFile}
+                  onCopyFileMeta={handleCopyFileMeta}
+                  copiedItem={copiedItem}
+                  getImpactColor={getImpactColor}
+                  showFullPath={true}
+                />
+              ))}
+            </div>
           )}
-          </div>
         </div>
       )}
 

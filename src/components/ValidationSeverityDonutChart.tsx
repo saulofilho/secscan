@@ -1,6 +1,7 @@
 import React from 'react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip } from 'recharts';
 import { AlertOctagon, ShieldAlert, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ValidationRunsSparkline } from './ValidationRunsSparkline';
 
 export interface ValidationSeverityDistribution {
   critical: number;
@@ -17,6 +18,7 @@ interface ValidationSeverityDonutChartProps {
     HIGH: boolean;
     WARNING: boolean;
   };
+  fileSetKey?: string;
 }
 
 interface DonutSlice {
@@ -30,7 +32,8 @@ interface DonutSlice {
 export const ValidationSeverityDonutChart: React.FC<ValidationSeverityDonutChartProps> = ({
   distribution,
   onSelectSeverity,
-  activeFilters
+  activeFilters,
+  fileSetKey
 }) => {
   const { critical, high, warning, total } = distribution;
 
@@ -90,7 +93,7 @@ export const ValidationSeverityDonutChart: React.FC<ValidationSeverityDonutChart
       id="validation-severity-progress-bar"
       className="p-2.5 rounded bg-black/50 border border-white/10 font-mono text-[10px] shadow-sm transition-all"
     >
-      <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-3">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         {/* Left Side: Compact Donut Chart HUD */}
         <div className="flex items-center gap-3 shrink-0">
           <div className="relative w-[84px] h-[84px] shrink-0 flex items-center justify-center">
@@ -178,6 +181,12 @@ export const ValidationSeverityDonutChart: React.FC<ValidationSeverityDonutChart
             </p>
           </div>
         </div>
+
+        {/* Small Sparkline Chart Next to Donut Chart: Trend of findings across last 5 validation runs */}
+        <ValidationRunsSparkline
+          distribution={distribution}
+          fileSetKey={fileSetKey}
+        />
 
         {/* Right Side: Interactive Breakdown Badges & Legend */}
         <div className="flex flex-wrap sm:flex-col items-end sm:items-end gap-1.5 w-full sm:w-auto">

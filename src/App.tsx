@@ -909,11 +909,12 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Compact Recharts Donut Chart Visualizing Finding Severities Distribution */}
+                    {/* Compact Recharts Donut Chart Visualizing Finding Severities Distribution & Sparkline Trend */}
                     <ValidationSeverityDonutChart
                       distribution={noticeSeverityDistribution}
                       onSelectSeverity={(sev) => toggleNoticeSeverityFilter(sev)}
                       activeFilters={noticeSeverityFilters}
+                      fileSetKey={files.map(f => f.name).sort().join('_') || 'empty_workspace'}
                     />
 
                     {/* Severity Filter Toggle Controls */}
