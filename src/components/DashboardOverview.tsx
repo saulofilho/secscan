@@ -31,7 +31,10 @@ import {
   Cloud,
   KeyRound,
   FileCode,
-  Clock
+  Clock,
+  TrendingDown,
+  TrendingUp,
+  History
 } from 'lucide-react';
 import { ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem } from '../types';
 import { BreachHeatmap } from './BreachHeatmap';
@@ -39,6 +42,8 @@ import { VulnerabilityHeatmap } from './VulnerabilityHeatmap';
 import { VulnerabilitySeverityPieChart } from './VulnerabilitySeverityPieChart';
 import { VulnerabilityTrendChart } from './VulnerabilityTrendChart';
 import { ScanTrendLineChart } from './ScanTrendLineChart';
+import { LastFiveScansTrend } from './LastFiveScansTrend';
+import { RecentScansHistory } from './RecentScansHistory';
 import { ScanSpeedometerGauge } from './ScanSpeedometerGauge';
 import { SeverityDonutChart } from './SeverityDonutChart';
 import { VulnerabilityTypeBarChart } from './VulnerabilityTypeBarChart';
@@ -340,6 +345,30 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <span>DURAÇÃO: {report.durationMs ?? 0}ms (VELOCÍMETRO &darr;)</span>
             </button>
             <button
+              id="dashboard-header-5scans-trend"
+              onClick={() => {
+                const el = document.getElementById('last-5-scans-trend-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="text-[10px] font-mono text-white hover:text-[#00FF41] bg-[#141414] hover:bg-[#1A1A1A] px-2 py-0.5 border border-[#333] hover:border-[#00FF41]/50 uppercase font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+              title="Visualizar indicador e gráfico de tendência das últimas 5 varreduras"
+            >
+              <Activity className="w-3 h-3 text-[#00FF41]" />
+              <span>TENDÊNCIA (5 SCANS) &darr;</span>
+            </button>
+            <button
+              id="dashboard-header-recent-scans-btn"
+              onClick={() => {
+                const el = document.getElementById('recent-scans-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="text-[10px] font-mono text-white hover:text-[#00FF41] bg-[#141414] hover:bg-[#1A1A1A] px-2 py-0.5 border border-[#333] hover:border-[#00FF41]/50 uppercase font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+              title="Visualizar histórico cronológico das últimas 10 varreduras (Recent Scans)"
+            >
+              <History className="w-3 h-3 text-[#00FF41]" />
+              <span>RECENT SCANS (10) &darr;</span>
+            </button>
+            <button
               onClick={() => {
                 const el = document.getElementById('critical-threshold-config');
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -517,8 +546,23 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div className={`text-5xl font-black tracking-tighter mb-1 ${findings.length > 0 ? 'text-[#FF3E00]' : 'text-white'}`}>
               {findings.length}
             </div>
-            <div className="text-[11px] font-mono text-[#666] uppercase tracking-wide">
-              Secrets Exposed
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] font-mono text-[#666] uppercase tracking-wide">
+                Secrets Exposed
+              </div>
+              <button
+                id="metric-4-trend-indicator-btn"
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById('last-5-scans-trend-section');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-[#00FF41] hover:text-white transition-colors cursor-pointer"
+                title="Visualizar gráfico de linha dos últimos 5 scans"
+              >
+                <TrendingDown className="w-3 h-3" />
+                <span>5 Scans &darr;</span>
+              </button>
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-[#1A1A1A] flex items-center justify-between font-mono text-[10px]">
@@ -1193,6 +1237,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         onNavigateToScanner={() => onNavigateToTab('scanner')}
       />
 
+      {/* Small Line Chart & Trend Indicator: Last 5 Scans Finding Counts */}
+      <LastFiveScansTrend
+        report={report}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+      />
+
       {/* Recharts 7-Scan Vulnerability Trend Line Chart */}
       <ScanTrendLineChart 
         report={report} 
@@ -1201,6 +1251,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
       {/* D3 30-Day Historical Vulnerability Trend Line Chart */}
       <VulnerabilityTrendChart report={report} />
+
+      {/* Recent Scans Execution History: Last 10 Scans with Timestamps, File Counts & Findings */}
+      <RecentScansHistory
+        report={report}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+      />
 
       {/* Critical Findings Quick Feed & Real-Time Audit Log */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -30,6 +30,7 @@ import { GlobalIgnoreModal } from './components/GlobalIgnoreModal';
 import { SecurityGlossaryModal } from './components/SecurityGlossary';
 import { SnippetHighlighter } from './components/SnippetHighlighter';
 import { WorkspaceFilesMetaPopover } from './components/WorkspaceFilesMetaPopover';
+import { ValidationSeverityDonutChart } from './components/ValidationSeverityDonutChart';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -908,84 +909,12 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Progress-style Bar Visualizing Finding Severities Distribution */}
-                    <div 
-                      id="validation-severity-progress-bar"
-                      className="p-2 rounded bg-black/40 border border-white/10 space-y-1.5 font-mono text-[10px]"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-1 text-[9.5px] text-white/70 uppercase">
-                        <span className="font-bold flex items-center gap-1 text-white/90">
-                          <span>Distribuição de Severidade</span>
-                          <span className="text-white/40">({noticeSeverityDistribution.total})</span>
-                        </span>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          {noticeSeverityDistribution.critical > 0 && (
-                            <span className="inline-flex items-center gap-1 text-rose-300 font-bold">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                              <span>{noticeSeverityDistribution.critical} crítico{noticeSeverityDistribution.critical > 1 ? 's' : ''}</span>
-                            </span>
-                          )}
-                          {noticeSeverityDistribution.high > 0 && (
-                            <span className="inline-flex items-center gap-1 text-amber-300 font-bold">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                              <span>{noticeSeverityDistribution.high} alto{noticeSeverityDistribution.high > 1 ? 's' : ''}</span>
-                            </span>
-                          )}
-                          {noticeSeverityDistribution.warning > 0 && (
-                            <span className="inline-flex items-center gap-1 text-yellow-300 font-bold">
-                              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
-                              <span>{noticeSeverityDistribution.warning} aviso{noticeSeverityDistribution.warning > 1 ? 's' : ''}</span>
-                            </span>
-                          )}
-                          {noticeSeverityDistribution.total === 0 && (
-                            <span className="inline-flex items-center gap-1 text-emerald-300 font-bold">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                              <span>Conforme (0 achados)</span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Stacked Progress Bar */}
-                      <div 
-                        className="w-full h-2 rounded-full bg-white/10 overflow-hidden flex shadow-inner"
-                        role="progressbar"
-                        aria-label="Distribuição de severidade dos achados"
-                        aria-valuenow={noticeSeverityDistribution.total}
-                      >
-                        {noticeSeverityDistribution.total > 0 ? (
-                          <>
-                            {noticeSeverityDistribution.critical > 0 && (
-                              <div 
-                                className="h-full bg-rose-500 transition-all duration-300 hover:brightness-110"
-                                style={{ width: `${(noticeSeverityDistribution.critical / noticeSeverityDistribution.total) * 100}%` }}
-                                title={`Crítico: ${noticeSeverityDistribution.critical} (${Math.round((noticeSeverityDistribution.critical / noticeSeverityDistribution.total) * 100)}%)`}
-                              />
-                            )}
-                            {noticeSeverityDistribution.high > 0 && (
-                              <div 
-                                className="h-full bg-amber-500 transition-all duration-300 hover:brightness-110"
-                                style={{ width: `${(noticeSeverityDistribution.high / noticeSeverityDistribution.total) * 100}%` }}
-                                title={`Alto: ${noticeSeverityDistribution.high} (${Math.round((noticeSeverityDistribution.high / noticeSeverityDistribution.total) * 100)}%)`}
-                              />
-                            )}
-                            {noticeSeverityDistribution.warning > 0 && (
-                              <div 
-                                className="h-full bg-yellow-400 transition-all duration-300 hover:brightness-110"
-                                style={{ width: `${(noticeSeverityDistribution.warning / noticeSeverityDistribution.total) * 100}%` }}
-                                title={`Aviso: ${noticeSeverityDistribution.warning} (${Math.round((noticeSeverityDistribution.warning / noticeSeverityDistribution.total) * 100)}%)`}
-                              />
-                            )}
-                          </>
-                        ) : (
-                          <div 
-                            className="h-full w-full bg-emerald-500 transition-all duration-300"
-                            title="Sem violações de severidade encontradas (100% Validado)"
-                          />
-                        )}
-                      </div>
-                    </div>
+                    {/* Compact Recharts Donut Chart Visualizing Finding Severities Distribution */}
+                    <ValidationSeverityDonutChart
+                      distribution={noticeSeverityDistribution}
+                      onSelectSeverity={(sev) => toggleNoticeSeverityFilter(sev)}
+                      activeFilters={noticeSeverityFilters}
+                    />
 
                     {/* Severity Filter Toggle Controls */}
                     <div 
