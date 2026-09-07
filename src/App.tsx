@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
   AlertTriangle, 
   ShieldAlert, 
@@ -195,6 +195,9 @@ export default function App() {
     return scanSourceFiles(SAMPLE_FILES, DEFAULT_RULES, activeIgnoreStrings);
   });
 
+  const [previousWorkspaceSize, setPreviousWorkspaceSize] = useState<number | undefined>(undefined);
+  const lastScanWorkspaceBytesRef = useRef<number | null>(null);
+
   // Execute scan
   const executeScan = useCallback((
     targetFiles: ScannedFile[], 
@@ -207,6 +210,15 @@ export default function App() {
       ? targetIgnorePatterns
       : (Array.isArray(ignorePatterns) ? ignorePatterns : DEFAULT_GLOBAL_IGNORE_PATTERNS);
     const activeIgnoreStrings = sourcePatterns.filter(p => p && p.enabled).map(p => p.pattern);
+
+    const currentWorkspaceBytes = targetFiles.reduce((acc, f) => {
+      return acc + (f.size ?? (f.content ? new Blob([f.content]).size : 0));
+    }, 0);
+
+    if (lastScanWorkspaceBytesRef.current !== null && lastScanWorkspaceBytesRef.current !== currentWorkspaceBytes) {
+      setPreviousWorkspaceSize(lastScanWorkspaceBytesRef.current);
+    }
+    lastScanWorkspaceBytesRef.current = currentWorkspaceBytes;
 
     const result = scanSourceFiles(targetFiles, targetRules, activeIgnoreStrings, (event) => {
       newLogs.push(event);
@@ -262,6 +274,64 @@ export default function App() {
     }
     setIgnorePatterns(updated);
     executeScan(files, rules, updated);
+  };
+
+  const handleBatchQuickIgnore = (filePaths: string[]) => {
+    if (filePaths.length === 0) return;
+    const newPatterns: IgnorePatternItem[] = [];
+    let updated = [...ignorePatterns];
+
+    filePaths.forEach((path) => {
+      const existingIndex = updated.findIndex(p => p.pattern.toLowerCase() === path.toLowerCase());
+      if (existingIndex >= 0) {
+        updated = updated.map((p, idx) => idx === existingIndex ? { ...p, enabled: true } : p);
+      } else {
+        const fileName = path.split('/').pop() || path;
+        newPatterns.push({
+          id: `custom-ignore-batch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          pattern: path,
+          enabled: true,
+          description: `Exclusão rápida em lote (${fileName})`,
+          isBuiltIn: false,
+          createdAt: new Date().toISOString().split('T')[0]
+        });
+      }
+    });
+
+    const finalPatterns = [...newPatterns, ...updated];
+    setIgnorePatterns(finalPatterns);
+    executeScan(files, rules, finalPatterns);
+
+    const auditEvent: AuditLogEvent = {
+      id: `audit-ignore-batch-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'SCAN_COMPLETE',
+      message: `${filePaths.length} arquivo(s) adicionado(s) à lista de ignorados em lote.`,
+      severity: 'LOW',
+      details: { ignoredPaths: filePaths }
+    };
+    setAuditLogs(prev => [auditEvent, ...prev].slice(0, 80));
+  };
+
+  const handleBatchDeleteFiles = (filePaths: string[]) => {
+    if (filePaths.length === 0) return;
+    const pathSet = new Set(filePaths);
+    const updatedFiles = files.filter(f => !pathSet.has(f.path) && !pathSet.has(f.name));
+    setFiles(updatedFiles);
+    if (selectedFile && (pathSet.has(selectedFile.path) || pathSet.has(selectedFile.name))) {
+      setSelectedFile(updatedFiles[0] || null);
+    }
+    executeScan(updatedFiles, rules, ignorePatterns);
+
+    const deleteEvent: AuditLogEvent = {
+      id: `audit-batch-del-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'SCAN_COMPLETE',
+      message: `${filePaths.length} arquivo(s) removido(s) do workspace em lote.`,
+      severity: 'LOW',
+      details: { deletedPaths: filePaths }
+    };
+    setAuditLogs(prev => [deleteEvent, ...prev].slice(0, 80));
   };
 
   // Security Glossary handlers
@@ -788,16 +858,33 @@ export default function App() {
                           <RefreshCw className={`w-3 h-3 text-sky-400 ${isScanning ? 'animate-spin' : ''}`} />
                           <span>{isScanning ? 'Scanning...' : 'Quick Rescan'}</span>
                         </button>
-                        <button
-                          id="btn-drawer-file-metadata"
-                          type="button"
-                          onClick={() => setShowFilesMetaPopover(prev => !prev)}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 hover:text-indigo-100 text-[10px] normal-case transition-colors cursor-pointer border border-indigo-500/30 shadow-sm"
-                          title="Exibir metadados dos arquivos do workspace"
-                        >
-                          <FileText className="w-3 h-3 text-indigo-400" />
-                          <span>Metadata</span>
-                        </button>
+                        <div className="relative">
+                          <button
+                            id="btn-drawer-file-metadata"
+                            type="button"
+                            onClick={() => setShowFilesMetaPopover(prev => !prev)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 hover:text-indigo-100 text-[10px] normal-case transition-colors cursor-pointer border border-indigo-500/30 shadow-sm"
+                            title="Exibir metadados dos arquivos do workspace"
+                          >
+                            <FileText className="w-3 h-3 text-indigo-400" />
+                            <span>Metadata</span>
+                          </button>
+                          {showFilesMetaPopover && !validationNotice && (
+                            <WorkspaceFilesMetaPopover
+                              files={files}
+                              isOpen={showFilesMetaPopover}
+                              onClose={() => setShowFilesMetaPopover(false)}
+                              onSelectFile={(f) => {
+                                setSelectedFile(f);
+                                setActiveTab('scanner');
+                                setShowFilesMetaPopover(false);
+                              }}
+                              onBatchQuickIgnore={handleBatchQuickIgnore}
+                              onBatchDeleteFiles={handleBatchDeleteFiles}
+                              previousWorkspaceSize={previousWorkspaceSize}
+                            />
+                          )}
+                        </div>
                         <button
                           id="btn-drawer-copy-log"
                           type="button"
@@ -1139,6 +1226,9 @@ export default function App() {
                     setActiveTab('scanner');
                     setShowFilesMetaPopover(false);
                   }}
+                  onBatchQuickIgnore={handleBatchQuickIgnore}
+                  onBatchDeleteFiles={handleBatchDeleteFiles}
+                  previousWorkspaceSize={previousWorkspaceSize}
                 />
               </div>
 
