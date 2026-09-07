@@ -30,7 +30,8 @@ import {
   Boxes,
   Cloud,
   KeyRound,
-  FileCode
+  FileCode,
+  Clock
 } from 'lucide-react';
 import { ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem } from '../types';
 import { BreachHeatmap } from './BreachHeatmap';
@@ -38,6 +39,7 @@ import { VulnerabilityHeatmap } from './VulnerabilityHeatmap';
 import { VulnerabilitySeverityPieChart } from './VulnerabilitySeverityPieChart';
 import { VulnerabilityTrendChart } from './VulnerabilityTrendChart';
 import { ScanTrendLineChart } from './ScanTrendLineChart';
+import { ScanSpeedometerGauge } from './ScanSpeedometerGauge';
 import { SeverityDonutChart } from './SeverityDonutChart';
 import { VulnerabilityTypeBarChart } from './VulnerabilityTypeBarChart';
 import { SecurityImpactPanel } from './SecurityImpactPanel';
@@ -325,6 +327,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <span className="text-[10px] font-mono text-[#00FF41] bg-[#00FF41]/10 px-2 py-0.5 border border-[#00FF41]/30 uppercase font-bold">
               REGEX_ENGINE_ACTIVE
             </span>
+            <button 
+              id="dashboard-header-scan-duration"
+              onClick={() => {
+                const el = document.getElementById('scan-speedometer-gauge-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="text-[10px] font-mono text-[#00FF41] bg-[#00FF41]/10 hover:bg-[#00FF41]/25 px-2 py-0.5 border border-[#00FF41]/30 hover:border-[#00FF41]/60 uppercase font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+              title={`Tempo total da última varredura: ${report.durationMs ?? 0}ms. Clique para visualizar o velocímetro de execução.`}
+            >
+              <Clock className="w-3 h-3 text-[#00FF41]" />
+              <span>DURAÇÃO: {report.durationMs ?? 0}ms (VELOCÍMETRO &darr;)</span>
+            </button>
             <button
               onClick={() => {
                 const el = document.getElementById('critical-threshold-config');
@@ -1172,6 +1186,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         onNavigateToScanner={() => onNavigateToTab('scanner')}
       />
 
+      {/* Visual Execution Time Speedometer Gauge (Current Scan vs. Average Scan Time) */}
+      <ScanSpeedometerGauge
+        report={report}
+        auditLogs={auditLogs}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+      />
+
       {/* Recharts 7-Scan Vulnerability Trend Line Chart */}
       <ScanTrendLineChart 
         report={report} 
@@ -1305,17 +1326,33 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               auditLogs.map((log) => {
                 const isAlert = log.type === 'SECRET_DETECTED';
                 const isIgnored = log.type === 'DEP_IGNORED';
+                const isComplete = log.type === 'SCAN_COMPLETE';
+                const durationVal = log.durationMs ?? (
+                  log.message.match(/(\d+)\s*ms/i)?.[1]
+                    ? parseInt(log.message.match(/(\d+)\s*ms/i)![1], 10)
+                    : undefined
+                );
                 return (
                   <div 
                     key={log.id} 
-                    className="flex gap-3 border-b border-[#141414] pb-2 text-[11px] leading-relaxed"
+                    className="flex gap-2.5 sm:gap-3 border-b border-[#141414] pb-2 text-[11px] leading-relaxed items-center flex-wrap sm:flex-nowrap"
                   >
-                    <span className="text-[#444] shrink-0">[{log.timestamp}]</span>
+                    <span className="text-[#444] shrink-0 font-mono">[{log.timestamp}]</span>
                     <span className={`shrink-0 font-bold ${
-                      isAlert ? 'text-[#FF3E00]' : isIgnored ? 'text-[#00FF41]' : 'text-[#3366FF]'
+                      isAlert ? 'text-[#FF3E00]' : isIgnored ? 'text-[#00FF41]' : isComplete ? 'text-[#00FF41]' : 'text-[#3366FF]'
                     }`}>
-                      {isAlert ? 'ALERT' : isIgnored ? 'PASS' : 'INFO'}
+                      {isAlert ? 'ALERT' : isIgnored ? 'PASS' : isComplete ? 'DONE' : 'INFO'}
                     </span>
+                    {durationVal !== undefined && (
+                      <span 
+                        id={`audit-log-duration-${log.id}`}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[#00FF41]/15 text-[#00FF41] border border-[#00FF41]/30 shrink-0 select-none shadow-xs"
+                        title={`Tempo de execução desta análise: ${durationVal}ms`}
+                      >
+                        <Clock className="w-2.5 h-2.5 text-[#00FF41]" />
+                        <span>{durationVal}ms</span>
+                      </span>
+                    )}
                     <span className="text-[#AAA] break-all">{log.message}</span>
                   </div>
                 );
@@ -1323,8 +1360,19 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             )}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-[#1A1A1A] flex items-center justify-between text-[10px] font-mono text-[#666]">
-            <span>SYSTEM_AUDIT_LOG_STREAM</span>
+          <div className="mt-4 pt-3 border-t border-[#1A1A1A] flex items-center justify-between text-[10px] font-mono text-[#666] flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span>SYSTEM_AUDIT_LOG_STREAM</span>
+              {report.durationMs !== undefined && (
+                <>
+                  <span className="text-[#333]">•</span>
+                  <span className="text-[#00FF41] flex items-center gap-1 font-bold">
+                    <Clock className="w-3 h-3 text-[#00FF41]" />
+                    <span>ÚLTIMA EXECUÇÃO: {report.durationMs}ms</span>
+                  </span>
+                </>
+              )}
+            </div>
             <span>{auditLogs.length} EVENTS RECORDED</span>
           </div>
         </div>

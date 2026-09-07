@@ -14,7 +14,8 @@ import {
   RotateCcw,
   Compass,
   Ban,
-  BookOpen
+  BookOpen,
+  Clock
 } from 'lucide-react';
 import { ScanReport } from '../types';
 
@@ -81,14 +82,52 @@ export const Header: React.FC<HeaderProps> = ({
                   LTS
                 </span>
               </div>
-              <p className="text-[10px] font-mono text-[#666] hidden md:block tracking-wider uppercase mt-0.5">
-                SAST Security Engine // Secret Matrix & API Discovery
+              <p className="text-[10px] font-mono text-[#666] hidden md:flex items-center gap-2 tracking-wider uppercase mt-0.5">
+                <span>SAST Security Engine // Secret Matrix & API Discovery</span>
+                <span className="text-[#333]">•</span>
+                <span className="text-zinc-400 flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-[#00FF41]" />
+                  <span>Duração: <strong className="text-[#00FF41] font-mono">{report.durationMs ?? 0}ms</strong></span>
+                </span>
               </p>
             </div>
           </div>
 
           {/* Quick Stats & Action Toolbar */}
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end shrink-0">
+            {/* Scan Duration Indicator */}
+            <button
+              id="header-scan-duration-badge"
+              type="button"
+              onClick={() => {
+                if (activeTab !== 'dashboard') {
+                  setActiveTab('dashboard');
+                }
+                setTimeout(() => {
+                  const el = document.getElementById('scan-speedometer-gauge-section');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+              }}
+              className={`flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded border font-mono text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                isScanning
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                  : 'bg-[#0F0F0F] hover:bg-[#1A1A1A] text-[#00FF41] border-[#2A2A2A] hover:border-[#00FF41]/50 shadow-xs'
+              }`}
+              title={
+                isScanning
+                  ? 'Executando análise do código-fonte em tempo real...'
+                  : `Duração total do último scan: ${report.durationMs ?? 0}ms. Clique para visualizar o velocímetro de execução.`
+              }
+            >
+              <Clock className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin text-amber-400' : 'text-[#00FF41]'} shrink-0`} />
+              <span className="text-zinc-400 text-[10px] uppercase tracking-wider hidden sm:inline">
+                Scan:
+              </span>
+              <span className="font-mono font-bold tracking-tight">
+                {isScanning ? 'MEDINDO...' : `${report.durationMs ?? 0}ms`}
+              </span>
+            </button>
+
             {/* Status indicator pill */}
             <div className={`flex items-center gap-1.5 h-8 px-2.5 rounded border font-mono text-[11px] font-bold uppercase tracking-wider ${
               isHealthy 

@@ -780,12 +780,13 @@ export function scanSourceFiles(
   const averageRiskScore = findings.length > 0 ? Math.round(totalRiskScore / findings.length) : 0;
   const maxRiskScore = findings.reduce((max, curr) => Math.max(max, curr.riskScore ?? 0), 0);
 
-  const durationMs = Math.round(performance.now() - startTime);
+  const durationMs = Math.max(1, Math.round(performance.now() - startTime));
 
   onLog?.({
     id: `log-${Date.now()}-end`,
     timestamp: new Date().toLocaleTimeString(),
     type: 'SCAN_COMPLETE',
+    durationMs,
     message: `Scan concluído em ${durationMs}ms. Security Impact Score: ${securityImpactScore}/100 (${impactLevel}). Encontrados ${findings.length} segredo(s) em ${scannedCount} arquivo(s) analisado(s).`
   });
 

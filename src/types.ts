@@ -211,6 +211,7 @@ export interface AuditLogEvent {
   type: 'SCAN_START' | 'FILE_PARSED' | 'SECRET_DETECTED' | 'DEP_IGNORED' | 'SCAN_COMPLETE' | 'ALERT_TRIGGERED' | 'RULE_APPLIED';
   message: string;
   severity?: SeverityLevel;
+  durationMs?: number;
   details?: Record<string, unknown>;
 }
 
