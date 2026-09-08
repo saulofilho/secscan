@@ -9,13 +9,17 @@ import {
   Send, 
   ExternalLink,
   Layers,
-  Database
+  Database,
+  Workflow,
+  SlidersHorizontal,
+  FileCode,
+  Sparkles
 } from 'lucide-react';
 import { ScanReport } from '../types';
 import { ScanScheduleManager } from './ScanScheduleManager';
+import { SecScanWorkflowModal } from './SecScanWorkflowModal';
 
 interface CiCdIntegrationViewProps {
-
   report: ScanReport;
 }
 
@@ -23,6 +27,7 @@ export const CiCdIntegrationView: React.FC<CiCdIntegrationViewProps> = ({ report
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [webhookUrl, setWebhookUrl] = useState('');
   const [webhookStatus, setWebhookStatus] = useState<string | null>(null);
+  const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -130,6 +135,24 @@ export async function accessGoogleSecret(secretName: string): Promise<string> {
         <p className="text-xs font-mono text-[#888] mt-1.5 max-w-3xl leading-relaxed">
           Automatize a execução do SecScan em pipelines de integração contínua (GitHub Actions, GitLab CI) e conecte com provedores de nuvem (AWS Secrets Manager, Google Cloud Secret Manager) para eliminação de credenciais estáticas no código.
         </p>
+
+        {/* Action Bar for Pre-Configured Workflow Generator */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-5 pt-4 border-t border-[#1C1C1C]">
+          <div className="flex items-center gap-2 text-xs font-mono text-[#AAA]">
+            <Sparkles className="w-4 h-4 text-[#00FF41] shrink-0" />
+            <span>Snippet pronto para cópia com suporte a overrides de severidade e regras dinâmicas</span>
+          </div>
+
+          <button
+            id="btn-open-secscan-workflow-modal"
+            type="button"
+            onClick={() => setIsWorkflowModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-mono font-black uppercase tracking-wider text-black bg-[#00FF41] hover:bg-[#00dd38] border border-[#00FF41] cursor-pointer transition-all shadow-md active:scale-95 shrink-0"
+          >
+            <Workflow className="w-4 h-4 text-black" />
+            <span>Gerar .github/workflows/secscan.yml</span>
+          </button>
+        </div>
       </div>
 
       {/* Automated Scan Schedules with Cron Engine */}
@@ -146,24 +169,47 @@ export async function accessGoogleSecret(secretName: string): Promise<string> {
             </span>
           </div>
 
-          <button
-            onClick={() => handleCopy(githubWorkflowCode, 'github-actions')}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-white bg-[#111] hover:bg-white hover:text-black border border-[#333] transition-colors"
-          >
-            {copiedKey === 'github-actions' ? <Check className="w-3.5 h-3.5 text-[#00FF41]" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>Copiar YAML</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              id="btn-open-workflow-modal-card"
+              type="button"
+              onClick={() => setIsWorkflowModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-[#00FF41] bg-[#111] hover:bg-[#00FF41] hover:text-black border border-[#00FF41]/40 transition-colors cursor-pointer"
+              title="Abrir gerador interativo com variáveis de ambiente e sobrescrita de regras"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>secscan.yml com Overrides</span>
+            </button>
+
+            <button
+              onClick={() => handleCopy(githubWorkflowCode, 'github-actions')}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-white bg-[#111] hover:bg-white hover:text-black border border-[#333] transition-colors cursor-pointer"
+            >
+              {copiedKey === 'github-actions' ? <Check className="w-3.5 h-3.5 text-[#00FF41]" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>Copiar YAML</span>
+            </button>
+          </div>
         </div>
 
         <div className="p-5 bg-[#050505] text-[#CCC] font-mono text-xs overflow-x-auto leading-relaxed border-b border-[#222]">
           <pre>{githubWorkflowCode}</pre>
         </div>
 
-        <div className="p-4 bg-[#080808] flex items-center gap-3 text-xs text-[#888] font-mono">
-          <ShieldCheck className="w-4 h-4 text-[#00FF41] shrink-0" />
-          <span>
-            <strong className="text-white">Upload SARIF nativo:</strong> As vulnerabilidades de segredos aparecem automaticamente na aba <em>Security &gt; Code Scanning Alerts</em> do GitHub.
-          </span>
+        <div className="p-4 bg-[#080808] flex items-center justify-between gap-3 text-xs text-[#888] font-mono flex-wrap">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-[#00FF41] shrink-0" />
+            <span>
+              <strong className="text-white">Upload SARIF nativo:</strong> As vulnerabilidades de segredos aparecem automaticamente na aba <em>Security &gt; Code Scanning Alerts</em> do GitHub.
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsWorkflowModalOpen(true)}
+            className="text-[10px] font-bold text-[#00FF41] hover:underline uppercase tracking-wider cursor-pointer"
+          >
+            Configurar Variáveis de Ambiente & Overrides &rarr;
+          </button>
         </div>
       </div>
 
@@ -251,6 +297,12 @@ export async function accessGoogleSecret(secretName: string): Promise<string> {
           </div>
         )}
       </div>
+
+      {/* SecScan GitHub Actions Workflow Modal (.github/workflows/secscan.yml) */}
+      <SecScanWorkflowModal
+        isOpen={isWorkflowModalOpen}
+        onClose={() => setIsWorkflowModalOpen(false)}
+      />
     </div>
   );
 };

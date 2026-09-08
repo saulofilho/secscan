@@ -15,11 +15,14 @@ import {
   Sparkles,
   Search,
   Filter,
-  BookOpen
+  BookOpen,
+  Terminal,
+  Wrench
 } from 'lucide-react';
 import { ScannedFile, ScanFinding, SeverityLevel, IgnorePatternItem } from '../types';
 import { SecurityGlossaryTooltip, SecurityGlossaryInlineCard } from './SecurityGlossary';
 import { SecurityGlossaryEntry } from '../lib/securityGlossary';
+import { SecurityRemediationWikiModal } from './SecurityRemediationWikiModal';
 
 interface ScannerViewProps {
   files: ScannedFile[];
@@ -32,6 +35,7 @@ interface ScannerViewProps {
   onOpenIgnoreModal?: () => void;
   onQuickIgnore?: (pattern: string, description?: string) => void;
   onOpenGlossary?: (entry?: SecurityGlossaryEntry) => void;
+  onOpenRemediationWiki?: (finding?: ScanFinding) => void;
 }
 
 export const ScannerView: React.FC<ScannerViewProps> = ({
@@ -44,7 +48,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   ignorePatterns = [],
   onOpenIgnoreModal,
   onQuickIgnore,
-  onOpenGlossary
+  onOpenGlossary,
+  onOpenRemediationWiki
 }) => {
   const safeFiles = Array.isArray(files) ? files : [];
   const safeFindings = Array.isArray(findings) ? findings : [];
@@ -57,6 +62,18 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const [showPasteModal, setShowPasteModal] = useState(false);
   const [pasteFileName, setPasteFileName] = useState('customService.js');
   const [pasteContent, setPasteContent] = useState('');
+
+  // Security Remediation Wiki Modal State
+  const [isRemediationWikiOpen, setIsRemediationWikiOpen] = useState(false);
+  const [selectedWikiFinding, setSelectedWikiFinding] = useState<ScanFinding | null>(null);
+
+  const handleOpenRemediationWiki = (finding?: ScanFinding) => {
+    setSelectedWikiFinding(finding || null);
+    setIsRemediationWikiOpen(true);
+    if (onOpenRemediationWiki) {
+      onOpenRemediationWiki(finding);
+    }
+  };
 
   const activeFile = selectedFile || safeFiles[0];
   const fileFindings = safeFindings.filter(f => f.file === activeFile?.path);
@@ -375,6 +392,24 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 <option value="LOW">Apenas Baixas</option>
               </select>
 
+              {/* Security Remediation Wiki Button */}
+              <button
+                type="button"
+                id="btn-scanner-open-remediation-wiki"
+                onClick={() => handleOpenRemediationWiki()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#170A00] hover:bg-[#FF3E00] border border-[#FF3E00]/40 hover:border-[#FF3E00] text-white text-xs font-mono transition-colors cursor-pointer group"
+                title="Abrir a Wiki de Remediação e Patching de Segurança"
+              >
+                <Wrench className="w-3.5 h-3.5 text-[#FF3E00] group-hover:text-white transition-colors" />
+                <span className="hidden sm:inline">Wiki de Remediação</span>
+                <span className="sm:hidden">Wiki</span>
+                {safeFindings.length > 0 && (
+                  <span className="px-1.5 py-0.2 bg-[#FF3E00] group-hover:bg-white text-white group-hover:text-black text-[9px] font-bold">
+                    {safeFindings.length}
+                  </span>
+                )}
+              </button>
+
               {onOpenGlossary && (
                 <button
                   type="button"
@@ -418,6 +453,17 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                         finding={finding} 
                         onOpenFullGlossary={onOpenGlossary} 
                       />
+
+                      {/* Direct Link to Security Remediation Wiki */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRemediationWiki(finding)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#141414] hover:bg-[#FF3E00] text-[#AAA] hover:text-white border border-[#333] hover:border-[#FF3E00] text-[10px] font-mono transition-all group cursor-pointer"
+                        title="Abrir Playbook Passo a Passo de Remediação para esta Vulnerabilidade"
+                      >
+                        <Wrench className="w-3 h-3 text-[#FF3E00] group-hover:text-white transition-colors" />
+                        <span className="font-bold">Wiki de Remediação</span>
+                      </button>
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -446,9 +492,19 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
                   {/* Remediation Guide & Suggested Safe Code */}
                   <div className="bg-[#050505] p-4 border border-[#1A1A1A] text-xs space-y-2.5">
-                    <div className="flex items-center gap-2 text-white font-bold uppercase tracking-wider text-[10px]">
-                      <Sparkles className="w-3.5 h-3.5 text-[#FF3E00]" />
-                      <span>Plano de Remediação:</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-white font-bold uppercase tracking-wider text-[10px]">
+                        <Sparkles className="w-3.5 h-3.5 text-[#FF3E00]" />
+                        <span>Plano de Remediação:</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRemediationWiki(finding)}
+                        className="text-[10px] font-mono text-[#FF3E00] hover:text-white inline-flex items-center gap-1 font-bold cursor-pointer transition-colors"
+                      >
+                        <Terminal className="w-3 h-3" />
+                        <span>Ver Guia Passo a Passo &rarr;</span>
+                      </button>
                     </div>
                     <p className="text-[#AAA] font-mono text-[11px] leading-relaxed">{finding.remediation}</p>
 
@@ -477,6 +533,20 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Security Remediation Wiki Modal */}
+      <SecurityRemediationWikiModal
+        isOpen={isRemediationWikiOpen}
+        onClose={() => setIsRemediationWikiOpen(false)}
+        initialFinding={selectedWikiFinding}
+        findings={safeFindings}
+        onNavigateToFileLine={(fileName, line) => {
+          const targetFile = safeFiles.find(f => f.path === fileName || f.name === fileName);
+          if (targetFile) {
+            onSelectFile(targetFile);
+          }
+        }}
+      />
 
       {/* Paste Code Modal */}
       {showPasteModal && (

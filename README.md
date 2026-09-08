@@ -20,7 +20,7 @@ Conta com um **Web Dashboard centralizado** para métricas e monitoramento de lo
   - Pagamentos & Finanças: Chaves secretas da Stripe (`sk_live_...`, `rk_live_...`).
   - Bancos de Dados & Senhas: URIs com credenciais (`postgres://`, `mongodb://`, `mysql://`, `redis://`), atribuições de senhas (`password = "..."`).
   - Inteligência Artificial: Chaves secretas da OpenAI (`sk-...`), SendGrid (`SG....`).
-  - Chaves Criptográficas: Chaves privadas PEM/RSA/SSH (`-----BEGIN PRIVATE KEY-----`).
+  - Chaves Criptográficas: Chaves privadas PEM/RSA/SSH (ex.: blocos de certificados e chaves assimétricas).
 
 - 🚫 **Filtro Automático de Dependências de Terceiros:**
   - Ignora rigorosamente diretórios de bibliotecas externas: `node_modules/`, `vendor/`, `bower_components/`, `.git/`, além de pastas de build `dist/`, `build/`, `.cache/` e arquivos minificados `*.min.js` ou bundles.

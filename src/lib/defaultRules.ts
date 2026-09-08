@@ -110,7 +110,7 @@ export const DEFAULT_RULES: RegexRule[] = [
     remediation: 'Remova chaves privadas do controle de versão e configure-as através do SSH Agent ou Cofre de Chaves.',
     enabled: true,
     tags: ['crypto', 'ssh', 'pki'],
-    exampleMatch: '-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFA...\n-----END PRIVATE KEY-----'
+    exampleMatch: '-----' + 'BEGIN [RSA] PRIVATE KEY' + '-----\n[CONTEUDO_DA_CHAVE_PRIVADA_REMOVIDO]\n-----' + 'END [RSA] PRIVATE KEY' + '-----'
   },
   {
     id: 'sec-db-uri',
@@ -123,7 +123,7 @@ export const DEFAULT_RULES: RegexRule[] = [
     remediation: 'Extraia as credenciais para DATABASE_URL em .env e utilize poolers com autenticação IAM quando disponível.',
     enabled: true,
     tags: ['database', 'postgres', 'mongo', 'mysql'],
-    exampleMatch: 'postgres://admin:SuperSecretPass123@db.prod.internal:5432/main'
+    exampleMatch: 'postgres://usuario:SENHA_SECRETA_AQUI@db.prod.internal:5432/main'
   },
   {
     id: 'sec-hardcoded-pass',
@@ -137,7 +137,7 @@ export const DEFAULT_RULES: RegexRule[] = [
     minEntropy: 3.2,
     enabled: true,
     tags: ['password', 'credentials'],
-    exampleMatch: 'const db_pass = "P@ssw0rdProd2026!";'
+    exampleMatch: 'const db_pass = "<SENHA_PADRAO_EXEMPLO>";'
   },
   {
     id: 'sec-openai-key',
@@ -151,7 +151,7 @@ export const DEFAULT_RULES: RegexRule[] = [
     minEntropy: 4.1,
     enabled: true,
     tags: ['openai', 'ai', 'api-key'],
-    exampleMatch: 'sk-proj-' + 'abc123def456ghi789jkl012mno345pqr678stu'
+    exampleMatch: 'sk-proj-' + '<CHAVE_OPENAI_DEMO_REMOVIDA>'
   },
   {
     id: 'sec-sendgrid-key',

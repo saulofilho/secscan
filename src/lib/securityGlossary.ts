@@ -118,7 +118,7 @@ export const SECURITY_GLOSSARY_ENTRIES: SecurityGlossaryEntry[] = [
     cvssScore: 9.6,
     severity: 'CRITICAL',
     summary: 'URIs de conexão com bancos de dados relacionais ou NoSQL (PostgreSQL, MongoDB, MySQL, Redis) contendo usuário, senha em texto claro, host e porta.',
-    threatScenario: 'O invasor copia a URL completa (ex.: postgres://admin:P@ssw0rd123@db.prod.internal:5432/main) e conecta-se diretamente ao banco de dados via cliente SQL.',
+    threatScenario: 'O invasor copia a URL completa (ex.: postgres://admin:<SENHA>@db.prod.internal:5432/main) e conecta-se diretamente ao banco de dados via cliente SQL.',
     attackerObjective: 'Extração integral de tabelas com dados pessoais (LGPD/GDPR), despejo de senhas com hash, injeção de dados maliciosos ou destruição e ransomware nas tabelas.',
     blastRadius: 'Vazamento catastrófico de dados proprietários, interrupção total das operações da empresa e penalidades legais regulatórias.',
     remediationSteps: [
@@ -128,7 +128,7 @@ export const SECURITY_GLOSSARY_ENTRIES: SecurityGlossaryEntry[] = [
     ],
     safePattern: {
       language: 'typescript',
-      bad: `// ❌ INSEGURO: Credenciais de banco em texto claro no código\nconst pool = new Pool({\n  connectionString: "postgres://postgres:SuperSecret2026!@production-db.internal:5432/main_db"\n});`,
+      bad: `// ❌ INSEGURO: Credenciais de banco em texto claro no código\nconst pool = new Pool({\n  connectionString: "postgres://postgres:" + "<SENHA_DO_BANCO>" + "@production-db.internal:5432/main_db"\n});`,
       good: `// ✅ SEGURO: Injeção por variável de ambiente com verificação preventiva\nconst connectionString = process.env.DATABASE_URL;\nif (!connectionString) {\n  throw new Error("A variável de ambiente DATABASE_URL não foi configurada.");\n}\nconst pool = new Pool({ connectionString });`,
       explanation: 'Utilize variáveis de ambiente ou segredos gerenciados pelo Kubernetes/Cloud Run para montar a string de conexão.'
     },
@@ -186,7 +186,7 @@ export const SECURITY_GLOSSARY_ENTRIES: SecurityGlossaryEntry[] = [
     },
     cvssScore: 9.8,
     severity: 'CRITICAL',
-    summary: 'Blocos PEM com chaves privadas criptográficas assimétricas (-----BEGIN RSA PRIVATE KEY-----, OpenSSH, EC PRIVATE KEY) armazenados no repositório.',
+    summary: 'Blocos PEM com chaves privadas criptográficas assimétricas (RSA, OpenSSH, EC Private Key) armazenados no repositório.',
     threatScenario: 'A chave privada é utilizada para assinar certificados SSL/TLS, decodificar tráfego criptografado ou acessar servidores SSH de produção sem necessidade de senha.',
     attackerObjective: 'Ataques Man-in-the-Middle (MitM) descriptografando comunicações confidenciais, login SSH direto como root e interceptação de pacotes internos.',
     blastRadius: 'Comprometimento irrestrito da confidencialidade e integridade das comunicações e servidores de toda a malha corporativa.',
@@ -198,7 +198,7 @@ export const SECURITY_GLOSSARY_ENTRIES: SecurityGlossaryEntry[] = [
     ],
     safePattern: {
       language: 'typescript',
-      bad: `// ❌ INSEGURO: Bloco de chave privada RSA gravado em string\nconst PRIVATE_KEY = \`-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA0m4Fz...\n-----END RSA PRIVATE KEY-----\`;`,
+      bad: `// ❌ INSEGURO: Bloco de chave privada gravado em string literal\nconst PRIVATE_KEY = "-----" + "BEGIN [RSA] PRIVATE KEY" + "-----\\n[CHAVE_PRIVADA_REMOVIDA]\\n-----" + "END [RSA] PRIVATE KEY" + "-----";`,
       good: `// ✅ SEGURO: Carregamento a partir de cofre de segredos em disco montado\nimport fs from 'fs';\nconst privateKeyPath = process.env.TLS_KEY_PATH || '/etc/secrets/tls.key';\nconst privateKey = fs.readFileSync(privateKeyPath, 'utf-8');`,
       explanation: 'Chaves privadas devem ser provisionadas via Kubernetes Secrets montados em volume seguro (tmpfs em memória) com permissões restritas chmod 400.'
     },
@@ -232,7 +232,7 @@ export const SECURITY_GLOSSARY_ENTRIES: SecurityGlossaryEntry[] = [
     ],
     safePattern: {
       language: 'typescript',
-      bad: `// ❌ INSEGURO: Senha administrativa literal no código\nconst config = {\n  username: "superadmin",\n  password: "MasterPassword2026!"\n};`,
+      bad: `// ❌ INSEGURO: Senha administrativa literal no código\nconst config = {\n  username: "superadmin",\n  password: "<SENHA_FIXA_INSEGURA>"\n};`,
       good: `// ✅ SEGURO: Carregamento mandatário via variáveis protegidas\nconst config = {\n  username: process.env.ADMIN_USERNAME || "admin",\n  password: process.env.ADMIN_PASSWORD // Obrigatório, sem default inseguro\n};`,
       explanation: 'Nunca forneça senhas literais de fallback no código-fonte. A ausência do segredo deve impedir o serviço de inicializar com um erro explícito.'
     },
