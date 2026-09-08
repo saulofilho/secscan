@@ -1286,6 +1286,8 @@ export default function App() {
         {activeTab === 'cicd' && (
           <CiCdIntegrationView
             report={report}
+            rules={rules}
+            ignorePatterns={ignorePatterns}
           />
         )}
       </main>

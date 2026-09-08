@@ -323,3 +323,21 @@ export interface DataFlowGraphData {
   };
 }
 
+export type DataFlowLayoutMode = 'HIERARCHICAL' | 'FORCE' | 'PIPELINE' | 'FILE_GROUPS';
+
+export interface DataFlowGraphSettings {
+  layoutMode: DataFlowLayoutMode;
+  hierarchicalOrientation: 'HORIZONTAL' | 'VERTICAL';
+  rankSeparation: number;
+  nodeSeparation: number;
+  curveStyle: 'BEZIER' | 'STRAIGHT';
+  alignSinksToEnd: boolean;
+  chargeStrength: number;
+  linkDistance: number;
+  collisionRadius: number;
+  isPhysicsPaused: boolean;
+  hideIsolatedNodes: boolean;
+  showLevelGuides: boolean;
+  highlightTaintEdges: boolean;
+}
+

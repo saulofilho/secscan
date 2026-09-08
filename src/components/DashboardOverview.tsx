@@ -455,26 +455,69 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           )}
           {onOpenTour && (
             <button
+              id="btn-open-tutorial-hero"
               onClick={onOpenTour}
-              className="px-5 py-3.5 border border-[#FF3E00]/40 bg-[#FF3E00]/10 hover:bg-[#FF3E00] hover:text-white text-[#FF3E00] font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2"
+              className="px-5 py-3.5 border border-[#FF3E00]/40 bg-[#FF3E00]/15 hover:bg-[#FF3E00] hover:text-white text-[#FF3E00] font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 shadow-[0_0_12px_rgba(255,62,0,0.15)] cursor-pointer"
+              title="Abrir tutorial completo e guia passo a passo da ferramenta"
             >
               <Compass className="w-3.5 h-3.5" />
-              <span>Guia Rápido</span>
+              <span>Tutorial Completo</span>
             </button>
           )}
           <button
             onClick={() => onNavigateToTab('cli')}
-            className="px-5 py-3.5 border border-[#333] hover:border-white bg-[#0A0A0A] hover:bg-white hover:text-black text-white font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2"
+            className="px-5 py-3.5 border border-[#333] hover:border-white bg-[#0A0A0A] hover:bg-white hover:text-black text-white font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 cursor-pointer"
           >
             <Terminal className="w-3.5 h-3.5 text-[#FF3E00]" />
             <span>Terminal CLI</span>
           </button>
           <button
             onClick={() => onNavigateToTab('cicd')}
-            className="px-5 py-3.5 bg-white hover:bg-[#FF3E00] hover:text-white text-black font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2"
+            className="px-5 py-3.5 bg-white hover:bg-[#FF3E00] hover:text-white text-black font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 cursor-pointer"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             <span>CI/CD Pipeline</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Tutorial & Onboarding Interactive Ribbon */}
+      <div className="bg-[#0A0A0A] border border-[#222] p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-[#FF3E00]/10 border border-[#FF3E00]/30 rounded-lg flex items-center justify-center text-[#FF3E00] shrink-0">
+            <Compass className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2">
+              <span>Como Usar a Ferramenta SecScan</span>
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#161616] text-[#00E5FF] border border-[#2A2A2A]">
+                Guia Rápido Interativo
+              </span>
+            </div>
+            <p className="text-[11px] font-mono text-zinc-400 mt-0.5">
+              Aprenda a analisar códigos, inspecionar achados com remediação em 1 clique, explorar grafos com Zoom-to-Fit e exportar relatórios SARIF/CI-CD.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
+          {onOpenTour && (
+            <button
+              id="btn-start-tutorial-ribbon"
+              onClick={onOpenTour}
+              className="w-full md:w-auto px-4 py-2 bg-[#FF3E00] hover:bg-white hover:text-black text-white font-mono font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 rounded-lg cursor-pointer shadow-[0_0_12px_rgba(255,62,0,0.2)]"
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span>Iniciar Tutorial (6 Passos)</span>
+            </button>
+          )}
+          <button
+            onClick={() => onNavigateToTab('dataflow')}
+            className="hidden sm:inline-flex px-3 py-2 bg-[#141414] hover:bg-[#202020] text-zinc-300 hover:text-white border border-[#2B2B2B] font-mono text-xs rounded-lg transition-colors items-center gap-1.5 cursor-pointer"
+            title="Ir para o Grafo de Fluxo com Zoom e Pan"
+          >
+            <Network className="w-3.5 h-3.5 text-[#00E5FF]" />
+            <span>Ver Grafo & Pan</span>
           </button>
         </div>
       </div>

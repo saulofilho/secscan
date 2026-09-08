@@ -13,7 +13,16 @@ import {
   Check, 
   Sparkles,
   ExternalLink,
-  Code2
+  Code2,
+  Network,
+  Activity,
+  SlidersHorizontal,
+  Route,
+  Scan,
+  Hand,
+  Boxes,
+  HelpCircle,
+  FileCode2
 } from 'lucide-react';
 
 interface QuickTourModalProps {
@@ -45,25 +54,25 @@ export const QuickTourModal: React.FC<QuickTourModalProps> = ({
   const tourSteps: TourStep[] = [
     {
       stepNumber: 1,
-      badge: '01 // INTRODUÇÃO & ARQUITETURA',
+      badge: '01 // INTRODUÇÃO & ARQUITETURA SAST',
       title: 'Bem-vindo ao SecScan SAST',
       targetTab: 'dashboard',
-      description: 'O SecScan é um motor de análise estática de segurança (SAST) voltado para JavaScript e TypeScript. Ele analisa códigos em tempo real, calculando a entropia de Shannon e aplicando regras de segurança OWASP.',
+      description: 'O SecScan é um motor de análise estática de segurança (SAST) de alto desempenho para JavaScript e TypeScript. Ele analisa códigos em tempo real, calculando a entropia de Shannon e aplicando regras de segurança contra vulnerabilidades OWASP e vazamentos de segredos.',
       keyPoints: [
         {
           icon: ShieldAlert,
-          title: 'Detecção em Tempo Real',
-          text: 'O código é varrido linha a linha buscando tokens JWT, chaves de API, credenciais AWS e segredos de alta entropia.'
+          title: 'Detecção em Tempo Real & Entropia de Shannon',
+          text: 'O código é varrido linha a linha buscando tokens JWT, chaves de API, credenciais AWS/GCP e segredos com alta entropia estatística.'
         },
         {
           icon: FolderTree,
-          title: 'Filtro Zero-Dependency',
-          text: 'Pastas como node_modules/** e dist/** são ignoradas automaticamente, focando 100% no código proprietário da aplicação.'
+          title: 'Filtro Zero-Dependency & .secscanignore',
+          text: 'Pastas como node_modules/** e dist/** são ignoradas automaticamente, mantendo o foco estrito no código proprietário da aplicação.'
         },
         {
           icon: Sparkles,
-          title: 'Dados de Exemplo Pré-Carregados',
-          text: 'A aplicação já vem com um repositório realista (paymentController, authService, etc.) para você testar imediatamente.'
+          title: 'Repositório de Exemplo Pré-Carregado',
+          text: 'O workspace inicia com arquivos realistas (paymentController, authService, etc.) para você testar e auditar todas as funcionalidades imediatamente.'
         }
       ],
       actionLabel: 'Ver Métricas no Dashboard',
@@ -71,80 +80,132 @@ export const QuickTourModal: React.FC<QuickTourModalProps> = ({
     },
     {
       stepNumber: 2,
-      badge: '02 // ONDE ENCONTRAR OS ACHADOS (FINDINGS)',
-      title: 'Localizando Vulnerabilidades e Hotspots',
+      badge: '02 // DASHBOARD EXECUTIVO & ANÁLISE DE RISCO',
+      title: 'Painel de Métricas, Heatmaps e Velocímetro',
       targetTab: 'dashboard',
-      description: 'Você pode inspecionar os achados em 3 níveis de profundidade conforme a necessidade da sua equipe técnica:',
+      description: 'O Dashboard consolida a postura de segurança do seu repositório com visualizações interativas desenhadas para priorização rápida de riscos:',
       keyPoints: [
         {
-          icon: Search,
-          title: 'D3 Density Heatmap',
-          text: 'Localizado no Dashboard, mostra exatamente quais diretórios ou arquivos concentram o maior número de alertas críticos.'
+          icon: Activity,
+          title: 'Velocímetro de Execução (Scan Latency)',
+          text: 'Mostra em tempo real a velocidade da varredura em milissegundos (ms), confirmando a alta performance do motor estático.'
         },
         {
+          icon: Search,
+          title: 'D3 Density Heatmap & Treemap',
+          text: 'Exibe visualmente quais diretórios e arquivos concentram o maior volume de achados críticos e vazamentos de segredos.'
+        },
+        {
+          icon: Boxes,
+          title: 'Matriz de Risco 2x2 & Tendências',
+          text: 'Cruza Probabilidade vs Impacto para classificar os achados e monitora a evolução das vulnerabilidades ao longo dos últimos scans.'
+        }
+      ],
+      actionLabel: 'Explorar o Dashboard',
+      actionTab: 'dashboard'
+    },
+    {
+      stepNumber: 3,
+      badge: '03 // INSPETOR DE CÓDIGO & REMEDIAÇÃO COM 1 CLIQUE',
+      title: 'Auditoria Linha a Linha e Correção Automática',
+      targetTab: 'scanner',
+      description: 'Na aba "Inspetor de Código", você visualiza a árvore de arquivos, linhas problemáticas destacadas e recebe snippets corrigidos prontos para copiar:',
+      keyPoints: [
+        {
           icon: Code2,
-          title: 'Inspetor de Código Linha a Linha',
-          text: 'Na aba "Inspetor de Código", clique em qualquer arquivo para ver as linhas destacadas em vermelho, o cálculo de entropia e a regra violada.'
+          title: 'Realce Visual de Segredos',
+          text: 'Tokens suspeitos são destacados com máscaras parciais, score de risco e detalhamento da regra violada.'
         },
         {
           icon: Sparkles,
-          title: 'Sugestão de Remediação Segura',
-          text: 'Cada achado gera automaticamente um snippet corrigido usando process.env.<NOME_VARIAVEL> para remover senhas hardcoded.'
+          title: 'Remediação Segura Automatizada',
+          text: 'Para cada chave hardcoded detectada, o SecScan sugere o código corrigido substituindo a constante por process.env.<NOME_VARIAVEL>.'
+        },
+        {
+          icon: FileCode2,
+          title: 'Cópia Rápida e Navegação Direta',
+          text: 'Copie a sugestão com 1 clique ou navegue diretamente entre os achados do arquivo usando a lista lateral.'
         }
       ],
       actionLabel: 'Abrir Inspetor de Código',
       actionTab: 'scanner'
     },
     {
-      stepNumber: 3,
-      badge: '03 // COMO SUBMETER SEU PRÓPRIO CÓDIGO',
-      title: 'Carregando Seus Arquivos para Varredura',
-      targetTab: 'scanner',
-      description: 'Você não precisa ficar restrito aos arquivos de exemplo. Existem 3 maneiras rápidas de analisar seu código real:',
+      stepNumber: 4,
+      badge: '04 // LINKFINDER, JS MINER & GRAFOS D3 COM ZOOM E PAN',
+      title: 'Rastreamento de Endpoints & Fluxo de Taint',
+      targetTab: 'dataflow',
+      description: 'Mapeie a superfície de ataque e o fluxo de dados não sanitizados da entrada até funções perigosas com controles modernos de navegação:',
       keyPoints: [
         {
-          icon: Upload,
-          title: 'Arrastar e Soltar (Drag & Drop)',
-          text: 'Na barra lateral da aba "Inspetor de Código", solte seus arquivos (.js, .ts, .env, .json) na caixa de upload.'
+          icon: Route,
+          title: 'LinkFinder & JS Miner',
+          text: 'Varre scripts e bundles JavaScript/TypeScript extraindo todas as rotas de API, métodos HTTP (GET, POST) e parâmetros sensíveis.'
         },
         {
-          icon: Code2,
-          title: 'Colar Código Diretamente ("Paste Code")',
-          text: 'Clique no botão "Paste Code" no Inspetor para colar qualquer snippet do seu repositório e analisá-lo instantaneamente.'
+          icon: Network,
+          title: 'Grafo de Fluxo de Dados D3 (Taint Analysis)',
+          text: 'Visualiza o trajeto dos dados: Endpoints ➔ Funções Consumidoras ➔ Sinks Críticos (ex: eval,innerHTML, SQL query).'
         },
         {
-          icon: Terminal,
-          title: 'Executar via Terminal CLI',
-          text: 'Use a aba "Terminal CLI" e digite "secscan run ." para disparar uma auditoria completa pelo console interativo.'
+          icon: Scan,
+          title: 'Navegação Interativa: Zoom-to-Fit e Pan Livre',
+          text: 'Utilize o botão "Fit" para enquadrar grafos de alta densidade instantaneamente, arraste o canvas livremente no Modo Pan, use o D-pad flutuante ou atalhos (F para Fit, P para Pan, setas para navegar).'
         }
       ],
-      actionLabel: 'Ir para Área de Upload',
-      actionTab: 'scanner'
+      actionLabel: 'Explorar Grafo de Fluxo',
+      actionTab: 'dataflow'
     },
     {
-      stepNumber: 4,
-      badge: '04 // EXPORTAÇÃO, CI/CD E NUVEM',
-      title: 'Pipelines e Automação DevSecOps',
-      targetTab: 'cicd',
-      description: 'Integre o SecScan ao fluxo de trabalho do seu time com exportações padronizadas e automação de segredos:',
+      stepNumber: 5,
+      badge: '05 // MOTOR DE REGRAS REGEX & TERMINAL CLI',
+      title: 'Regras Customizadas e Console Interativo',
+      targetTab: 'rules',
+      description: 'Personalize o comportamento do scanner com regras próprias ou execute comandos avançados via terminal de linha de comando:',
       keyPoints: [
         {
-          icon: Download,
-          title: 'Exportação SARIF 2.1.0 e JSON',
-          text: 'Exporte o relatório no formato padrão SARIF para exibir os alertas nativamente na aba Security do GitHub.'
+          icon: SlidersHorizontal,
+          title: 'Editor de Regras Regex & Entropia',
+          text: 'Crie e configure regras com expressões regulares, severidade (CRITICAL, HIGH, WARNING) e limites mínimos de entropia estatística.'
         },
         {
           icon: Terminal,
-          title: 'Workflow do GitHub Actions',
-          text: 'Acesse a aba "CI/CD & Cloud" para copiar o template de pipeline pronto para quebrar builds em caso de vazamentos.'
+          title: 'Terminal CLI Emulado',
+          text: 'Execute comandos como "secscan run .", "secscan --sarif", ou explore flags e diretórios diretamente pelo terminal interativo.'
         },
         {
           icon: FolderTree,
-          title: 'KMS & Cloud Secret Manager',
-          text: 'Veja exemplos de integração com AWS Secrets Manager e Google Cloud Secret Manager para eliminar variáveis estáticas.'
+          title: 'Global Ignore List Modal',
+          text: 'Defina expressões globais de exclusão (glob patterns) para omitir arquivos de teste (.test.ts), mocks e documentações.'
         }
       ],
-      actionLabel: 'Ver Pipeline CI/CD',
+      actionLabel: 'Acessar Editor de Regras',
+      actionTab: 'rules'
+    },
+    {
+      stepNumber: 6,
+      badge: '06 // COMO SUBMETER SEU CÓDIGO & CI/CD GITHUB ACTIONS',
+      title: 'Auditoria de Arquivos Reais e Automação DevSecOps',
+      targetTab: 'cicd',
+      description: 'Você pode testar seus próprios arquivos agora mesmo e exportar pipelines prontos para proteger seu repositório:',
+      keyPoints: [
+        {
+          icon: Upload,
+          title: '3 Formas de Escanear Seu Código',
+          text: 'Solte arquivos na caixa Drag & Drop, use o botão "Paste Code" no Inspetor para colar snippets, ou use o comando run no Terminal.'
+        },
+        {
+          icon: Download,
+          title: 'Exportação SARIF 2.1.0, JSON e PDF',
+          text: 'Gere relatórios no padrão OASIS SARIF para integrar com a aba Security do GitHub, além de JSON para scripts e PDF corporativo.'
+        },
+        {
+          icon: Terminal,
+          title: 'Gerador de Workflow GitHub Actions',
+          text: 'Na aba "CI/CD & Cloud", gere e baixe o arquivo .github/workflows/secscan.yml sincronizado com suas regras ativas para bloquear PRs inseguros.'
+        }
+      ],
+      actionLabel: 'Ver Integração CI/CD',
       actionTab: 'cicd'
     }
   ];
@@ -194,14 +255,31 @@ export const QuickTourModal: React.FC<QuickTourModalProps> = ({
           <button 
             onClick={onClose}
             className="text-[#666] hover:text-white p-1 transition-colors"
-            title="Fechar Guia"
+            title="Fechar Tutorial"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
+        {/* Step Tabs Quick Selector */}
+        <div className="bg-[#080808] border-b border-[#1A1A1A] px-4 py-2 flex items-center gap-1.5 overflow-x-auto text-[10px] font-mono">
+          {tourSteps.map((step, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentStep(idx)}
+              className={`px-2.5 py-1 rounded transition-all whitespace-nowrap shrink-0 ${
+                idx === currentStep
+                  ? 'bg-[#FF3E00] text-white font-bold'
+                  : 'text-zinc-400 hover:text-white hover:bg-[#181818]'
+              }`}
+            >
+              Passo {idx + 1}
+            </button>
+          ))}
+        </div>
+
         {/* Content Body */}
-        <div className="p-6 sm:p-8 space-y-6 overflow-y-auto max-h-[65vh]">
+        <div className="p-6 sm:p-8 space-y-6 overflow-y-auto max-h-[60vh]">
           <p className="text-xs font-mono text-[#AAA] leading-relaxed">
             {current.description}
           </p>
@@ -239,7 +317,7 @@ export const QuickTourModal: React.FC<QuickTourModalProps> = ({
               </span>
               <button
                 onClick={() => handleActionClick(current.actionTab)}
-                className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider bg-white text-black hover:bg-[#FF3E00] hover:text-white transition-colors flex items-center gap-1.5"
+                className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider bg-white text-black hover:bg-[#FF3E00] hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <span>{current.actionLabel}</span>
                 <ExternalLink className="w-3 h-3" />
@@ -269,7 +347,7 @@ export const QuickTourModal: React.FC<QuickTourModalProps> = ({
             {currentStep > 0 && (
               <button
                 onClick={handlePrev}
-                className="px-4 py-2 text-[10px] font-black uppercase tracking-wider text-white bg-[#111] hover:bg-[#222] border border-[#333] transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 text-[10px] font-black uppercase tracking-wider text-white bg-[#111] hover:bg-[#222] border border-[#333] transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
                 <span>Anterior</span>
@@ -278,9 +356,9 @@ export const QuickTourModal: React.FC<QuickTourModalProps> = ({
 
             <button
               onClick={handleNext}
-              className="px-5 py-2 text-[10px] font-black uppercase tracking-wider text-black bg-white hover:bg-[#FF3E00] hover:text-white transition-colors flex items-center gap-1.5 font-mono"
+              className="px-5 py-2 text-[10px] font-black uppercase tracking-wider text-black bg-white hover:bg-[#FF3E00] hover:text-white transition-colors flex items-center gap-1.5 font-mono cursor-pointer"
             >
-              <span>{currentStep === tourSteps.length - 1 ? 'Concluir Tour' : 'Próximo'}</span>
+              <span>{currentStep === tourSteps.length - 1 ? 'Concluir Tutorial' : 'Próximo'}</span>
               {currentStep === tourSteps.length - 1 ? (
                 <Check className="w-3.5 h-3.5" />
               ) : (

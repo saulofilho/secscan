@@ -62,29 +62,29 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   return (
-    <header className="border-b border-[#222] bg-[#050505]/95 backdrop-blur-md sticky top-0 z-30">
+    <header className="w-full border-b border-[#222] bg-[#050505]/95 backdrop-blur-md sticky top-0 z-30">
       {/* Top Banner Bar & Navigation Container */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main Header Bar (Responsive Brand + Toolbar) */}
-        <div className="flex flex-wrap lg:flex-nowrap items-center justify-between py-3 sm:py-3.5 gap-3 border-b border-[#1A1A1A]">
+        <div className="w-full flex flex-wrap 2xl:flex-nowrap items-center justify-between py-2.5 sm:py-3.5 gap-2.5 sm:gap-3 border-b border-[#1A1A1A]">
           {/* Brand Logo & Meta */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="w-10 h-10 bg-[#0F0F0F] border border-[#2A2A2A] rounded flex items-center justify-center text-[#FF3E00] shrink-0 shadow-inner">
-              <ShieldAlert className="w-5 h-5" />
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#0F0F0F] border border-[#2A2A2A] rounded flex items-center justify-center text-[#FF3E00] shrink-0 shadow-inner">
+              <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-black text-xl sm:text-2xl tracking-tight text-white uppercase">
+                <span className="font-black text-lg sm:text-2xl tracking-tight text-white uppercase">
                   SECSCAN<span className="text-[#FF3E00]">.JS</span>
                 </span>
-                <span className="text-[9.5px] font-mono bg-[#FF3E00]/15 text-[#FF3E00] border border-[#FF3E00]/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                <span className="text-[9px] sm:text-[9.5px] font-mono bg-[#FF3E00]/15 text-[#FF3E00] border border-[#FF3E00]/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
                   v1.0
                 </span>
                 <span className="hidden sm:inline-flex items-center text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-[#111] text-[#777] border border-[#222]">
                   LTS
                 </span>
               </div>
-              <p className="text-[10px] font-mono text-[#666] hidden md:flex items-center gap-2 tracking-wider uppercase mt-0.5">
+              <p className="text-[10px] font-mono text-[#666] hidden xl:flex items-center gap-2 tracking-wider uppercase mt-0.5">
                 <span>SAST Security Engine // Secret Matrix & API Discovery</span>
                 <span className="text-[#333]">•</span>
                 <span className="text-zinc-400 flex items-center gap-1">
@@ -96,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Quick Stats & Action Toolbar */}
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
             {/* Scan Duration Indicator */}
             <button
               id="header-scan-duration-badge"
@@ -149,15 +149,15 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            {/* Quick Tour Button */}
+            {/* Tutorial Button */}
             <button
               id="btn-quick-tour"
               onClick={onOpenTour}
-              title="Iniciar Guia Rápido do SecScan"
-              className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-[#FF3E00] bg-[#FF3E00]/10 hover:bg-[#FF3E00] hover:text-white border border-[#FF3E00]/30 hover:border-[#FF3E00] transition-all cursor-pointer"
+              title="Abrir Tutorial Completo da Ferramenta SecScan"
+              className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-[#FF3E00] bg-[#FF3E00]/15 hover:bg-[#FF3E00] hover:text-white border border-[#FF3E00]/40 hover:border-[#FF3E00] transition-all cursor-pointer shadow-[0_0_12px_rgba(255,62,0,0.15)]"
             >
-              <Compass className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden xl:inline">Guia</span>
+              <Compass className="w-3.5 h-3.5 shrink-0 animate-spin-slow" />
+              <span>Tutorial</span>
             </button>
 
             {/* Global Ignore List Button */}

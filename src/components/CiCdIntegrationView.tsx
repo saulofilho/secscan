@@ -13,17 +13,25 @@ import {
   Workflow,
   SlidersHorizontal,
   FileCode,
-  Sparkles
+  Sparkles,
+  Download
 } from 'lucide-react';
-import { ScanReport } from '../types';
+import { ScanReport, RegexRule, IgnorePatternItem } from '../types';
 import { ScanScheduleManager } from './ScanScheduleManager';
 import { SecScanWorkflowModal } from './SecScanWorkflowModal';
+import { GitHubWorkflowTemplateGenerator } from './GitHubWorkflowTemplateGenerator';
 
 interface CiCdIntegrationViewProps {
   report: ScanReport;
+  rules?: RegexRule[];
+  ignorePatterns?: IgnorePatternItem[];
 }
 
-export const CiCdIntegrationView: React.FC<CiCdIntegrationViewProps> = ({ report }) => {
+export const CiCdIntegrationView: React.FC<CiCdIntegrationViewProps> = ({ 
+  report,
+  rules = [],
+  ignorePatterns = []
+}) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [webhookUrl, setWebhookUrl] = useState('');
   const [webhookStatus, setWebhookStatus] = useState<string | null>(null);
@@ -158,60 +166,12 @@ export async function accessGoogleSecret(secretName: string): Promise<string> {
       {/* Automated Scan Schedules with Cron Engine */}
       <ScanScheduleManager report={report} />
 
-      {/* GitHub Actions Card */}
-      <div className="bg-[#0A0A0A] border border-[#222] overflow-hidden">
-        <div className="p-4 bg-[#080808] border-b border-[#222] flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <GitBranch className="w-4 h-4 text-[#FF3E00]" />
-            <span className="text-xs font-black uppercase tracking-wider text-white">GitHub Actions Pipeline (.github/workflows/ci-cd.yml)</span>
-            <span className="text-[9px] px-2 py-0.5 bg-[#141414] text-[#AAA] font-mono border border-[#333] uppercase">
-              SARIF UPLOAD
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              id="btn-open-workflow-modal-card"
-              type="button"
-              onClick={() => setIsWorkflowModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-[#00FF41] bg-[#111] hover:bg-[#00FF41] hover:text-black border border-[#00FF41]/40 transition-colors cursor-pointer"
-              title="Abrir gerador interativo com variáveis de ambiente e sobrescrita de regras"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>secscan.yml com Overrides</span>
-            </button>
-
-            <button
-              onClick={() => handleCopy(githubWorkflowCode, 'github-actions')}
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-white bg-[#111] hover:bg-white hover:text-black border border-[#333] transition-colors cursor-pointer"
-            >
-              {copiedKey === 'github-actions' ? <Check className="w-3.5 h-3.5 text-[#00FF41]" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>Copiar YAML</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="p-5 bg-[#050505] text-[#CCC] font-mono text-xs overflow-x-auto leading-relaxed border-b border-[#222]">
-          <pre>{githubWorkflowCode}</pre>
-        </div>
-
-        <div className="p-4 bg-[#080808] flex items-center justify-between gap-3 text-xs text-[#888] font-mono flex-wrap">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-[#00FF41] shrink-0" />
-            <span>
-              <strong className="text-white">Upload SARIF nativo:</strong> As vulnerabilidades de segredos aparecem automaticamente na aba <em>Security &gt; Code Scanning Alerts</em> do GitHub.
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIsWorkflowModalOpen(true)}
-            className="text-[10px] font-bold text-[#00FF41] hover:underline uppercase tracking-wider cursor-pointer"
-          >
-            Configurar Variáveis de Ambiente & Overrides &rarr;
-          </button>
-        </div>
-      </div>
+      {/* GitHub Actions Workflow Template Generator (Pre-Configured with Active Rules) */}
+      <GitHubWorkflowTemplateGenerator
+        rules={rules}
+        ignorePatterns={ignorePatterns}
+        onOpenAdvancedModal={() => setIsWorkflowModalOpen(true)}
+      />
 
       {/* Cloud Providers Secrets Replacement */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -302,6 +262,8 @@ export async function accessGoogleSecret(secretName: string): Promise<string> {
       <SecScanWorkflowModal
         isOpen={isWorkflowModalOpen}
         onClose={() => setIsWorkflowModalOpen(false)}
+        rules={rules}
+        ignorePatterns={ignorePatterns}
       />
     </div>
   );

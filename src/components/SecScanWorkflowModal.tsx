@@ -16,20 +16,28 @@ import {
   Layers,
   HelpCircle,
   ExternalLink,
-  Workflow
+  Workflow,
+  FolderDown
 } from 'lucide-react';
+import { RegexRule, IgnorePatternItem } from '../types';
 
 interface SecScanWorkflowModalProps {
   isOpen: boolean;
   onClose: () => void;
+  rules?: RegexRule[];
+  ignorePatterns?: IgnorePatternItem[];
 }
 
 export const SecScanWorkflowModal: React.FC<SecScanWorkflowModalProps> = ({
   isOpen,
   onClose,
+  rules = [],
+  ignorePatterns = []
 }) => {
   const [activeTab, setActiveTab] = useState<'WORKFLOW' | 'ENV_DOCS' | 'JSON_SAMPLES'>('WORKFLOW');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const activeRules = rules.filter(r => r.enabled);
 
   // Workflow generation options
   const [branches, setBranches] = useState('main, master, develop');
@@ -42,7 +50,10 @@ export const SecScanWorkflowModal: React.FC<SecScanWorkflowModalProps> = ({
   const [includeSlackAlert, setIncludeSlackAlert] = useState(true);
   const [includeManualDispatch, setIncludeManualDispatch] = useState(true);
   const [includeNightlyCron, setIncludeNightlyCron] = useState(false);
-  const [customIgnorePatterns, setCustomIgnorePatterns] = useState('node_modules,dist,build,vendor,**/*.test.js,**/*.spec.ts');
+  const [customIgnorePatterns, setCustomIgnorePatterns] = useState(() => {
+    const active = ignorePatterns.filter(p => p.enabled).map(p => p.pattern);
+    return active.length > 0 ? active.join(',') : 'node_modules,dist,build,vendor,**/*.test.js,**/*.spec.ts';
+  });
   const [minEntropy, setMinEntropy] = useState('3.2');
 
   // Handle ESC key to close modal
@@ -252,6 +263,12 @@ ${includeSlackAlert ? `      - name: 📢 Dispatch DevSecOps Alert on Failure
               <span className="text-[10px] font-mono bg-[#141414] text-[#3366FF] border border-[#3366FF]/30 px-2 py-0.5 font-bold">
                 RULE OVERRIDES READY
               </span>
+              {activeRules.length > 0 && (
+                <span className="text-[10px] font-mono bg-emerald-950/60 text-emerald-300 border border-emerald-700/50 px-2 py-0.5 font-bold inline-flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#00FF41] animate-pulse" />
+                  {activeRules.length} REGRAS ATIVAS
+                </span>
+              )}
             </div>
 
             <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
@@ -333,6 +350,35 @@ ${includeSlackAlert ? `      - name: 📢 Dispatch DevSecOps Alert on Failure
               {copiedKey === 'file-path' ? <Check className="w-3 h-3 text-[#00FF41]" /> : <Copy className="w-3 h-3" />}
               <span>.github/workflows/secscan.yml</span>
             </button>
+
+            {/* Download Rules JSON button */}
+            {activeRules.length > 0 && (
+              <button
+                id="btn-download-secscan-rules-json-modal"
+                type="button"
+                onClick={() => {
+                  const rulesJson = JSON.stringify(activeRules.map(r => ({
+                    id: r.id,
+                    name: r.name,
+                    category: r.category,
+                    severity: r.severity,
+                    pattern: r.pattern,
+                    flags: r.flags || 'g',
+                    minEntropy: r.minEntropy || 3.0,
+                    enabled: true,
+                    description: r.description,
+                    remediation: r.remediation
+                  })), null, 2);
+                  handleDownload('.secscan-rules.json', rulesJson);
+                }}
+                className="px-2.5 py-1.5 text-xs font-mono font-bold uppercase tracking-wider bg-[#141414] hover:bg-[#222] text-[#00FF41] border border-[#00FF41]/40 flex items-center gap-1.5 cursor-pointer transition-colors"
+                title={`Baixar arquivo .secscan-rules.json com as ${activeRules.length} regras ativas`}
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Regras</span>
+                <span>.json</span>
+              </button>
+            )}
 
             {/* Download YAML file button */}
             <button
