@@ -176,6 +176,7 @@ export interface ScanReport {
   findings: ScanFinding[];
   apiEndpoints: ApiEndpointFinding[];
   jsMiner?: JsMinerResults;
+  dataFlowGraph?: DataFlowGraphData;
   metrics: {
     criticalCount: number;
     highCount: number;
@@ -262,5 +263,63 @@ export interface IgnorePatternItem {
   description?: string;
   isBuiltIn?: boolean;
   createdAt: string;
+}
+
+// Data Flow Graph & Taint Analysis Types
+export type DataFlowNodeType = 'ENDPOINT' | 'CONSUMER' | 'SINK';
+
+export type DataFlowLinkType = 'ENDPOINT_TO_CONSUMER' | 'CONSUMER_TO_SINK' | 'DIRECT_FLOW';
+
+export interface DataFlowNode {
+  id: string;
+  type: DataFlowNodeType;
+  label: string;
+  sublabel?: string;
+  file: string;
+  line: number;
+  method?: string;
+  urlType?: string;
+  scope?: string;
+  isInternalOrAdmin?: boolean;
+  sinkType?: DangerousSinkFinding['sinkType'];
+  severity?: SeverityLevel;
+  snippet?: string;
+  remediation?: string;
+  description?: string;
+  tainted?: boolean;
+  riskCategory?: string;
+  cwe?: { id: string; name: string };
+  connectionsCount?: number;
+  // D3 force layout fields
+  x?: number;
+  y?: number;
+  fx?: number | null;
+  fy?: number | null;
+  vx?: number;
+  vy?: number;
+  index?: number;
+}
+
+export interface DataFlowLink {
+  id: string;
+  source: string | DataFlowNode;
+  target: string | DataFlowNode;
+  flowType: DataFlowLinkType;
+  isTainted: boolean;
+  label?: string;
+  file: string;
+}
+
+export interface DataFlowGraphData {
+  nodes: DataFlowNode[];
+  links: DataFlowLink[];
+  metrics: {
+    totalEndpoints: number;
+    totalConsumers: number;
+    totalSinks: number;
+    totalTaintFlows: number;
+    criticalSinksCount: number;
+    filesAnalyzed: number;
+  };
 }
 

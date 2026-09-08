@@ -1,6 +1,6 @@
 {
   "name": "Remix SecScan - JavaScript Secret \u0026 API Path Scanner",
-  "description": "Ferramenta avançada de análise estática (SAST) e dashboard web para detecção automatizada de chaves expostas, reconhecimento de endpoints via LinkFinder e mineração de ativos via JS-Miner (Buckets, JWTs, Source Maps, Sinks DOM).",
+  "description": "Ferramenta avançada de análise estática (SAST) e dashboard web para detecção automatizada de chaves expostas, reconhecimento de endpoints via LinkFinder, mineração de ativos via JS-Miner e visualizador de grafos D3 mapeando fluxo de dados e sinks perigosos.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

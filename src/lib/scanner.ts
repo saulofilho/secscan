@@ -14,10 +14,12 @@ import {
   CloudBucketFinding,
   JwtTokenFinding,
   BundledDependencyFinding,
-  DangerousSinkFinding
+  DangerousSinkFinding,
+  DataFlowGraphData
 } from '../types';
 import { extractLinkFinderEndpoints } from './linkFinderEngine';
 import { analyzeWithJsMiner } from './jsMinerEngine';
+import { buildDataFlowGraph } from './dataFlowGraphEngine';
 
 export const DEFAULT_GLOBAL_IGNORE_PATTERNS: IgnorePatternItem[] = [
   {
@@ -746,6 +748,9 @@ export function scanSourceFiles(
       allDangerousSinks.length
   };
 
+  // 3. Data Flow Graph Engine: Map endpoints -> consumer functions -> dangerous sinks
+  const dataFlowGraph = buildDataFlowGraph(files, apiEndpoints, allDangerousSinks);
+
   // Calculate Metrics
   const criticalCount = findings.filter(f => f.severity === 'CRITICAL').length;
   const highCount = findings.filter(f => f.severity === 'HIGH').length;
@@ -800,6 +805,7 @@ export function scanSourceFiles(
     findings,
     apiEndpoints,
     jsMiner,
+    dataFlowGraph,
     metrics: {
       criticalCount,
       highCount,

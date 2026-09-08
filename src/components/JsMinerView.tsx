@@ -15,15 +15,18 @@ import {
   Search,
   Cloud,
   Layers,
-  Code2
+  Code2,
+  Network,
+  ArrowRight
 } from 'lucide-react';
 import { JsMinerResults, CloudBucketFinding, JwtTokenFinding, BundledDependencyFinding, DangerousSinkFinding, SourceMapFinding } from '../types';
 
 interface JsMinerViewProps {
   jsMiner?: JsMinerResults;
+  onNavigateToDataFlow?: () => void;
 }
 
-export const JsMinerView: React.FC<JsMinerViewProps> = ({ jsMiner }) => {
+export const JsMinerView: React.FC<JsMinerViewProps> = ({ jsMiner, onNavigateToDataFlow }) => {
   const [activeSubTab, setActiveSubTab] = useState<'BUCKETS' | 'JWTS' | 'SOURCEMAPS' | 'DEPS' | 'SINKS'>('BUCKETS');
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -106,13 +109,26 @@ export const JsMinerView: React.FC<JsMinerViewProps> = ({ jsMiner }) => {
           </p>
         </div>
 
-        <button
-          onClick={handleExportJson}
-          className="inline-flex items-center gap-2 px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white bg-[#111] hover:bg-white hover:text-black border border-[#333] transition-colors shrink-0"
-        >
-          <Download className="w-3.5 h-3.5 text-[#FF3E00]" />
-          <span>Exportar JS-Miner JSON</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          {onNavigateToDataFlow && (
+            <button
+              onClick={onNavigateToDataFlow}
+              className="inline-flex items-center gap-2 px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#00E5FF] bg-[#0E1B20] hover:bg-[#00E5FF] hover:text-black border border-[#00E5FF]/40 transition-colors shrink-0"
+              title="Mapear fluxo de dados em Grafo D3 interativo"
+            >
+              <Network className="w-3.5 h-3.5" />
+              <span>Grafo de Fluxo D3 (Taint)</span>
+            </button>
+          )}
+
+          <button
+            onClick={handleExportJson}
+            className="inline-flex items-center gap-2 px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white bg-[#111] hover:bg-white hover:text-black border border-[#333] transition-colors shrink-0"
+          >
+            <Download className="w-3.5 h-3.5 text-[#FF3E00]" />
+            <span>Exportar JS-Miner JSON</span>
+          </button>
+        </div>
       </div>
 
       {/* Metrics Row */}
@@ -448,6 +464,27 @@ export const JsMinerView: React.FC<JsMinerViewProps> = ({ jsMiner }) => {
       {/* SUBTAB 5: DANGEROUS DOM SINKS */}
       {activeSubTab === 'SINKS' && (
         <div className="space-y-4">
+          {onNavigateToDataFlow && (
+            <div className="bg-[#140604] border border-[#FF3E00]/40 p-4 rounded flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-[0_0_15px_rgba(255,62,0,0.1)]">
+              <div className="flex items-center gap-3">
+                <Network className="w-5 h-5 text-[#FF3E00] shrink-0 animate-pulse" />
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase font-mono">Visualizador de Grafo D3 de Fluxo de Dados</h4>
+                  <p className="text-[11px] text-[#888] font-mono mt-0.5">
+                    Rastreie como os endpoints de API detectados fluem até estes perigosos sinks através das funções consumidoras do código.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={onNavigateToDataFlow}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FF3E00] hover:bg-white hover:text-black text-white font-mono text-xs font-bold uppercase transition-colors shrink-0"
+              >
+                <span>Explorar no Grafo D3</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {filteredSinks.length === 0 ? (
             <div className="bg-[#0A0A0A] border border-[#1F1F1F] p-12 text-center">
               <ShieldCheck className="w-8 h-8 text-[#00FF41] mx-auto mb-3" />

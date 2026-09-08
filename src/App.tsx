@@ -21,6 +21,7 @@ import { DashboardOverview } from './components/DashboardOverview';
 import { ScannerView } from './components/ScannerView';
 import { ApiPathsView } from './components/ApiPathsView';
 import { JsMinerView } from './components/JsMinerView';
+import { DataFlowGraphView } from './components/DataFlowGraphView';
 import { CustomRulesView } from './components/CustomRulesView';
 import { CliTerminalView } from './components/CliTerminalView';
 import { CiCdIntegrationView } from './components/CiCdIntegrationView';
@@ -1246,6 +1247,21 @@ export default function App() {
         {activeTab === 'jsminer' && (
           <JsMinerView
             jsMiner={report.jsMiner}
+            onNavigateToDataFlow={() => setActiveTab('dataflow')}
+          />
+        )}
+
+        {activeTab === 'dataflow' && (
+          <DataFlowGraphView
+            graphData={report.dataFlowGraph}
+            files={files}
+            onSelectFile={(filePath) => {
+              const target = files.find(f => f.path === filePath);
+              if (target) {
+                setSelectedFile(target);
+                setActiveTab('scanner');
+              }
+            }}
           />
         )}
 

@@ -152,7 +152,7 @@ function loadUserCustomScript(payload) {
 
 async function fetchPortalMetadata(userId) {
   // LinkFinder REST Route with parameters
-  const res = await fetch(\`/api/v2/users/\${userId}/audit-trail?limit=50&format=json\`);
+  const res = await fetch("/api/v2/users/" + userId + "/audit-trail?limit=50&format=json");
   
   // LinkFinder Internal GraphQL endpoint
   const gql = await fetch('/api/v1/graphql?query={financialAccounts{id,balance}}');
@@ -160,6 +160,20 @@ async function fetchPortalMetadata(userId) {
   // LinkFinder Internal Admin route
   await axios.get('/api/internal/debug/sysinfo');
   return res.json();
+}
+
+async function renderUserProfile(userId) {
+  // Data Flow Consumer: Fetches endpoint data and feeds dangerous sinks
+  const metadata = await fetchPortalMetadata(userId);
+  
+  // Tainted Sink: unescaped innerHTML injection from API response
+  document.getElementById("profile-container").innerHTML = metadata.bioHtml;
+  
+  // Tainted Sink: insecure storage of auth token from endpoint
+  localStorage.setItem("session_token", metadata.token);
+  
+  // Invokes custom script evaluator with payload from API
+  loadUserCustomScript(metadata);
 }
 
 //# sourceMappingURL=clientPortalBundle.js.map`

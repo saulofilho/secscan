@@ -28,6 +28,7 @@ import {
   FolderTree,
   BookOpen,
   Boxes,
+  Network,
   Cloud,
   KeyRound,
   FileCode,
@@ -1123,16 +1124,38 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </button>
             <button
               onClick={() => onNavigateToTab('jsminer')}
-              className="px-4 py-2 bg-[#FF3E00] hover:bg-white hover:text-black border border-[#FF3E00] text-white font-mono text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-4 py-2 bg-[#111] hover:bg-[#222] border border-[#333] text-white font-mono text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Boxes className="w-3.5 h-3.5" />
+              <Boxes className="w-3.5 h-3.5 text-[#FF3E00]" />
               <span>JS Miner ({report.jsMiner?.totalAssetsCount ?? 0})</span>
+            </button>
+            <button
+              onClick={() => onNavigateToTab('dataflow')}
+              className="px-4 py-2 bg-[#FF3E00]/15 hover:bg-[#FF3E00] text-[#FF3E00] hover:text-white border border-[#FF3E00]/40 font-mono text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Mapeamento de fluxo entre Endpoints e Sinks Perigosos usando D3"
+            >
+              <Network className="w-3.5 h-3.5" />
+              <span>Grafo de Fluxo D3 ({report.dataFlowGraph?.metrics.totalTaintFlows ?? 0} Taint)</span>
             </button>
           </div>
         </div>
 
         {/* Reconnaissance Highlights Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <button
+            onClick={() => onNavigateToTab('dataflow')}
+            className="p-4 bg-[#140604] border border-[#FF3E00]/50 hover:border-[#FF3E00] text-left transition-all group cursor-pointer shadow-[0_0_15px_rgba(255,62,0,0.1)]"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono text-[#FF3E00] uppercase font-bold">Data Flow (D3)</span>
+              <Network className="w-4 h-4 text-[#FF3E00] animate-pulse" />
+            </div>
+            <div className="text-2xl font-black font-mono text-white mt-2 flex items-baseline gap-1.5">
+              <span>{report.dataFlowGraph?.metrics.totalTaintFlows ?? 0}</span>
+              <span className="text-[10px] text-rose-400 font-mono font-normal">taint paths</span>
+            </div>
+            <span className="text-[10px] font-mono text-zinc-400 block mt-0.5">Endpoints ➔ Sinks</span>
+          </button>
           <button
             onClick={() => onNavigateToTab('jsminer')}
             className="p-4 bg-[#0D0D0D] border border-[#1F1F1F] hover:border-[#FF3E00] text-left transition-all group cursor-pointer"
