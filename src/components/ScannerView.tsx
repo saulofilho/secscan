@@ -17,12 +17,14 @@ import {
   Filter,
   BookOpen,
   Terminal,
-  Wrench
+  Wrench,
+  ExternalLink
 } from 'lucide-react';
 import { ScannedFile, ScanFinding, SeverityLevel, IgnorePatternItem } from '../types';
 import { SecurityGlossaryTooltip, SecurityGlossaryInlineCard } from './SecurityGlossary';
 import { SecurityGlossaryEntry } from '../lib/securityGlossary';
 import { SecurityRemediationWikiModal } from './SecurityRemediationWikiModal';
+import { getOfficialDocLinksForFinding } from '../lib/remediationWikiData';
 
 interface ScannerViewProps {
   files: ScannedFile[];
@@ -521,6 +523,60 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                       </button>
                     </div>
                   </div>
+
+                  {/* Official Security Documentation References (OWASP & Snyk) */}
+                  {(() => {
+                    const docLinks = getOfficialDocLinksForFinding(finding);
+                    if (!docLinks || docLinks.length === 0) return null;
+                    return (
+                      <div className="bg-[#090909] p-3.5 border border-[#1f1f1f] text-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-[#DDD] font-bold uppercase tracking-wider text-[10px]">
+                            <ExternalLink className="w-3.5 h-3.5 text-[#00FF41]" />
+                            <span>Documentação Oficial de Segurança (OWASP &amp; Snyk):</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-[#666]">
+                            {docLinks.length} {docLinks.length === 1 ? 'referência' : 'referências'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                          {docLinks.map((doc, idx) => (
+                            <a
+                              key={idx}
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-start justify-between gap-2 p-2.5 bg-[#121212] hover:bg-[#181818] border border-[#242424] hover:border-[#FF3E00]/60 transition-all group rounded-none text-left"
+                              title={`${doc.title} - ${doc.url}`}
+                            >
+                              <div className="space-y-1 min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className={`text-[9px] font-mono font-black px-1.5 py-0.5 uppercase tracking-wider ${
+                                    doc.provider === 'OWASP'
+                                      ? 'bg-[#007acc]/20 text-[#38bdf8] border border-[#007acc]/40'
+                                      : doc.provider === 'SNYK'
+                                      ? 'bg-[#4b2670]/30 text-[#c084fc] border border-[#a855f7]/40'
+                                      : 'bg-[#222] text-[#AAA] border border-[#333]'
+                                  }`}>
+                                    {doc.badge || doc.provider}
+                                  </span>
+                                  <span className="text-[11px] font-bold text-[#EEE] group-hover:text-white truncate block">
+                                    {doc.title}
+                                  </span>
+                                </div>
+                                {doc.description && (
+                                  <p className="text-[10px] text-[#777] line-clamp-1 font-mono">
+                                    {doc.description}
+                                  </p>
+                                )}
+                              </div>
+                              <ExternalLink className="w-3 h-3 shrink-0 text-[#666] group-hover:text-[#FF3E00] mt-0.5 transition-colors" />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Context-aware In-Depth Technical Explanation */}
                   <SecurityGlossaryInlineCard 

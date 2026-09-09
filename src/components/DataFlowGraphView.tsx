@@ -36,7 +36,8 @@ import {
   MousePointer,
   ChevronUp,
   ChevronDown,
-  ChevronLeft
+  ChevronLeft,
+  Compass
 } from 'lucide-react';
 import {
   DataFlowNode,
@@ -48,6 +49,7 @@ import {
   DataFlowGraphSettings
 } from '../types';
 import { DataFlowSettingsPanel } from './DataFlowSettingsPanel';
+import { DataFlowTutorialOverlay } from './DataFlowTutorialOverlay';
 
 interface DataFlowGraphViewProps {
   graphData?: DataFlowGraphData;
@@ -93,6 +95,7 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
   const [selectedPathIds, setSelectedPathIds] = useState<Set<string>>(new Set());
   const [isPanMode, setIsPanMode] = useState(false);
   const [zoomScale, setZoomScale] = useState(100);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
   const isPanModeRef = useRef(isPanMode);
   useEffect(() => {
@@ -1216,6 +1219,18 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
             </button>
           </div>
 
+          {/* Tutorial Button */}
+          <button
+            id="btn-open-dataflow-tutorial"
+            onClick={() => setIsTutorialOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-mono transition-all bg-[#FF3E00]/15 text-[#FF3E00] border-[#FF3E00]/40 hover:bg-[#FF3E00] hover:text-white cursor-pointer shadow-[0_0_12px_rgba(255,62,0,0.15)] font-bold"
+            title="Abrir Guia Interativo: Como Interpretar Sources, Sanitizers, Sinks e Navegação"
+          >
+            <Compass className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">Guia do Grafo</span>
+            <span className="sm:hidden">Guia</span>
+          </button>
+
           {/* Settings Panel Trigger */}
           <button
             onClick={() => setIsSettingsOpen(prev => !prev)}
@@ -1486,6 +1501,16 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
               <span>Clique em qualquer nó para rastrear o fluxo e inspecionar remediação</span>
             )}
           </div>
+
+          {/* Interactive Tutorial Overlay Component */}
+          <DataFlowTutorialOverlay
+            isOpen={isTutorialOpen}
+            onClose={() => setIsTutorialOpen(false)}
+            onSelectLayoutMode={(mode) => setSettings(prev => ({ ...prev, layoutMode: mode }))}
+            onTriggerZoomToFit={() => handleZoomToFit()}
+            onTogglePanMode={() => setIsPanMode(prev => !prev)}
+            isPanMode={isPanMode}
+          />
         </div>
 
         {/* Node Inspector Drawer */}

@@ -21,20 +21,23 @@ export const ExportModal: React.FC<ExportModalProps> = ({ report, onClose, initi
 
   if (selectedFormat === 'PDF') {
     exportContent = `================================================================================
-SECSCAN.JS — CONSOLIDATED SECURITY AUDIT & EXECUTIVE RISK ASSESSMENT (PDF)
+SECSCAN APPSEC SUITE — CONSOLIDATED SECURITY AUDIT & EXECUTIVE RISK ASSESSMENT (PDF)
 ================================================================================
 Target Repository : ${report.target || 'Workspace Root'}
 Timestamp         : ${new Date(report.timestamp).toLocaleString()}
-Engine            : SecScan.js SAST v1.0 (Entropy + Deep Regex + Path Criticality)
+Engine            : SecScan AppSec Suite v2.5 (Entropy + Deep Regex + Taint Analysis)
 
 EXECUTIVE RISK SUMMARY:
 --------------------------------------------------------------------------------
+• Cumulative Risk Score  : ${report.metrics.riskScore ?? 0} / 100 [${report.metrics.riskLevel ?? 'MINIMAL'} RISK]
+• Risk Scoring Formula   : ${report.metrics.workspaceRiskBreakdown?.formula || 'N/A'}
 • Security Impact Score  : ${report.metrics.securityImpactScore ?? 0} / 100 [${report.metrics.impactLevel ?? 'NOMINAL'}]
 • Compliance Health Score: ${report.metrics.securityScore}%
-• Critical Vulnerabilities : ${report.metrics.criticalCount}
-• High Risk Exposures    : ${report.metrics.highCount}
-• Medium & Low Findings  : ${report.metrics.mediumCount + report.metrics.lowCount}
+• Critical Vulnerabilities : ${report.metrics.criticalCount} (25 pts cada)
+• High Risk Exposures    : ${report.metrics.highCount} (15 pts cada)
+• Medium & Low Findings  : ${report.metrics.mediumCount + report.metrics.lowCount} (6 pts / 2 pts cada)
 • Files Scanned / Ignored: ${report.scannedFilesCount} / ${report.ignoredFilesCount} (node_modules filter active)
+• Quality Gate Status    : ${(report.metrics.riskScore ?? 0) >= 75 ? 'FAILED (CRITICAL RISK)' : (report.metrics.riskScore ?? 0) >= 50 ? 'WARNING (ELEVATED RISK)' : 'PASSED (COMPLIANT)'}
 
 EXECUTIVE MITIGATION PHASES:
 --------------------------------------------------------------------------------

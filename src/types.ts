@@ -17,7 +17,9 @@ export type FindingCategory =
   | 'PRIVATE_KEY' 
   | 'API_PATH' 
   | 'PASSWORD' 
-  | 'CUSTOM_REGEX';
+  | 'CUSTOM_REGEX'
+  | 'TAINT_SINK'
+  | 'ENTROPY';
 
 export interface RegexRule {
   id: string;
@@ -33,6 +35,15 @@ export interface RegexRule {
   isCustom?: boolean;
   tags?: string[];
   exampleMatch?: string;
+}
+
+export interface OfficialDocLink {
+  provider: 'OWASP' | 'SNYK' | 'CWE' | 'NIST';
+  title: string;
+  url: string;
+  badge: string;
+  description?: string;
+  cheatSheetUrl?: string;
 }
 
 export interface ScanFinding {
@@ -56,6 +67,7 @@ export interface ScanFinding {
   fileCriticalityWeight?: number;
   weightedScore?: number;
   riskScore?: number;
+  documentationLinks?: OfficialDocLink[];
   riskScoreDetails?: {
     baseRuleScore: number;
     categoryAdjustment: number;
@@ -187,6 +199,25 @@ export interface ScanReport {
     securityImpactScore: number; // 0 - 100 (Weighted Risk Impact: 0 = Nominal, 100 = Catastrophic)
     impactLevel: 'CRITICAL' | 'HIGH' | 'ELEVATED' | 'MODERATE' | 'LOW' | 'NOMINAL';
     totalWeightedRisk: number;
+    // Cumulative Workspace Risk Score (0 - 100) based on severity and count of detected vulnerabilities
+    riskScore: number;
+    riskLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'MINIMAL';
+    workspaceRiskBreakdown?: {
+      rawPoints: number;
+      criticalCount: number;
+      highCount: number;
+      mediumCount: number;
+      lowCount: number;
+      infoCount: number;
+      criticalPoints: number;
+      highPoints: number;
+      mediumPoints: number;
+      lowPoints: number;
+      infoPoints: number;
+      formula: string;
+      maxThreshold?: number;
+      isThresholdExceeded?: boolean;
+    };
     criticalityDistribution: {
       criticalFiles: number;
       highFiles: number;
@@ -339,5 +370,31 @@ export interface DataFlowGraphSettings {
   hideIsolatedNodes: boolean;
   showLevelGuides: boolean;
   highlightTaintEdges: boolean;
+}
+
+export interface WorkspaceRiskValidation {
+  riskScore: number;
+  riskLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'MINIMAL';
+  status: 'PASS' | 'WARN' | 'FAIL';
+  maxAllowedRiskScore: number;
+  isCompliant: boolean;
+  reasons: string[];
+  findingsSummary: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    info: number;
+    total: number;
+  };
+  scoreBreakdown: {
+    criticalContribution: number;
+    highContribution: number;
+    mediumContribution: number;
+    lowContribution: number;
+    infoContribution: number;
+    rawSum: number;
+    saturatedScore: number;
+  };
 }
 

@@ -68,28 +68,55 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Main Header Bar (Responsive Brand + Toolbar) */}
         <div className="w-full flex flex-wrap 2xl:flex-nowrap items-center justify-between py-2.5 sm:py-3.5 gap-2.5 sm:gap-3 border-b border-[#1A1A1A]">
           {/* Brand Logo & Meta */}
-          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#0F0F0F] border border-[#2A2A2A] rounded flex items-center justify-center text-[#FF3E00] shrink-0 shadow-inner">
-              <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5" />
+          <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-b from-[#1C1C1C] to-[#0A0A0A] border border-[#333] hover:border-[#FF3E00]/60 rounded-lg flex items-center justify-center text-[#FF3E00] shrink-0 shadow-[0_0_15px_rgba(255,62,0,0.15)] relative group transition-all">
+              <ShieldAlert className="w-5 h-5 sm:w-6 sm:h-6 text-[#FF3E00] drop-shadow-[0_0_6px_rgba(255,62,0,0.5)] transition-transform group-hover:scale-110" />
+              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  (report.metrics.riskScore ?? 0) >= 75 ? 'bg-[#FF3E00]' : (report.metrics.riskScore ?? 0) >= 50 ? 'bg-[#FF7A00]' : 'bg-[#00FF41]'
+                }`} />
+                <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                  (report.metrics.riskScore ?? 0) >= 75 ? 'bg-[#FF3E00]' : (report.metrics.riskScore ?? 0) >= 50 ? 'bg-[#FF7A00]' : 'bg-[#00FF41]'
+                }`} />
+              </span>
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-black text-lg sm:text-2xl tracking-tight text-white uppercase">
-                  SECSCAN<span className="text-[#FF3E00]">.JS</span>
-                </span>
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <div className="flex items-center">
+                  <span className="font-black text-lg sm:text-2xl tracking-tight text-white uppercase">
+                    SECSCAN
+                  </span>
+                  <span className="text-[#FF3E00] font-black tracking-tight text-lg sm:text-2xl uppercase ml-1.5 drop-shadow-[0_0_8px_rgba(255,62,0,0.4)]">
+                    APPSEC
+                  </span>
+                  <span className="ml-2 px-1.5 sm:px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-200 text-[9px] sm:text-[10px] font-black tracking-widest uppercase shadow-xs">
+                    SUITE
+                  </span>
+                </div>
                 <span className="text-[9px] sm:text-[9.5px] font-mono bg-[#FF3E00]/15 text-[#FF3E00] border border-[#FF3E00]/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                  v1.0
+                  v2.5
                 </span>
-                <span className="hidden sm:inline-flex items-center text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-[#111] text-[#777] border border-[#222]">
-                  LTS
+                <span className="hidden md:inline-flex items-center text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#111] text-zinc-400 border border-[#222]">
+                  ENTERPRISE SAST
                 </span>
               </div>
-              <p className="text-[10px] font-mono text-[#666] hidden xl:flex items-center gap-2 tracking-wider uppercase mt-0.5">
-                <span>SAST Security Engine // Secret Matrix & API Discovery</span>
+              <p className="text-[10px] font-mono text-[#777] hidden xl:flex items-center gap-2 tracking-wider uppercase mt-0.5">
+                <span>SAST &amp; Secret Matrix // DataFlow Taint Platform</span>
                 <span className="text-[#333]">•</span>
                 <span className="text-zinc-400 flex items-center gap-1">
                   <Clock className="w-3 h-3 text-[#00FF41]" />
                   <span>Duração: <strong className="text-[#00FF41] font-mono">{report.durationMs ?? 0}ms</strong></span>
+                </span>
+                <span className="text-[#333] hidden 2xl:inline">•</span>
+                <span className="text-zinc-400 hidden 2xl:flex items-center gap-1">
+                  <span>Score Risco:</span>
+                  <strong className={`font-mono font-bold ${
+                    (report.metrics.riskScore ?? 0) >= 75 ? 'text-[#FF3E00]' :
+                    (report.metrics.riskScore ?? 0) >= 50 ? 'text-[#FF7A00]' :
+                    (report.metrics.riskScore ?? 0) >= 25 ? 'text-amber-400' : 'text-[#00FF41]'
+                  }`}>
+                    {report.metrics.riskScore ?? 0}/100 [{report.metrics.riskLevel ?? 'MINIMAL'}]
+                  </strong>
                 </span>
               </p>
             </div>
@@ -97,6 +124,44 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Quick Stats & Action Toolbar */}
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
+            {/* Cumulative Workspace Risk Score Pill */}
+            <button
+              id="header-workspace-risk-score-badge"
+              type="button"
+              onClick={() => {
+                if (activeTab !== 'dashboard') {
+                  setActiveTab('dashboard');
+                }
+                setTimeout(() => {
+                  const el = document.getElementById('cumulative-risk-validation-section') || 
+                             document.getElementById('metric-card-cumulative-risk-score') ||
+                             document.getElementById('cumulative-risk-score-gauge-card');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+              }}
+              className={`flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded border font-mono text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                (report.metrics.riskScore ?? 0) >= 75
+                  ? 'bg-[#FF3E00]/15 text-[#FF3E00] border-[#FF3E00]/40 hover:bg-[#FF3E00]/25'
+                  : (report.metrics.riskScore ?? 0) >= 50
+                  ? 'bg-[#FF7A00]/15 text-[#FF7A00] border-[#FF7A00]/40 hover:bg-[#FF7A00]/25'
+                  : (report.metrics.riskScore ?? 0) >= 25
+                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/40 hover:bg-amber-500/25'
+                  : 'bg-[#00FF41]/10 text-[#00FF41] border-[#00FF41]/30 hover:bg-[#00FF41]/20'
+              }`}
+              title={`Score de Risco Cumulativo do Workspace: ${report.metrics.riskScore ?? 0}/100 [${report.metrics.riskLevel ?? 'MINIMAL'}]. Clique para visualizar detalhes de cálculo.`}
+            >
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span className="text-zinc-400 text-[10px] uppercase tracking-wider hidden sm:inline">
+                Risk Score:
+              </span>
+              <span className="font-mono font-black tracking-tight">
+                {report.metrics.riskScore ?? 0}/100
+              </span>
+              <span className="text-[9px] px-1 py-0.2 rounded bg-black/40 border border-current hidden md:inline">
+                {report.metrics.riskLevel ?? 'MINIMAL'}
+              </span>
+            </button>
+
             {/* Scan Duration Indicator */}
             <button
               id="header-scan-duration-badge"

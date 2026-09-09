@@ -15,11 +15,13 @@ import {
   JwtTokenFinding,
   BundledDependencyFinding,
   DangerousSinkFinding,
-  DataFlowGraphData
+  DataFlowGraphData,
+  WorkspaceRiskValidation
 } from '../types';
 import { extractLinkFinderEndpoints } from './linkFinderEngine';
 import { analyzeWithJsMiner } from './jsMinerEngine';
 import { buildDataFlowGraph } from './dataFlowGraphEngine';
+import { getOfficialDocLinksForFinding } from './remediationWikiData';
 
 export const DEFAULT_GLOBAL_IGNORE_PATTERNS: IgnorePatternItem[] = [
   {
@@ -396,6 +398,171 @@ export function calculateSecurityImpactScore(findings: ScanFinding[]): {
 }
 
 /**
+ * Severities and their point contribution weights used in the cumulative workspace risk score
+ */
+export const WORKSPACE_SEVERITY_WEIGHTS = {
+  CRITICAL: 25,
+  HIGH: 15,
+  MEDIUM: 6,
+  LOW: 2,
+  INFO: 0.5
+} as const;
+
+/**
+ * Calculates a cumulative 'Risk Score' (0-100) for the current workspace
+ * based on the severity and count of detected vulnerabilities.
+ * 
+ * Formula:
+ * rawPoints = (CRIT * 25) + (HIGH * 15) + (MED * 6) + (LOW * 2) + (INFO * 0.5)
+ * Saturated curve: 100 * (1 - exp(-rawPoints / 50))
+ * Result is strictly bounded in 0 - 100.
+ */
+export function calculateCumulativeWorkspaceRiskScore(counts: {
+  criticalCount: number;
+  highCount: number;
+  mediumCount: number;
+  lowCount: number;
+  infoCount?: number;
+}): {
+  riskScore: number;
+  riskLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'MINIMAL';
+  rawPoints: number;
+  breakdown: {
+    criticalPoints: number;
+    highPoints: number;
+    mediumPoints: number;
+    lowPoints: number;
+    infoPoints: number;
+    formula: string;
+  };
+} {
+  const crit = Math.max(0, counts.criticalCount || 0);
+  const high = Math.max(0, counts.highCount || 0);
+  const med = Math.max(0, counts.mediumCount || 0);
+  const low = Math.max(0, counts.lowCount || 0);
+  const info = Math.max(0, counts.infoCount || 0);
+
+  const totalFindings = crit + high + med + low + info;
+  if (totalFindings === 0) {
+    return {
+      riskScore: 0,
+      riskLevel: 'MINIMAL',
+      rawPoints: 0,
+      breakdown: {
+        criticalPoints: 0,
+        highPoints: 0,
+        mediumPoints: 0,
+        lowPoints: 0,
+        infoPoints: 0,
+        formula: '0 vulnerabilidades detectadas (Risk Score = 0)'
+      }
+    };
+  }
+
+  const criticalPoints = crit * WORKSPACE_SEVERITY_WEIGHTS.CRITICAL;
+  const highPoints = high * WORKSPACE_SEVERITY_WEIGHTS.HIGH;
+  const mediumPoints = med * WORKSPACE_SEVERITY_WEIGHTS.MEDIUM;
+  const lowPoints = low * WORKSPACE_SEVERITY_WEIGHTS.LOW;
+  const infoPoints = info * WORKSPACE_SEVERITY_WEIGHTS.INFO;
+
+  const rawPoints = criticalPoints + highPoints + mediumPoints + lowPoints + infoPoints;
+
+  // Asymptotic saturation curve mapping to strictly 0 - 100 scale:
+  const saturated = 100 * (1 - Math.exp(-rawPoints / 50));
+  const riskScore = Math.min(100, Math.max(1, Math.round(saturated)));
+
+  let riskLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'MINIMAL';
+  if (riskScore >= 75) {
+    riskLevel = 'CRITICAL';
+  } else if (riskScore >= 50) {
+    riskLevel = 'HIGH';
+  } else if (riskScore >= 25) {
+    riskLevel = 'MEDIUM';
+  } else {
+    riskLevel = 'LOW';
+  }
+
+  return {
+    riskScore,
+    riskLevel,
+    rawPoints: Number(rawPoints.toFixed(1)),
+    breakdown: {
+      criticalPoints,
+      highPoints,
+      mediumPoints,
+      lowPoints,
+      infoPoints,
+      formula: `(${crit}×25 CRIT) + (${high}×15 HIGH) + (${med}×6 MED) + (${low}×2 LOW) + (${info}×0.5 INFO) = ${rawPoints.toFixed(1)} raw pts → Saturação = ${riskScore}/100`
+    }
+  };
+}
+
+/**
+ * Validates the workspace against risk score thresholds and vulnerability severity quality gates
+ */
+export function validateWorkspaceRisk(
+  report: ScanReport,
+  maxAllowedRiskScore = 60
+): WorkspaceRiskValidation {
+  const { criticalCount, highCount, mediumCount, lowCount, infoCount, riskScore, riskLevel } = report.metrics;
+  const reasons: string[] = [];
+  let status: 'PASS' | 'WARN' | 'FAIL' = 'PASS';
+
+  if (criticalCount > 0) {
+    reasons.push(`${criticalCount} vulnerabilidade(s) de severidade CRÍTICA detectada(s).`);
+  }
+  if (highCount > 0) {
+    reasons.push(`${highCount} vulnerabilidade(s) de severidade ALTA detectada(s).`);
+  }
+  if (riskScore > maxAllowedRiskScore) {
+    reasons.push(`Score de Risco Cumulativo (${riskScore}/100) excede o limite tolerado de ${maxAllowedRiskScore}/100.`);
+  }
+
+  if (criticalCount > 0 || riskScore >= 75 || riskScore > maxAllowedRiskScore) {
+    status = 'FAIL';
+  } else if (highCount > 0 || riskScore >= 50) {
+    status = 'WARN';
+  } else {
+    status = 'PASS';
+  }
+
+  const calc = calculateCumulativeWorkspaceRiskScore({
+    criticalCount,
+    highCount,
+    mediumCount,
+    lowCount,
+    infoCount
+  });
+
+  return {
+    riskScore: report.metrics.riskScore,
+    riskLevel: report.metrics.riskLevel,
+    status,
+    maxAllowedRiskScore,
+    isCompliant: status === 'PASS',
+    reasons: reasons.length > 0 ? reasons : ['Nenhuma violação aos limites de risco detectada.'],
+    findingsSummary: {
+      critical: criticalCount,
+      high: highCount,
+      medium: mediumCount,
+      low: lowCount,
+      info: infoCount,
+      total: report.findings.length
+    },
+    scoreBreakdown: {
+      criticalContribution: calc.breakdown.criticalPoints,
+      highContribution: calc.breakdown.highPoints,
+      mediumContribution: calc.breakdown.mediumPoints,
+      lowContribution: calc.breakdown.lowPoints,
+      infoContribution: calc.breakdown.infoPoints,
+      rawSum: calc.rawPoints,
+      saturatedScore: report.metrics.riskScore
+    }
+  };
+}
+
+
+/**
  * Calculates Shannon Entropy of a string to detect high-randomness secrets (hashes, tokens, keys)
  */
 export function calculateEntropy(str: string): number {
@@ -695,7 +862,24 @@ export function scanSourceFiles(
             finalScore: riskEval.riskScore,
             assignedSeverity: riskEval.assignedSeverity,
             factors: riskEval.factors
-          }
+          },
+          documentationLinks: getOfficialDocLinksForFinding({
+            id: findingId,
+            ruleId: rule.id,
+            ruleName: rule.name,
+            category: rule.category,
+            severity: riskEval.assignedSeverity,
+            file: file.path,
+            line,
+            column,
+            snippet: lineContent.trim(),
+            matchedSecret: fullMatch,
+            maskedSecret: maskSecret(fullMatch),
+            entropy,
+            description: rule.description,
+            remediation: rule.remediation,
+            timestamp: new Date().toISOString()
+          })
         };
 
         findings.push(finding);
@@ -765,6 +949,15 @@ export function scanSourceFiles(
   // Security Impact Score (0 - 100): Weighted risk scoring system based on finding severity & file criticality
   const { score: securityImpactScore, totalWeightedRisk, impactLevel } = calculateSecurityImpactScore(findings);
 
+  // Cumulative Workspace Risk Score (0 - 100): Based on severity and count of detected vulnerabilities
+  const workspaceRisk = calculateCumulativeWorkspaceRiskScore({
+    criticalCount,
+    highCount,
+    mediumCount,
+    lowCount,
+    infoCount
+  });
+
   // File Criticality Distribution across findings
   const fileCriticalityMap = new Map<string, FileCriticalityLevel>();
   for (const f of findings) {
@@ -792,7 +985,7 @@ export function scanSourceFiles(
     timestamp: new Date().toLocaleTimeString(),
     type: 'SCAN_COMPLETE',
     durationMs,
-    message: `Scan concluído em ${durationMs}ms. Security Impact Score: ${securityImpactScore}/100 (${impactLevel}). Encontrados ${findings.length} segredo(s) em ${scannedCount} arquivo(s) analisado(s).`
+    message: `Scan concluído em ${durationMs}ms. Workspace Risk Score: ${workspaceRisk.riskScore}/100 (${workspaceRisk.riskLevel}). Encontrados ${findings.length} achado(s) em ${scannedCount} arquivo(s) analisado(s).`
   });
 
   return {
@@ -815,6 +1008,22 @@ export function scanSourceFiles(
       securityScore,
       securityImpactScore,
       impactLevel,
+      riskScore: workspaceRisk.riskScore,
+      riskLevel: workspaceRisk.riskLevel,
+      workspaceRiskBreakdown: {
+        rawPoints: workspaceRisk.rawPoints,
+        criticalCount,
+        highCount,
+        mediumCount,
+        lowCount,
+        infoCount,
+        criticalPoints: workspaceRisk.breakdown.criticalPoints,
+        highPoints: workspaceRisk.breakdown.highPoints,
+        mediumPoints: workspaceRisk.breakdown.mediumPoints,
+        lowPoints: workspaceRisk.breakdown.lowPoints,
+        infoPoints: workspaceRisk.breakdown.infoPoints,
+        formula: workspaceRisk.breakdown.formula
+      },
       totalWeightedRisk,
       criticalityDistribution,
       averageEntropy,
@@ -869,8 +1078,8 @@ export function exportToSarif(report: ScanReport): string {
       {
         tool: {
           driver: {
-            name: "SecScan",
-            semanticVersion: "1.0.0",
+            name: "SecScan AppSec Suite",
+            semanticVersion: "2.5.0",
             informationUri: "https://github.com/secscan/secscan",
             rules: Array.from(new Set(report.findings.map(f => f.ruleId))).map(ruleId => {
               const finding = report.findings.find(f => f.ruleId === ruleId)!;
@@ -885,6 +1094,13 @@ export function exportToSarif(report: ScanReport): string {
               };
             })
           }
+        },
+        properties: {
+          riskScore: report.metrics.riskScore,
+          riskLevel: report.metrics.riskLevel,
+          securityScore: report.metrics.securityScore,
+          rawRiskPoints: report.metrics.workspaceRiskBreakdown?.rawPoints ?? 0,
+          qualityGate: report.metrics.riskScore >= 75 ? 'FAIL' : report.metrics.riskScore >= 50 ? 'WARN' : 'PASS'
         },
         results: report.findings.map(finding => ({
           ruleId: finding.ruleId,
@@ -920,23 +1136,26 @@ export function exportToSarif(report: ScanReport): string {
  * Generates an executive Markdown audit report
  */
 export function exportToMarkdown(report: ScanReport): string {
-  return `# Relatório de Auditoria de Segurança - SecScan
+  return `# Relatório de Auditoria de Segurança - SecScan AppSec Suite
 
 **Data do Scan:** ${new Date(report.timestamp).toLocaleString('pt-BR')}
-**Score de Conformidade:** ${report.metrics.securityScore}/100
+**Score de Risco Cumulativo do Workspace:** ${report.metrics.riskScore}/100 [${report.metrics.riskLevel}]
+**Score de Conformidade (Health):** ${report.metrics.securityScore}/100
 **Arquivos Analisados:** ${report.scannedFilesCount} (Ignorados: ${report.ignoredFilesCount})
 **Total de Vulnerabilidades:** ${report.findings.length}
+**Cálculo de Risco Cumulativo:** \`${report.metrics.workspaceRiskBreakdown?.formula || 'N/A'}\`
 
 ---
 
 ## 📊 Sumário de Métricas
 
-| Severidade | Quantidade |
-|---|---|
-| 🚨 CRITICAL | ${report.metrics.criticalCount} |
-| ⚠️ HIGH | ${report.metrics.highCount} |
-| 🟡 MEDIUM | ${report.metrics.mediumCount} |
-| ℹ️ LOW / INFO | ${report.metrics.lowCount + report.metrics.infoCount} |
+| Severidade | Quantidade | Peso Cumulativo |
+|---|---|---|
+| 🚨 CRITICAL | ${report.metrics.criticalCount} | 25 pts cada |
+| ⚠️ HIGH | ${report.metrics.highCount} | 15 pts cada |
+| 🟡 MEDIUM | ${report.metrics.mediumCount} | 6 pts cada |
+| ℹ️ LOW / INFO | ${report.metrics.lowCount + report.metrics.infoCount} | 2 pts / 0.5 pts |
+
 
 ---
 

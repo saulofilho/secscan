@@ -35,7 +35,8 @@ import {
   Clock,
   TrendingDown,
   TrendingUp,
-  History
+  History,
+  Copy
 } from 'lucide-react';
 import { ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem } from '../types';
 import { BreachHeatmap } from './BreachHeatmap';
@@ -103,6 +104,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     securityImpactScore: 0,
     impactLevel: 'NOMINAL',
     totalWeightedRisk: 0,
+    riskScore: 0,
+    riskLevel: 'MINIMAL',
     criticalityDistribution: {
       criticalFiles: 0,
       highFiles: 0,
@@ -174,6 +177,41 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     return { text: 'text-[#00FF41]', bg: 'bg-[#00FF41]/15 border-[#00FF41]/30', label: 'NOMINAL' };
   };
   const impactBadge = getImpactBadge(impactScore);
+
+  // Cumulative Workspace Risk Score (0-100) & Quality Gate
+  const DEFAULT_MAX_RISK = 50;
+  const [qualityGateMaxRisk, setQualityGateMaxRisk] = useState<number>(() => {
+    try {
+      const saved = safeGetItem('secscan_quality_gate_max_risk');
+      if (saved !== null) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_MAX_RISK;
+  });
+
+  const handleUpdateQualityGateMaxRisk = (val: number) => {
+    const sanitized = Math.min(100, Math.max(0, Math.floor(val)));
+    setQualityGateMaxRisk(sanitized);
+    safeSetItem('secscan_quality_gate_max_risk', sanitized.toString());
+  };
+
+  const cumulativeRiskScore = metrics.riskScore ?? 0;
+  const cumulativeRiskLevel = metrics.riskLevel ?? 'MINIMAL';
+  const isQualityGateExceeded = cumulativeRiskScore > qualityGateMaxRisk;
+
+  const getRiskScoreBadge = (val: number) => {
+    if (val >= 75) return { text: 'text-[#FF3E00]', bg: 'bg-[#FF3E00]/15 border-[#FF3E00]/40', label: 'CRÍTICO' };
+    if (val >= 50) return { text: 'text-[#FF7A00]', bg: 'bg-[#FF7A00]/15 border-[#FF7A00]/40', label: 'ALTO' };
+    if (val >= 25) return { text: 'text-[#EAB308]', bg: 'bg-[#EAB308]/15 border-[#EAB308]/40', label: 'MÉDIO' };
+    if (val > 0) return { text: 'text-[#3366FF]', bg: 'bg-[#3366FF]/15 border-[#3366FF]/40', label: 'BAIXO' };
+    return { text: 'text-[#00FF41]', bg: 'bg-[#00FF41]/15 border-[#00FF41]/30', label: 'MÍNIMO' };
+  };
+  const riskScoreBadge = getRiskScoreBadge(cumulativeRiskScore);
+  const [copiedCliCommand, setCopiedCliCommand] = useState(false);
 
   return (
     <div className="space-y-8 pb-12">
@@ -383,6 +421,22 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <span>RECENT SCANS (10) &darr;</span>
             </button>
             <button
+              id="dashboard-header-cumulative-risk-btn"
+              onClick={() => {
+                const el = document.getElementById('cumulative-risk-validation-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className={`text-[10px] font-mono px-2 py-0.5 border font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                isQualityGateExceeded
+                  ? 'bg-[#FF3E00]/15 text-[#FF3E00] border-[#FF3E00]/50 hover:bg-[#FF3E00] hover:text-white animate-pulse'
+                  : 'bg-[#111] text-white hover:text-[#00FF41] border-[#333] hover:border-[#00FF41]/50'
+              }`}
+              title="Inspecionar cálculo e regras do Cumulative Workspace Risk Score (0-100)"
+            >
+              <ShieldAlert className="w-3 h-3 text-[#FF3E00]" />
+              <span>RISK SCORE: {cumulativeRiskScore}/100 [{cumulativeRiskLevel}]</span>
+            </button>
+            <button
               onClick={() => {
                 const el = document.getElementById('critical-threshold-config');
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -522,9 +576,45 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* Metrics Row - 6 High-Precision Cards with Security Impact Score */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {/* Metric 1: Security Impact Score (Weighted System) */}
+      {/* Metrics Row - 7 High-Precision Cards with Cumulative Risk Score & Security Impact */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
+        {/* Metric 1: Cumulative Workspace Risk Score (0-100) */}
+        <div 
+          id="metric-card-cumulative-risk-score"
+          onClick={() => {
+            const el = document.getElementById('cumulative-risk-validation-section');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }}
+          className="bg-[#0A0A0A] p-6 border border-[#2A2A2A] hover:border-[#FF3E00]/60 relative overflow-hidden flex flex-col justify-between cursor-pointer group transition-all"
+          title="Clique para inspecionar o cálculo e a validação do Risk Score cumulativo do workspace"
+        >
+          <div className="absolute top-0 right-0 w-20 h-20 bg-[#FF3E00]/5 rounded-bl-full pointer-events-none" />
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] font-black tracking-[0.2em] text-[#888] group-hover:text-white uppercase">
+                Workspace Risk
+              </span>
+              <div className={`px-2 py-0.5 font-mono font-black text-[10px] border ${riskScoreBadge.bg} ${riskScoreBadge.text}`}>
+                {riskScoreBadge.label}
+              </div>
+            </div>
+            <div className="flex items-baseline gap-1.5 mb-1">
+              <span className={`text-5xl font-black tracking-tighter ${riskScoreBadge.text}`}>
+                {cumulativeRiskScore}
+              </span>
+              <span className="text-xs font-mono text-[#666] font-bold">/ 100</span>
+            </div>
+            <div className="text-[11px] font-mono text-[#888] uppercase tracking-wide">
+              Cumulative Risk Score
+            </div>
+          </div>
+          <div className="mt-4 pt-3 border-t border-[#1A1A1A] flex items-center justify-between text-[10px] font-mono text-[#AAA]">
+            <span>{metrics.criticalCount}C • {metrics.highCount}H • {metrics.mediumCount}M</span>
+            <span className="text-[#FF3E00] group-hover:underline text-[9px]">Validar &rarr;</span>
+          </div>
+        </div>
+
+        {/* Metric 2: Security Impact Score (Weighted System) */}
         <div className="bg-[#0A0A0A] p-6 border border-[#2A2A2A] relative overflow-hidden flex flex-col justify-between">
           <div className="absolute top-0 right-0 w-20 h-20 bg-[#FF3E00]/5 rounded-bl-full pointer-events-none" />
           <div>
@@ -862,6 +952,289 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <span className="text-[10px] uppercase tracking-wider text-[#777] shrink-0">
             Armazenamento: LocalStorage • Automático
           </span>
+        </div>
+      </div>
+
+      {/* Cumulative Workspace Risk Score & Quality Gate Validation Engine */}
+      <div 
+        id="cumulative-risk-validation-section"
+        className={`border-2 p-6 lg:p-8 space-y-6 transition-all ${
+          isQualityGateExceeded
+            ? 'bg-[#0E0301] border-[#FF3E00] shadow-[0_0_30px_rgba(255,62,0,0.18)]'
+            : 'bg-[#0A0A0A] border-[#2A2A2A]'
+        }`}
+      >
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-[#222]">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-mono text-[#FF3E00] bg-[#FF3E00]/10 px-2.5 py-0.5 border border-[#FF3E00]/40 uppercase font-black tracking-widest flex items-center gap-1.5">
+                <ShieldAlert className="w-3 h-3" />
+                QUALITY GATE // CUMULATIVE RISK SCORE
+              </span>
+              <span className={`text-[10px] font-mono px-2 py-0.5 border font-black uppercase ${riskScoreBadge.bg} ${riskScoreBadge.text}`}>
+                SCORE: {cumulativeRiskScore} / 100 [{cumulativeRiskLevel}]
+              </span>
+              <span className={`text-[10px] font-mono px-2 py-0.5 border font-bold uppercase ${
+                isQualityGateExceeded
+                  ? 'bg-[#FF3E00]/20 border-[#FF3E00]/60 text-[#FF3E00] animate-pulse'
+                  : 'bg-[#00FF41]/10 border-[#00FF41]/30 text-[#00FF41]'
+              }`}>
+                {isQualityGateExceeded ? '⚠️ QUALITY GATE BLOQUEADO' : '✓ QUALITY GATE APROVADO'}
+              </span>
+            </div>
+
+            <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2.5">
+              <span>Validação de Risk Score Cumulativo (0 - 100)</span>
+            </h2>
+            <p className="text-xs font-mono text-[#888] max-w-3xl leading-relaxed">
+              Mede a exposição agregada de risco do workspace somando as ponderações de severidade (Crítico: 25, Alto: 15, Médio: 6, Baixo: 2, Info: 0.5) através da função assintótica saturada <code className="text-white bg-[#141414] px-1 py-0.5">100 * (1 - e^(-pontos / 50))</code>, prevenindo explosão e oferecendo qualidade gate rigoroso para pipelines de CI/CD.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="text-right">
+              <div className="text-[10px] font-mono text-[#666] uppercase">Teto Máximo Configurado</div>
+              <div className="text-2xl font-black font-mono text-white">
+                {qualityGateMaxRisk} <span className="text-xs text-[#666]">/ 100</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 2-Column Bento Breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left: Mathematical Score Meter & Gauge */}
+          <div className="lg:col-span-6 bg-[#050505] p-6 border border-[#222] space-y-5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2">
+                <Activity className="w-4 h-4 text-[#FF3E00]" />
+                <span>Termômetro e Níveis de Risco do Workspace</span>
+              </span>
+              <span className="text-[10px] font-mono text-[#888]">
+                SATURAÇÃO EXPONENCIAL
+              </span>
+            </div>
+
+            {/* Score Big Display & Progress Meter */}
+            <div className="space-y-2">
+              <div className="flex items-baseline justify-between">
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-6xl font-black tracking-tighter ${riskScoreBadge.text}`}>
+                    {cumulativeRiskScore}
+                  </span>
+                  <span className="text-sm font-mono text-[#666]">/ 100</span>
+                </div>
+                <div className="text-right">
+                  <span className={`text-xs font-black font-mono px-2.5 py-1 uppercase border ${riskScoreBadge.bg} ${riskScoreBadge.text}`}>
+                    {cumulativeRiskLevel}
+                  </span>
+                </div>
+              </div>
+
+              {/* Tier Progress Bar */}
+              <div className="relative w-full h-3.5 bg-[#141414] border border-[#333] overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-700 ${
+                    cumulativeRiskScore >= 75 ? 'bg-[#FF3E00]' :
+                    cumulativeRiskScore >= 50 ? 'bg-[#FF7A00]' :
+                    cumulativeRiskScore >= 25 ? 'bg-[#EAB308]' :
+                    cumulativeRiskScore > 0 ? 'bg-[#3366FF]' : 'bg-[#00FF41]'
+                  }`}
+                  style={{ width: `${Math.min(100, Math.max(0, cumulativeRiskScore))}%` }}
+                />
+                {/* Max Risk Threshold Marker */}
+                <div 
+                  className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_#FFF] z-10"
+                  style={{ left: `${qualityGateMaxRisk}%` }}
+                  title={`Limite Máximo: ${qualityGateMaxRisk}`}
+                />
+              </div>
+
+              <div className="flex justify-between text-[9px] font-mono text-[#666] pt-1">
+                <span className="text-[#00FF41]">0 Mínimo</span>
+                <span className="text-[#3366FF]">25 Baixo</span>
+                <span className="text-[#EAB308]">50 Médio</span>
+                <span className="text-[#FF7A00]">75 Alto</span>
+                <span className="text-[#FF3E00]">100 Crítico</span>
+              </div>
+            </div>
+
+            {/* Point Contributions Table */}
+            <div className="space-y-2 pt-2 border-t border-[#1A1A1A]">
+              <div className="text-[10px] font-mono text-[#AAA] uppercase font-bold flex justify-between">
+                <span>Composição de Pontos por Severidade:</span>
+                <span>Subtotal</span>
+              </div>
+              <div className="grid grid-cols-1 gap-1.5 font-mono text-xs">
+                <div className="flex items-center justify-between p-2 bg-[#0C0C0C] border border-[#1A1A1A]">
+                  <span className="text-[#FF3E00] font-bold flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#FF3E00]" />
+                    Crítico ({metrics.criticalCount} achados × 25 pts)
+                  </span>
+                  <span className="text-white font-bold">{metrics.workspaceRiskBreakdown?.criticalPoints ?? (metrics.criticalCount * 25)} pts</span>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-[#0C0C0C] border border-[#1A1A1A]">
+                  <span className="text-[#FF7A00] font-bold flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#FF7A00]" />
+                    Alto ({metrics.highCount} achados × 15 pts)
+                  </span>
+                  <span className="text-white font-bold">{metrics.workspaceRiskBreakdown?.highPoints ?? (metrics.highCount * 15)} pts</span>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-[#0C0C0C] border border-[#1A1A1A]">
+                  <span className="text-[#EAB308] font-bold flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#EAB308]" />
+                    Médio ({metrics.mediumCount} achados × 6 pts)
+                  </span>
+                  <span className="text-white font-bold">{metrics.workspaceRiskBreakdown?.mediumPoints ?? (metrics.mediumCount * 6)} pts</span>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-[#0C0C0C] border border-[#1A1A1A]">
+                  <span className="text-[#3366FF] font-bold flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#3366FF]" />
+                    Baixo ({metrics.lowCount} achados × 2 pts)
+                  </span>
+                  <span className="text-white font-bold">{metrics.workspaceRiskBreakdown?.lowPoints ?? (metrics.lowCount * 2)} pts</span>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-[#0C0C0C] border border-[#1A1A1A]">
+                  <span className="text-[#AAA] font-bold flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#777]" />
+                    Info ({metrics.infoCount} achados × 0.5 pts)
+                  </span>
+                  <span className="text-white font-bold">{metrics.workspaceRiskBreakdown?.infoPoints ?? (metrics.infoCount * 0.5)} pts</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-2 px-1 text-xs font-mono text-[#888]">
+                <span>Pontos Brutos Acumulados:</span>
+                <span className="text-white font-bold">{metrics.workspaceRiskBreakdown?.rawPoints ?? 0} pts</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Quality Gate Configuration & CI/CD Testing */}
+          <div className="lg:col-span-6 bg-[#050505] p-6 border border-[#222] flex flex-col justify-between space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-[#FF3E00]" />
+                  <span>Configurar Tolerância Máxima de Risco (Quality Gate)</span>
+                </span>
+                <span className="text-[10px] font-mono text-[#AAA]">CLI --max-risk</span>
+              </div>
+
+              {/* Input & Range Controls */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => handleUpdateQualityGateMaxRisk(qualityGateMaxRisk - 5)}
+                    className="w-10 h-10 bg-[#141414] hover:bg-[#FF3E00] hover:text-white text-white border border-[#333] flex items-center justify-center font-bold transition-all"
+                    title="Diminuir teto em 5"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex-1 relative">
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={qualityGateMaxRisk}
+                      onChange={(e) => handleUpdateQualityGateMaxRisk(Number(e.target.value))}
+                      className="w-full h-2 bg-[#1A1A1A] rounded-none appearance-none cursor-pointer accent-[#FF3E00]"
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => handleUpdateQualityGateMaxRisk(qualityGateMaxRisk + 5)}
+                    className="w-10 h-10 bg-[#141414] hover:bg-[#FF3E00] hover:text-white text-white border border-[#333] flex items-center justify-center font-bold transition-all"
+                    title="Aumentar teto em 5"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+
+                  <div className="w-16 text-center font-mono font-black text-lg bg-[#0C0C0C] border border-[#333] py-1.5 text-white">
+                    {qualityGateMaxRisk}
+                  </div>
+                </div>
+
+                {/* Presets */}
+                <div className="grid grid-cols-4 gap-2 pt-1">
+                  {[
+                    { val: 15, label: '15', name: 'Ultra-Rígido' },
+                    { val: 30, label: '30', name: 'Estrito' },
+                    { val: 50, label: '50', name: 'Padrão SecOps' },
+                    { val: 75, label: '75', name: 'Permissivo' }
+                  ].map((preset) => (
+                    <button
+                      key={preset.val}
+                      onClick={() => handleUpdateQualityGateMaxRisk(preset.val)}
+                      className={`p-2 border font-mono text-center transition-all ${
+                        qualityGateMaxRisk === preset.val
+                          ? 'border-[#FF3E00] bg-[#FF3E00]/15 text-white'
+                          : 'border-[#222] bg-[#0A0A0A] text-[#888] hover:text-white hover:border-[#444]'
+                      }`}
+                    >
+                      <div className="text-xs font-bold">{preset.label}</div>
+                      <div className="text-[8px] text-[#666] uppercase truncate">{preset.name}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Status Diagnostic Card */}
+              <div className={`p-4 border font-mono text-xs space-y-2 ${
+                isQualityGateExceeded
+                  ? 'bg-[#1A0400] border-[#FF3E00]/60 text-[#FF8533]'
+                  : 'bg-[#001405] border-[#00FF41]/40 text-[#00FF41]'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {isQualityGateExceeded ? (
+                    <AlertTriangle className="w-4 h-4 text-[#FF3E00] shrink-0 animate-pulse" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 text-[#00FF41] shrink-0" />
+                  )}
+                  <strong className="text-white uppercase tracking-wider">
+                    {isQualityGateExceeded ? 'PIPELINE BLOQUEADO (EXIT CODE 1)' : 'PIPELINE APROVADO (EXIT CODE 0)'}
+                  </strong>
+                </div>
+                <p className="text-[11px] leading-relaxed text-[#CCC]">
+                  {isQualityGateExceeded ? (
+                    <span>
+                      O Risk Score cumulativo (<strong className="text-[#FF3E00]">{cumulativeRiskScore}</strong>) ultrapassou o teto máximo tolerado de <strong className="text-white">{qualityGateMaxRisk}</strong>. Ações de remediação são mandatórias antes da publicação em produção.
+                    </span>
+                  ) : (
+                    <span>
+                      O Risk Score cumulativo (<strong className="text-[#00FF41]">{cumulativeRiskScore}</strong>) está dentro do limite configurado de <strong className="text-white">{qualityGateMaxRisk}</strong>. Os requisitos de segurança para este workspace foram atendidos.
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* CLI Command Generator */}
+            <div className="p-3.5 bg-[#000] border border-[#222] space-y-2 font-mono text-xs">
+              <div className="flex items-center justify-between text-[10px] text-[#888]">
+                <span>COMANDO PARA CI/CD (GitHub Actions / Jenkins):</span>
+                <span className="text-[#00FF41]">Exit Code Automático</span>
+              </div>
+              <div className="flex items-center justify-between gap-2 p-2 bg-[#080808] border border-[#1A1A1A]">
+                <code className="text-[#00FF41] text-[11px] truncate">
+                  node bin/secscan.js . --max-risk {qualityGateMaxRisk}
+                </code>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`node bin/secscan.js . --max-risk ${qualityGateMaxRisk}`);
+                    setCopiedCliCommand(true);
+                    setTimeout(() => setCopiedCliCommand(false), 2000);
+                  }}
+                  className="px-2 py-1 bg-[#1A1A1A] hover:bg-[#FF3E00] hover:text-white text-[#AAA] text-[10px] font-bold border border-[#333] transition-all flex items-center gap-1 shrink-0"
+                  title="Copiar comando de terminal"
+                >
+                  {copiedCliCommand ? <Check className="w-3 h-3 text-[#00FF41]" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedCliCommand ? 'Copiado' : 'Copiar'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

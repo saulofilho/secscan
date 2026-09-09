@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * SecScan CLI - Automated Secret & API Path Static Analysis Tool
+ * SecScan AppSec Suite CLI - Automated Static Application Security Analysis Tool
  * Usage:
  *   node bin/secscan.js [directory] [options]
  * Options:
@@ -9,6 +9,7 @@
  *   --rules <path>                    Custom regex rules JSON file
  *   --ignore <pattern>                Additional directories/patterns to ignore
  *   --fail-on <critical|high|medium>  Exit code 1 if findings meet/exceed severity
+ *   --max-risk <score>                Exit code 1 if cumulative Risk Score (0-100) exceeds threshold
  *   --output <path>                   Write report directly to file
  *   --help                            Display command line manual
  */
@@ -157,7 +158,7 @@ function run() {
 
   if (args.includes('--help') || args.includes('-h')) {
     console.log(`
-🛡️  SecScan CLI - Static Analysis Secret & API Path Finder for CI/CD
+🛡️  SecScan AppSec Suite CLI - Static Application Security & Risk Analysis Platform
 
 Usage:
   secscan [target_directory] [options]
@@ -167,12 +168,13 @@ Options:
   --rules <file.json>               Path to custom regex rules JSON file
   --ignore <glob>                   Additional ignore patterns (comma-separated)
   --fail-on <critical|high|medium>  Fail CI build if severity is met
+  --max-risk <score>                Fail CI build if cumulative Risk Score (0-100) exceeds threshold
   --output <file>                   Write results directly to destination file
   --help                            Show this help message
 
 Examples:
   secscan . --format json --output secscan-report.json
-  secscan ./src --fail-on critical --format table
+  secscan ./src --fail-on critical --max-risk 60 --format table
   secscan . --format sarif --output results.sarif
 `);
     process.exit(0);
@@ -187,6 +189,8 @@ Examples:
   const customIgnores = ignoreIdx !== -1 && args[ignoreIdx + 1] ? args[ignoreIdx + 1].split(',') : [];
   const failOnIdx = args.indexOf('--fail-on');
   const failOn = failOnIdx !== -1 && args[failOnIdx + 1] ? args[failOnIdx + 1].toUpperCase() : null;
+  const maxRiskIdx = args.indexOf('--max-risk') !== -1 ? args.indexOf('--max-risk') : args.indexOf('--max-risk-score');
+  const maxRisk = maxRiskIdx !== -1 && args[maxRiskIdx + 1] ? parseFloat(args[maxRiskIdx + 1]) : null;
 
   let rules = [...DEFAULT_RULES];
   const rulesIdx = args.indexOf('--rules');
@@ -244,12 +248,39 @@ Examples:
     }
   }
 
+  // Calculate Cumulative Workspace Risk Score (0-100) based on severity count
+  const criticalCount = findings.filter(f => f.severity === 'CRITICAL').length;
+  const highCount = findings.filter(f => f.severity === 'HIGH').length;
+  const mediumCount = findings.filter(f => f.severity === 'MEDIUM').length;
+  const lowCount = findings.filter(f => f.severity === 'LOW').length;
+  const infoCount = findings.filter(f => f.severity === 'INFO').length;
+
+  const rawRiskPoints = (criticalCount * 25) + (highCount * 15) + (mediumCount * 6) + (lowCount * 2) + (infoCount * 0.5);
+  const riskScore = findings.length === 0 ? 0 : Math.min(100, Math.max(1, Math.round(100 * (1 - Math.exp(-rawRiskPoints / 50)))));
+  
+  let riskLevel = 'MINIMAL';
+  if (riskScore >= 75) riskLevel = 'CRITICAL';
+  else if (riskScore >= 50) riskLevel = 'HIGH';
+  else if (riskScore >= 25) riskLevel = 'MEDIUM';
+  else if (riskScore > 0) riskLevel = 'LOW';
+
   const report = {
-    scanner: "SecScan SAST v1.0.0",
+    scanner: "SecScan AppSec Suite v2.5.0",
     timestamp: new Date().toISOString(),
     targetDirectory: targetDir,
     totalFilesScanned: files.length,
     totalFindings: findings.length,
+    metrics: {
+      criticalCount,
+      highCount,
+      mediumCount,
+      lowCount,
+      infoCount,
+      riskScore,
+      riskLevel,
+      rawRiskPoints: Number(rawRiskPoints.toFixed(1)),
+      formula: `(${criticalCount}×25 CRIT) + (${highCount}×15 HIGH) + (${mediumCount}×6 MED) + (${lowCount}×2 LOW) = ${rawRiskPoints.toFixed(1)} raw pts → ${riskScore}/100`
+    },
     findings,
     durationMs: Date.now() - startTime
   };
@@ -266,7 +297,16 @@ Examples:
       $schema: "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
       version: "2.1.0",
       runs: [{
-        tool: { driver: { name: "SecScan", semanticVersion: "1.0.0" } },
+        tool: { driver: { name: "SecScan AppSec Suite", semanticVersion: "2.5.0" } },
+        properties: {
+          riskScore,
+          riskLevel,
+          rawRiskPoints,
+          criticalCount,
+          highCount,
+          mediumCount,
+          lowCount
+        },
         results: findings.map(f => ({
           ruleId: f.ruleId,
           level: f.severity === 'CRITICAL' || f.severity === 'HIGH' ? 'error' : 'warning',
@@ -284,13 +324,16 @@ Examples:
   } else {
     // Human readable table output
     const divider = '─'.repeat(80);
-    console.log(`\n🛡️  SecScan Static Security Analysis Report`);
+    console.log(`\n🛡️  SecScan AppSec Suite - Static Application Security & Risk Report`);
     console.log(divider);
     console.log(`Target: ${targetDir} | Scanned Files: ${files.length} | Findings: ${findings.length} | Elapsed: ${report.durationMs}ms`);
+    console.log(`Cumulative Workspace Risk Score: ${riskScore}/100 [${riskLevel} RISK]`);
+    console.log(`  Severity Breakdown: ${criticalCount} Critical (25 pts), ${highCount} High (15 pts), ${mediumCount} Medium (6 pts), ${lowCount} Low (2 pts)`);
+    console.log(`  Formula: ${report.metrics.formula}`);
     console.log(divider);
 
     if (findings.length === 0) {
-      console.log(`✅ No exposed secrets or sensitive API endpoints detected!\n`);
+      console.log(`✅ No exposed secrets or sensitive API endpoints detected! Workspace is CLEAN.\n`);
     } else {
       findings.forEach(f => {
         const tag = f.severity === 'CRITICAL' ? '🚨 CRITICAL' : f.severity === 'HIGH' ? '⚠️  HIGH' : '🟡 MEDIUM';
@@ -310,7 +353,17 @@ Examples:
     console.log(formattedOutput);
   }
 
-  // Check CI fail condition
+  // Check Quality Gate: Max Cumulative Risk Score
+  if (maxRisk !== null && !isNaN(maxRisk)) {
+    if (riskScore > maxRisk) {
+      console.error(`\n❌ [SecScan Quality Gate] Cumulative Workspace Risk Score (${riskScore}/100) exceeds maximum tolerated limit (${maxRisk})!`);
+      process.exit(1);
+    } else {
+      console.log(`\n✅ [SecScan Quality Gate] Workspace Risk Score (${riskScore}/100) complies with max threshold (${maxRisk}).`);
+    }
+  }
+
+  // Check CI fail condition by severity
   if (failOn) {
     const levels = ['MEDIUM', 'HIGH', 'CRITICAL'];
     const thresholdIdx = levels.indexOf(failOn);

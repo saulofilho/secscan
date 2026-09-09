@@ -56,7 +56,7 @@ export function generateSecurityReportPdf(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-    doc.text('SECSCAN.JS // RELATÓRIO EXECUTIVO DE AUDITORIA SAST & VULNERABILIDADES', marginX, 10);
+    doc.text('SECSCAN APPSEC SUITE // RELATÓRIO EXECUTIVO DE AUDITORIA SAST & MATRIZ DE RISCO', marginX, 10);
     
     doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
     doc.setLineWidth(0.2);
@@ -91,7 +91,7 @@ export function generateSecurityReportPdf(
   const orgName = options?.organizationName || 'SecScan Security Engineering';
   const targetRepo = report.target || 'Workspace Root';
   doc.text(`Repositório: ${targetRepo}   •   Emissão: ${new Date(report.timestamp).toLocaleString('pt-BR')} UTC`, marginX + 6, currentY + 26);
-  doc.text(`Organização: ${orgName}   •   Engine: SecScan SAST v1.0 (RegEx + Entropy Analysis)`, marginX + 6, currentY + 32);
+  doc.text(`Organização: ${orgName}   •   Engine: SecScan AppSec Suite v2.5 (Taint Analysis + Risk Matrix)`, marginX + 6, currentY + 32);
 
   currentY += 44;
 
@@ -111,6 +111,12 @@ export function generateSecurityReportPdf(
 
   const kpis = [
     {
+      title: 'WORKSPACE RISK SCORE',
+      value: `${report.metrics.riskScore ?? 0} / 100`,
+      sub: `Nível: ${report.metrics.riskLevel ?? 'MINIMAL'} (${report.metrics.criticalCount}C • ${report.metrics.highCount}H)`,
+      isAlert: (report.metrics.riskScore ?? 0) >= 50
+    },
+    {
       title: 'SECURITY IMPACT',
       value: `${report.metrics.securityImpactScore ?? 0} / 100`,
       sub: `Nível: ${report.metrics.impactLevel ?? 'NOMINAL'}`,
@@ -123,16 +129,10 @@ export function generateSecurityReportPdf(
       isAlert: report.metrics.securityScore < 70
     },
     {
-      title: 'TOTAL ACHADOS',
-      value: `${report.findings.length}`,
-      sub: `${report.metrics.criticalCount} Críticos • ${report.metrics.highCount} Altos`,
+      title: 'ACHADOS & ARQUIVOS',
+      value: `${report.findings.length} achados`,
+      sub: `${report.scannedFilesCount} auditados (${report.ignoredFilesCount} ignorados)`,
       isAlert: report.metrics.criticalCount > 0
-    },
-    {
-      title: 'ARQUIVOS AUDITADOS',
-      value: `${report.scannedFilesCount}`,
-      sub: `${report.ignoredFilesCount} ignorados (node_modules)`,
-      isAlert: false
     }
   ];
 
@@ -489,7 +489,7 @@ export function generateSecurityReportPdf(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-    doc.text('SECSCAN.JS • AUDITORIA CONFIDENCIAL DE SEGURANÇA DA INFORMAÇÃO', marginX, pageHeight - 8);
+    doc.text('SECSCAN APPSEC SUITE • AUDITORIA CONFIDENCIAL DE SEGURANÇA DA INFORMAÇÃO', marginX, pageHeight - 8);
     doc.text(`Página ${p} de ${totalPages}`, marginX + contentWidth - 20, pageHeight - 8);
   }
 
