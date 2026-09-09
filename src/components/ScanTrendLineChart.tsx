@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { ScanReport } from '../types';
 import { safeGetItem, safeSetItem } from '../lib/storage';
+import { calculateCumulativeWorkspaceRiskScore } from '../lib/scanner';
 
 interface ScanTrendLineChartProps {
   report: ScanReport;
