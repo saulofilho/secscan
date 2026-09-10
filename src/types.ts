@@ -450,4 +450,64 @@ export interface ScanProgress {
   elapsedMs: number;
 }
 
+// Compliance Frameworks and Readiness Mapping Types
+export type ComplianceFrameworkId = 'SOC2' | 'HIPAA' | 'OWASP_TOP_10' | 'PCI_DSS' | 'ISO_27001';
+
+export type ComplianceControlStatus = 'COMPLIANT' | 'DEGRADED' | 'AT_RISK';
+
+export interface ComplianceControlDefinition {
+  id: string;
+  framework: ComplianceFrameworkId;
+  frameworkName: string;
+  code: string;
+  title: string;
+  category: string;
+  description: string;
+  auditImplication: string;
+  recommendedRemediation: string;
+  severityThreshold: SeverityLevel;
+  matchingCategories: FindingCategory[];
+  matchingRuleIds?: string[];
+  matchingKeywords?: string[];
+  docUrl?: string;
+}
+
+export interface EvaluatedComplianceControl extends ComplianceControlDefinition {
+  status: ComplianceControlStatus;
+  matchingFindings: ScanFinding[];
+  criticalCount: number;
+  highCount: number;
+  mediumCount: number;
+  lowCount: number;
+  riskPoints: number;
+}
+
+export interface FrameworkReadinessSummary {
+  framework: ComplianceFrameworkId;
+  name: string;
+  badge: string;
+  shortDescription: string;
+  totalControls: number;
+  compliantControls: number;
+  atRiskControls: number;
+  degradedControls: number;
+  readinessPercentage: number;
+  status: ComplianceControlStatus;
+  violatingFindingsCount: number;
+}
+
+export interface GlobalComplianceAssessment {
+  overallReadinessPercentage: number;
+  overallStatus: ComplianceControlStatus;
+  totalControlsEvaluated: number;
+  totalControlsAtRisk: number;
+  totalControlsDegraded: number;
+  totalControlsCompliant: number;
+  frameworksAtRiskCount: number;
+  totalFrameworksCount: number;
+  frameworkSummaries: Record<ComplianceFrameworkId, FrameworkReadinessSummary>;
+  evaluatedControls: EvaluatedComplianceControl[];
+}
+
+
 

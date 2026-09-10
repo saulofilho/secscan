@@ -14,6 +14,7 @@ export interface SensitivePatternFinding {
   matchedPreview: string;
   line: number;
   remediation: string;
+  securityImpact?: string;
 }
 
 export interface WorkspaceValidationResult {
@@ -54,6 +55,7 @@ const SENSITIVE_CONTENT_PATTERNS: Array<{
   regex: RegExp;
   description: string;
   remediation: string;
+  securityImpact: string;
   isPlaceholder?: (match: string) => boolean;
 }> = [
   {
@@ -63,6 +65,7 @@ const SENSITIVE_CONTENT_PATTERNS: Array<{
     regex: /\b(?:sk|rk)_live_[0-9a-zA-Z]{24,99}\b/g,
     description: 'Chave de API de produção do Stripe detectada.',
     remediation: 'Rotacione a chave no painel do Stripe imediatamente e utilize variáveis de ambiente no servidor.',
+    securityImpact: 'Allows unauthorized API access & payment charge execution',
     isPlaceholder: (m) => /dummy|example|placeholder|test/i.test(m)
   },
   {
@@ -72,6 +75,7 @@ const SENSITIVE_CONTENT_PATTERNS: Array<{
     regex: /\bwhsec_[0-9a-zA-Z]{32,99}\b/g,
     description: 'Assinatura secreta de Webhook do Stripe detectada.',
     remediation: 'Substitua por um placeholder antes de salvar o código.',
+    securityImpact: 'Enables webhook signature forgery & balance spoofing',
     isPlaceholder: (m) => /dummy|example|placeholder|test|replace/i.test(m)
   },
   {
@@ -81,6 +85,7 @@ const SENSITIVE_CONTENT_PATTERNS: Array<{
     regex: /\bAKIA[0-9A-Z]{16}\b/g,
     description: 'Identificador de acesso da AWS exposto.',
     remediation: 'Invalide as credenciais no IAM da AWS e utilize IAM Roles.',
+    securityImpact: 'Credentials exposure risk & cloud infrastructure takeover',
     isPlaceholder: (m) => /EXAMPLE/i.test(m)
   },
   {
@@ -90,6 +95,7 @@ const SENSITIVE_CONTENT_PATTERNS: Array<{
     regex: /\b(?:ghp_[0-9a-zA-Z]{36}|github_pat_[0-9a-zA-Z_]{82})\b/g,
     description: 'Token de acesso pessoal do GitHub exposto.',
     remediation: 'Revogue o token no GitHub Settings > Developer settings > Personal access tokens.',
+    securityImpact: 'Allows unauthorized repository & CI/CD pipeline access',
     isPlaceholder: (m) => /dummy|example|placeholder/i.test(m)
   },
   {
@@ -99,6 +105,7 @@ const SENSITIVE_CONTENT_PATTERNS: Array<{
     regex: /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/g,
     description: 'Bloco de chave privada assimétrica em texto simples.',
     remediation: 'Remova a chave privada do código e utilize gerenciador de segredos.',
+    securityImpact: 'Credentials exposure risk & server decrypt/SSH compromise',
   },
   {
     id: 'slack-webhook',
@@ -107,9 +114,62 @@ const SENSITIVE_CONTENT_PATTERNS: Array<{
     regex: /https:\/\/hooks\.slack\.com\/services\/T[0-9A-Za-z]{8,12}\/B[0-9A-Za-z]{8,12}\/[0-9A-Za-z]{24}/g,
     description: 'Webhook de canal do Slack exposto.',
     remediation: 'Regenere a URL do webhook no portal do Slack Apps.',
+    securityImpact: 'Allows unauthorized internal messaging & channel phishing',
     isPlaceholder: (m) => /abcdefghijklmnopqrstuvwx/i.test(m)
   }
 ];
+
+/**
+ * Resolves the security impact explanation for any given sensitive pattern finding
+ */
+export function resolveSecurityImpact(finding: { patternId?: string; name?: string; severity?: string; securityImpact?: string }): string {
+  if (finding.securityImpact && finding.securityImpact.trim().length > 0) {
+    return finding.securityImpact;
+  }
+
+  const id = (finding.patternId || '').toLowerCase();
+  const name = (finding.name || '').toLowerCase();
+
+  if (id === 'stripe-live-secret' || name.includes('stripe live')) {
+    return 'Allows unauthorized API access & payment charge execution';
+  }
+  if (id === 'stripe-webhook-secret' || name.includes('webhook')) {
+    return 'Enables webhook signature forgery & balance spoofing';
+  }
+  if (id === 'aws-access-key' || id.includes('aws') || name.includes('aws')) {
+    return 'Credentials exposure risk & cloud infrastructure takeover';
+  }
+  if (id === 'github-pat' || id.includes('github') || name.includes('github')) {
+    return 'Allows unauthorized repository & CI/CD pipeline access';
+  }
+  if (id === 'private-rsa-key' || id.includes('rsa') || id.includes('ssh') || name.includes('private key')) {
+    return 'Credentials exposure risk & server decrypt/SSH compromise';
+  }
+  if (id === 'slack-webhook' || id.includes('slack')) {
+    return 'Allows unauthorized internal messaging & channel phishing';
+  }
+  if (id === 'forbidden-filename' || id.includes('env') || name.includes('bloqueado') || name.includes('forbidden')) {
+    return 'Credentials exposure risk (Master environment keys & private certificates)';
+  }
+
+  // Common pattern categories
+  if (id.includes('token') || name.includes('token') || id.includes('jwt')) {
+    return 'Allows unauthorized API access & session hijacking';
+  }
+  if (id.includes('password') || name.includes('password') || id.includes('pass')) {
+    return 'Credentials exposure risk & unauthorized authentication';
+  }
+  if (id.includes('db') || id.includes('database') || name.includes('database')) {
+    return 'Credentials exposure risk & direct database compromise';
+  }
+  if (id.includes('key') || name.includes('key') || id.includes('secret')) {
+    return 'Allows unauthorized API access & service impersonation';
+  }
+
+  return finding.severity === 'CRITICAL'
+    ? 'Credentials exposure risk'
+    : 'Allows unauthorized API access';
+}
 
 /**
  * Checks if a filename matches forbidden workspace file types (.env, keys, etc.)
@@ -150,7 +210,8 @@ export function validateFileForSensitivePatterns(fileName: string, content: stri
           description: forbiddenCheck.reason || 'Tipo de arquivo restrito.',
           matchedPreview: fileName,
           line: 1,
-          remediation: 'Não envie arquivos de configuração de ambiente (.env) ou chaves privadas.'
+          remediation: 'Não envie arquivos de configuração de ambiente (.env) ou chaves privadas.',
+          securityImpact: 'Credentials exposure risk (Master environment keys & private certificates)'
         }
       ],
       hasBlockers: true,
@@ -199,7 +260,8 @@ export function validateFileForSensitivePatterns(fileName: string, content: stri
         description: pattern.description,
         matchedPreview: preview,
         line: lineNum,
-        remediation: pattern.remediation
+        remediation: pattern.remediation,
+        securityImpact: pattern.securityImpact || resolveSecurityImpact(pattern)
       });
 
       // Avoid infinite loop if regex is zero-width

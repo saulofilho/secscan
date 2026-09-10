@@ -43,7 +43,8 @@ import { safeGetItem, safeSetItem } from './lib/storage';
 import { 
   validateFileForSensitivePatterns, 
   isForbiddenWorkspaceFile,
-  SensitivePatternFinding 
+  SensitivePatternFinding,
+  resolveSecurityImpact
 } from './lib/workspaceValidator';
 
 export interface NoticeDetailItem {
@@ -108,8 +109,80 @@ export default function App() {
     message: string;
     phase?: string;
     details?: NoticeDetailItem[];
-  } | null>(null);
-  const [isNoticeDetailsOpen, setIsNoticeDetailsOpen] = useState<boolean>(false);
+  } | null>(() => {
+    const noticeDetails: NoticeDetailItem[] = [];
+    const blockedFiles: string[] = [];
+    const warningFiles: string[] = [];
+
+    SAMPLE_FILES.forEach((file) => {
+      const nameCheck = isForbiddenWorkspaceFile(file.name);
+      if (nameCheck.isForbidden) {
+        blockedFiles.push(`${file.name} (${nameCheck.reason})`);
+        noticeDetails.push({
+          fileName: file.name,
+          blockedReason: nameCheck.reason,
+          status: 'BLOCKED',
+          findings: [
+            {
+              patternId: 'forbidden-filename',
+              name: 'Arquivo Bloqueado',
+              severity: 'CRITICAL',
+              description: nameCheck.reason || 'Tipo de arquivo restrito.',
+              matchedPreview: file.name,
+              line: 1,
+              remediation: 'Não envie arquivos de configuração de ambiente (.env) ou chaves privadas.',
+              securityImpact: 'Credentials exposure risk (Master environment keys & private certificates)'
+            }
+          ]
+        });
+        return;
+      }
+
+      const validation = validateFileForSensitivePatterns(file.name, file.content);
+      if (validation.isForbiddenFile || validation.hasBlockers) {
+        blockedFiles.push(`${file.name} [${validation.findings.map(f => f.name).join(', ')}]`);
+        noticeDetails.push({
+          fileName: file.name,
+          blockedReason: validation.blockedReason,
+          status: 'BLOCKED',
+          findings: validation.findings
+        });
+      } else if (validation.hasWarnings) {
+        warningFiles.push(`${file.name} (${validation.findings.length} aviso(s))`);
+        noticeDetails.push({
+          fileName: file.name,
+          status: 'WARNING',
+          findings: validation.findings
+        });
+      } else {
+        noticeDetails.push({
+          fileName: file.name,
+          status: 'VALIDATED',
+          findings: []
+        });
+      }
+    });
+
+    if (blockedFiles.length > 0) {
+      return {
+        type: 'error',
+        title: 'Arquivos Sensíveis Bloqueados',
+        phase: 'Blocked',
+        message: `Violações detectadas durante a verificação de integridade: ${blockedFiles.join('; ')}`,
+        details: noticeDetails.filter(d => d.status === 'BLOCKED')
+      };
+    } else if (warningFiles.length > 0) {
+      return {
+        type: 'warning',
+        title: 'Varredura com Alertas de Padrões',
+        phase: 'Filtered',
+        message: `Análise concluída com potenciais tokens detectados: ${warningFiles.join('; ')}`,
+        details: noticeDetails.filter(d => d.status === 'WARNING')
+      };
+    }
+    return null;
+  });
+  const [isNoticeDetailsOpen, setIsNoticeDetailsOpen] = useState<boolean>(true);
 
   const noticeSeverityDistribution = useMemo(() => {
     if (!validationNotice?.details || validationNotice.details.length === 0) {
@@ -410,6 +483,7 @@ export default function App() {
         if (detail.findings && detail.findings.length > 0) {
           detail.findings.forEach((f, fIdx) => {
             lines.push(`    - Finding #${fIdx + 1}: [${f.severity}] ${f.name} (Pattern: ${f.patternId}, Line: ${f.line})`);
+            lines.push(`      Security Impact: ${f.securityImpact || resolveSecurityImpact(f)}`);
             lines.push(`      Description: ${f.description}`);
             if (f.matchedPreview) {
               lines.push(`      Preview: ${f.matchedPreview}`);
@@ -484,7 +558,18 @@ export default function App() {
             fileName: file.name,
             blockedReason: nameCheck.reason,
             status: 'BLOCKED',
-            findings: []
+            findings: [
+              {
+                patternId: 'forbidden-filename',
+                name: 'Arquivo Bloqueado',
+                severity: 'CRITICAL',
+                description: nameCheck.reason || 'Tipo de arquivo restrito.',
+                matchedPreview: file.name,
+                line: 1,
+                remediation: 'Não envie arquivos de configuração de ambiente (.env) ou chaves privadas.',
+                securityImpact: 'Credentials exposure risk (Master environment keys & private certificates)'
+              }
+            ]
           });
           return;
         }
@@ -573,7 +658,18 @@ export default function App() {
           fileName: file.name,
           blockedReason: nameCheck.reason,
           status: 'BLOCKED',
-          findings: []
+          findings: [
+            {
+              patternId: 'forbidden-filename',
+              name: 'Arquivo Bloqueado',
+              severity: 'CRITICAL',
+              description: nameCheck.reason || 'Tipo de arquivo restrito.',
+              matchedPreview: file.name,
+              line: 1,
+              remediation: 'Não envie arquivos de configuração de ambiente (.env) ou chaves privadas.',
+              securityImpact: 'Credentials exposure risk (Master environment keys & private certificates)'
+            }
+          ]
         });
         return;
       }
@@ -1084,12 +1180,21 @@ export default function App() {
 
                             {/* Blocked Reason Policy */}
                             {detail.showBlockedPolicy && detail.blockedReason && (
-                              <div className="text-[10.5px] text-rose-300 bg-rose-950/40 p-2 rounded border border-rose-800/40 space-y-0.5">
+                              <div className="text-[10.5px] text-rose-300 bg-rose-950/40 p-2 rounded border border-rose-800/40 space-y-1">
                                 <div className="font-bold uppercase tracking-wider flex items-center gap-1 text-[10px]">
                                   <ShieldAlert className="w-3 h-3 text-rose-400 shrink-0" />
                                   <span>Regra de Política: Arquivo Proibido</span>
                                 </div>
                                 <p className="opacity-90 leading-relaxed break-words">{detail.blockedReason}</p>
+                                <div 
+                                  id={`drawer-policy-impact-${dIdx}`}
+                                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[9.5px] font-mono border bg-rose-950/50 text-rose-200 border-rose-500/40 w-fit"
+                                  title="Security Impact: Risco de exposição de chaves mestras e arquivos de ambiente"
+                                >
+                                  <ShieldAlert className="w-3 h-3 text-rose-400 shrink-0" />
+                                  <span className="font-bold uppercase tracking-wider text-[8.5px] opacity-80">Security Impact:</span>
+                                  <span className="font-semibold text-white/95">Credentials exposure risk (Master environment keys & private certificates)</span>
+                                </div>
                               </div>
                             )}
 
@@ -1099,7 +1204,8 @@ export default function App() {
                                 {detail.visibleFindings.map((f, fIdx) => (
                                   <div 
                                     key={`finding-${fIdx}`}
-                                    className="p-2 rounded bg-black/60 border border-white/10 space-y-1"
+                                    id={`validation-finding-card-${fIdx}`}
+                                    className="p-2 rounded bg-black/60 border border-white/10 space-y-1.5"
                                   >
                                     <div className="flex flex-wrap items-center justify-between gap-1.5">
                                       <span className="font-bold text-white flex items-center gap-1.5">
@@ -1107,9 +1213,28 @@ export default function App() {
                                           f.severity === 'CRITICAL' ? 'bg-rose-500' : f.severity === 'HIGH' ? 'bg-amber-500' : 'bg-yellow-500'
                                         }`} />
                                         <span>{f.name}</span>
-                                        <span className="text-[9.5px] text-white/50">[{f.patternId}]</span>
+                                        <span className="text-[9.5px] text-white/50 font-normal">[{f.patternId}]</span>
                                       </span>
                                       <span className="text-[9.5px] text-white/60">Linha {f.line}</span>
+                                    </div>
+
+                                    {/* Security Impact Indicator */}
+                                    <div 
+                                      id={`validation-finding-impact-${fIdx}`}
+                                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[9.5px] font-mono border ${
+                                        f.severity === 'CRITICAL'
+                                          ? 'bg-rose-950/50 text-rose-200 border-rose-500/40'
+                                          : f.severity === 'HIGH'
+                                          ? 'bg-amber-950/50 text-amber-200 border-amber-500/40'
+                                          : 'bg-yellow-950/50 text-yellow-200 border-yellow-500/40'
+                                      }`}
+                                      title="Security Impact: Motivo pelo qual este padrão foi sinalizado"
+                                    >
+                                      <ShieldAlert className={`w-3 h-3 shrink-0 ${
+                                        f.severity === 'CRITICAL' ? 'text-rose-400' : f.severity === 'HIGH' ? 'text-amber-400' : 'text-yellow-400'
+                                      }`} />
+                                      <span className="font-bold uppercase tracking-wider text-[8.5px] opacity-80">Security Impact:</span>
+                                      <span className="font-semibold text-white/95">{f.securityImpact || resolveSecurityImpact(f)}</span>
                                     </div>
 
                                     <p className="text-[10.5px] text-white/80 leading-snug">{f.description}</p>
