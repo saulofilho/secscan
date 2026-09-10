@@ -1,7 +1,7 @@
 import React from 'react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip } from 'recharts';
-import { AlertOctagon, ShieldAlert, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { ValidationRunsSparkline } from './ValidationRunsSparkline';
+import { CheckCircle2 } from 'lucide-react';
+import { RiskScoreSparkline, RiskScoreScanPoint } from './RiskScoreSparkline';
 
 export interface ValidationSeverityDistribution {
   critical: number;
@@ -19,6 +19,9 @@ interface ValidationSeverityDonutChartProps {
     WARNING: boolean;
   };
   fileSetKey?: string;
+  riskScore?: number;
+  qualityGateLimit?: number;
+  onSelectScan?: (point: RiskScoreScanPoint) => void;
 }
 
 interface DonutSlice {
@@ -33,7 +36,10 @@ export const ValidationSeverityDonutChart: React.FC<ValidationSeverityDonutChart
   distribution,
   onSelectSeverity,
   activeFilters,
-  fileSetKey
+  fileSetKey,
+  riskScore,
+  qualityGateLimit = 50,
+  onSelectScan
 }) => {
   const { critical, high, warning, total } = distribution;
 
@@ -182,14 +188,8 @@ export const ValidationSeverityDonutChart: React.FC<ValidationSeverityDonutChart
           </div>
         </div>
 
-        {/* Small Sparkline Chart Next to Donut Chart: Trend of findings across last 5 validation runs */}
-        <ValidationRunsSparkline
-          distribution={distribution}
-          fileSetKey={fileSetKey}
-        />
-
         {/* Right Side: Interactive Breakdown Badges & Legend */}
-        <div className="flex flex-wrap sm:flex-col items-end sm:items-end gap-1.5 w-full sm:w-auto">
+        <div className="flex flex-wrap sm:flex-col items-end sm:items-end gap-1.5 w-full sm:w-auto shrink-0">
           {/* Critical Slice */}
           <button
             type="button"
@@ -274,6 +274,15 @@ export const ValidationSeverityDonutChart: React.FC<ValidationSeverityDonutChart
           )}
         </div>
       </div>
+
+      {/* Sparkline Beneath the Donut Chart: Historical Progression of Risk Score over the last 5 scans */}
+      <RiskScoreSparkline
+        distribution={distribution}
+        riskScore={riskScore}
+        qualityGateLimit={qualityGateLimit}
+        fileSetKey={fileSetKey}
+        onSelectScan={onSelectScan}
+      />
     </div>
   );
 };

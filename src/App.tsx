@@ -32,11 +32,12 @@ import { SecurityGlossaryModal } from './components/SecurityGlossary';
 import { SnippetHighlighter } from './components/SnippetHighlighter';
 import { WorkspaceFilesMetaPopover } from './components/WorkspaceFilesMetaPopover';
 import { ValidationSeverityDonutChart } from './components/ValidationSeverityDonutChart';
+import { GlobalScanProgressBar } from './components/GlobalScanProgressBar';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
-import { scanSourceFiles, exportToJson, DEFAULT_GLOBAL_IGNORE_PATTERNS } from './lib/scanner';
-import { RegexRule, ScannedFile, ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem } from './types';
+import { scanSourceFiles, scanSourceFilesAsync, exportToJson, DEFAULT_GLOBAL_IGNORE_PATTERNS } from './lib/scanner';
+import { RegexRule, ScannedFile, ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem, ScanProgress } from './types';
 import { SecurityGlossaryEntry } from './lib/securityGlossary';
 import { safeGetItem, safeSetItem } from './lib/storage';
 import { 
@@ -200,13 +201,32 @@ export default function App() {
   const [previousWorkspaceSize, setPreviousWorkspaceSize] = useState<number | undefined>(undefined);
   const lastScanWorkspaceBytesRef = useRef<number | null>(null);
 
+  // Global scan progress tracking
+  const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
+  const activeScanSequenceRef = useRef<number>(0);
+
   // Execute scan
-  const executeScan = useCallback((
+  const executeScan = useCallback(async (
     targetFiles: ScannedFile[], 
     targetRules: RegexRule[], 
     targetIgnorePatterns?: IgnorePatternItem[]
   ) => {
+    const currentSeq = ++activeScanSequenceRef.current;
     setIsScanning(true);
+    setScanProgress({
+      percentage: 0,
+      currentFileIndex: 0,
+      totalFiles: targetFiles.length,
+      currentFileName: targetFiles[0]?.name || '',
+      currentFilePath: targetFiles[0]?.path || '',
+      phase: 'INITIALIZING',
+      phaseLabel: 'Inicializando motor SAST...',
+      findingsFoundCount: 0,
+      scannedCount: 0,
+      ignoredCount: 0,
+      elapsedMs: 0
+    });
+
     const newLogs: AuditLogEvent[] = [];
     const sourcePatterns = Array.isArray(targetIgnorePatterns)
       ? targetIgnorePatterns
@@ -222,13 +242,32 @@ export default function App() {
     }
     lastScanWorkspaceBytesRef.current = currentWorkspaceBytes;
 
-    const result = scanSourceFiles(targetFiles, targetRules, activeIgnoreStrings, (event) => {
-      newLogs.push(event);
-    });
+    try {
+      const result = await scanSourceFilesAsync(
+        targetFiles, 
+        targetRules, 
+        activeIgnoreStrings, 
+        (event) => {
+          newLogs.push(event);
+        },
+        (prog) => {
+          if (activeScanSequenceRef.current === currentSeq) {
+            setScanProgress(prog);
+          }
+        }
+      );
 
-    setReport(result);
-    setAuditLogs(prev => [...newLogs.reverse(), ...prev].slice(0, 80));
-    setIsScanning(false);
+      if (activeScanSequenceRef.current === currentSeq) {
+        setReport(result);
+        setAuditLogs(prev => [...newLogs.reverse(), ...prev].slice(0, 80));
+      }
+    } catch (err) {
+      console.error('Error in executeScan:', err);
+    } finally {
+      if (activeScanSequenceRef.current === currentSeq) {
+        setIsScanning(false);
+      }
+    }
   }, [ignorePatterns]);
 
   // Run on first load
@@ -734,13 +773,21 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#E0E0E0] flex flex-col font-sans selection:bg-[#FF3E00] selection:text-white">
+    <div className="min-h-screen bg-[#050505] text-[#E0E0E0] flex flex-col font-sans selection:bg-[#FF3E00] selection:text-white relative">
+      {/* Global Real-time Scan Progress Bar (0% to 100%) */}
+      <GlobalScanProgressBar
+        isScanning={isScanning}
+        progress={scanProgress}
+        onTriggerScan={() => executeScan(files, rules, ignorePatterns)}
+      />
+
       {/* Top Navigation & App Bar */}
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         report={report}
         isScanning={isScanning}
+        scanProgress={scanProgress}
         onRunScan={() => executeScan(files, rules, ignorePatterns)}
         onOpenExport={() => setShowExportModal(true)}
         onResetWorkspace={handleResetWorkspace}
@@ -916,6 +963,7 @@ export default function App() {
                       onSelectSeverity={(sev) => toggleNoticeSeverityFilter(sev)}
                       activeFilters={noticeSeverityFilters}
                       fileSetKey={files.map(f => f.name).sort().join('_') || 'empty_workspace'}
+                      riskScore={report.metrics.riskScore}
                     />
 
                     {/* Severity Filter Toggle Controls */}

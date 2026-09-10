@@ -16,7 +16,8 @@ import {
   BundledDependencyFinding,
   DangerousSinkFinding,
   DataFlowGraphData,
-  WorkspaceRiskValidation
+  WorkspaceRiskValidation,
+  ScanProgress
 } from '../types';
 import { extractLinkFinderEndpoints } from './linkFinderEngine';
 import { analyzeWithJsMiner } from './jsMinerEngine';
@@ -746,95 +747,106 @@ function getLineAndColumn(content: string, index: number): { line: number; colum
 }
 
 /**
- * Core scanning function that processes files against active regex rules
+ * Helper to scan a single file against regex rules, LinkFinder, and JS-Miner
  */
-export function scanSourceFiles(
-  files: ScannedFile[],
-  rules: RegexRule[],
-  customIgnorePatterns: string[] = [],
+function scanSingleFile(
+  file: ScannedFile,
+  activeRules: RegexRule[],
+  customIgnorePatterns: string[],
+  findings: ScanFinding[],
+  apiEndpoints: ApiEndpointFinding[],
+  allSourceMaps: SourceMapFinding[],
+  allCloudBuckets: CloudBucketFinding[],
+  allJwtTokens: JwtTokenFinding[],
+  allDependencies: BundledDependencyFinding[],
+  allDangerousSinks: DangerousSinkFinding[],
   onLog?: (event: AuditLogEvent) => void
-): ScanReport {
-  const startTime = performance.now();
-  const scanId = 'scan-' + Math.random().toString(36).substring(2, 9);
-  const findings: ScanFinding[] = [];
-  const apiEndpoints: ApiEndpointFinding[] = [];
-  const allSourceMaps: SourceMapFinding[] = [];
-  const allCloudBuckets: CloudBucketFinding[] = [];
-  const allJwtTokens: JwtTokenFinding[] = [];
-  const allDependencies: BundledDependencyFinding[] = [];
-  const allDangerousSinks: DangerousSinkFinding[] = [];
+): { isIgnored: boolean; ignoreReason?: string } {
+  const ignoreCheck = isThirdPartyOrIgnored(file.path, customIgnorePatterns);
+  if (ignoreCheck.isIgnored) {
+    file.isIgnored = true;
+    file.ignoreReason = ignoreCheck.reason;
+    onLog?.({
+      id: `log-${Date.now()}-${file.name}`,
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'DEP_IGNORED',
+      message: `Ignorando dependência: ${file.path} (${ignoreCheck.reason})`
+    });
+    return { isIgnored: true, ignoreReason: ignoreCheck.reason };
+  }
 
-  let scannedCount = 0;
-  let ignoredCount = 0;
+  file.isIgnored = false;
+  file.findingsCount = 0;
 
-  onLog?.({
-    id: `log-${Date.now()}-0`,
-    timestamp: new Date().toLocaleTimeString(),
-    type: 'SCAN_START',
-    message: `Iniciando análise estática em ${files.length} arquivo(s)...`
-  });
-
-  const activeRules = rules.filter(r => r.enabled);
-
-  for (const file of files) {
-    const ignoreCheck = isThirdPartyOrIgnored(file.path, customIgnorePatterns);
-    if (ignoreCheck.isIgnored) {
-      ignoredCount++;
-      file.isIgnored = true;
-      file.ignoreReason = ignoreCheck.reason;
-      onLog?.({
-        id: `log-${Date.now()}-${file.name}`,
-        timestamp: new Date().toLocaleTimeString(),
-        type: 'DEP_IGNORED',
-        message: `Ignorando dependência: ${file.path} (${ignoreCheck.reason})`
-      });
+  // Scan for secrets with regex rules
+  for (const rule of activeRules) {
+    let regex: RegExp;
+    try {
+      let pattern = rule.pattern;
+      let flags = rule.flags || 'g';
+      // Strip any PCRE-style inline (?i) prefix and add 'i' flag
+      if (pattern.startsWith('(?i)')) {
+        pattern = pattern.slice(4);
+        if (!flags.includes('i')) flags += 'i';
+      }
+      // ensure global flag exists for matching all occurrences
+      const effectiveFlags = flags.includes('g') ? flags : flags + 'g';
+      regex = new RegExp(pattern, effectiveFlags);
+    } catch (err) {
+      console.warn(`Invalid regex pattern in rule ${rule.name}:`, err);
       continue;
     }
 
-    scannedCount++;
-    file.isIgnored = false;
-    file.findingsCount = 0;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(file.content)) !== null) {
+      const fullMatch = match[0];
+      if (!fullMatch) break;
 
-    // Scan for secrets with regex rules
-    for (const rule of activeRules) {
-      let regex: RegExp;
-      try {
-        let pattern = rule.pattern;
-        let flags = rule.flags || 'g';
-        // Strip any PCRE-style inline (?i) prefix and add 'i' flag
-        if (pattern.startsWith('(?i)')) {
-          pattern = pattern.slice(4);
-          if (!flags.includes('i')) flags += 'i';
-        }
-        // ensure global flag exists for matching all occurrences
-        const effectiveFlags = flags.includes('g') ? flags : flags + 'g';
-        regex = new RegExp(pattern, effectiveFlags);
-      } catch (err) {
-        console.warn(`Invalid regex pattern in rule ${rule.name}:`, err);
+      const entropy = calculateEntropy(fullMatch);
+      if (rule.minEntropy && entropy < rule.minEntropy) {
+        // Skip low-entropy false positives
         continue;
       }
 
-      let match: RegExpExecArray | null;
-      while ((match = regex.exec(file.content)) !== null) {
-        const fullMatch = match[0];
-        if (!fullMatch) break;
+      const { line, column, lineContent } = getLineAndColumn(file.content, match.index);
+      const criticalityInfo = evaluateFileCriticality(file.path);
+      
+      // Calculate dynamic Risk Score (0-100) and assign authoritative severity level based on the matched rule
+      const riskEval = calculateFindingRiskScore(rule, fullMatch, entropy, file.path);
+      const baseSeverityWeight = SEVERITY_BASE_WEIGHTS[riskEval.assignedSeverity] || 5;
+      const weightedScore = Number((baseSeverityWeight * criticalityInfo.weight).toFixed(1));
 
-        const entropy = calculateEntropy(fullMatch);
-        if (rule.minEntropy && entropy < rule.minEntropy) {
-          // Skip low-entropy false positives
-          continue;
-        }
-
-        const { line, column, lineContent } = getLineAndColumn(file.content, match.index);
-        const criticalityInfo = evaluateFileCriticality(file.path);
-        
-        // Calculate dynamic Risk Score (0-100) and assign authoritative severity level based on the matched rule
-        const riskEval = calculateFindingRiskScore(rule, fullMatch, entropy, file.path);
-        const baseSeverityWeight = SEVERITY_BASE_WEIGHTS[riskEval.assignedSeverity] || 5;
-        const weightedScore = Number((baseSeverityWeight * criticalityInfo.weight).toFixed(1));
-
-        const findingId = `finding-${findings.length + 1}`;
-        const finding: ScanFinding = {
+      const findingId = `finding-${findings.length + 1}`;
+      const finding: ScanFinding = {
+        id: findingId,
+        ruleId: rule.id,
+        ruleName: rule.name,
+        category: rule.category,
+        severity: riskEval.assignedSeverity,
+        file: file.path,
+        line,
+        column,
+        snippet: lineContent.trim(),
+        matchedSecret: fullMatch,
+        maskedSecret: maskSecret(fullMatch),
+        entropy,
+        description: rule.description,
+        remediation: rule.remediation,
+        timestamp: new Date().toISOString(),
+        fileCriticality: criticalityInfo.level,
+        fileCriticalityWeight: criticalityInfo.weight,
+        weightedScore,
+        riskScore: riskEval.riskScore,
+        riskScoreDetails: {
+          baseRuleScore: riskEval.baseRuleScore,
+          categoryAdjustment: riskEval.categoryAdjustment,
+          entropyAdjustment: riskEval.entropyAdjustment,
+          contextMultiplier: riskEval.contextMultiplier,
+          finalScore: riskEval.riskScore,
+          assignedSeverity: riskEval.assignedSeverity,
+          factors: riskEval.factors
+        },
+        documentationLinks: getOfficialDocLinksForFinding({
           id: findingId,
           ruleId: rule.id,
           ruleName: rule.name,
@@ -849,74 +861,65 @@ export function scanSourceFiles(
           entropy,
           description: rule.description,
           remediation: rule.remediation,
-          timestamp: new Date().toISOString(),
-          fileCriticality: criticalityInfo.level,
-          fileCriticalityWeight: criticalityInfo.weight,
-          weightedScore,
-          riskScore: riskEval.riskScore,
-          riskScoreDetails: {
-            baseRuleScore: riskEval.baseRuleScore,
-            categoryAdjustment: riskEval.categoryAdjustment,
-            entropyAdjustment: riskEval.entropyAdjustment,
-            contextMultiplier: riskEval.contextMultiplier,
-            finalScore: riskEval.riskScore,
-            assignedSeverity: riskEval.assignedSeverity,
-            factors: riskEval.factors
-          },
-          documentationLinks: getOfficialDocLinksForFinding({
-            id: findingId,
-            ruleId: rule.id,
-            ruleName: rule.name,
-            category: rule.category,
-            severity: riskEval.assignedSeverity,
-            file: file.path,
-            line,
-            column,
-            snippet: lineContent.trim(),
-            matchedSecret: fullMatch,
-            maskedSecret: maskSecret(fullMatch),
-            entropy,
-            description: rule.description,
-            remediation: rule.remediation,
-            timestamp: new Date().toISOString()
-          })
-        };
+          timestamp: new Date().toISOString()
+        })
+      };
 
-        findings.push(finding);
-        file.findingsCount = (file.findingsCount || 0) + 1;
+      findings.push(finding);
+      file.findingsCount = (file.findingsCount || 0) + 1;
 
-        if (finding.severity === 'CRITICAL' || finding.severity === 'HIGH') {
-          onLog?.({
-            id: `log-${Date.now()}-${findingId}`,
-            timestamp: new Date().toLocaleTimeString(),
-            type: 'SECRET_DETECTED',
-            severity: finding.severity,
-            message: `[ALERTA ${finding.severity}] ${rule.name} detectado em ${file.path}:${line} (Risk Score: ${riskEval.riskScore}/100 • ${riskEval.assignedSeverity})`
-          });
-        }
+      if (finding.severity === 'CRITICAL' || finding.severity === 'HIGH') {
+        onLog?.({
+          id: `log-${Date.now()}-${findingId}`,
+          timestamp: new Date().toLocaleTimeString(),
+          type: 'SECRET_DETECTED',
+          severity: finding.severity,
+          message: `[ALERTA ${finding.severity}] ${rule.name} detectado em ${file.path}:${line} (Risk Score: ${riskEval.riskScore}/100 • ${riskEval.assignedSeverity})`
+        });
       }
     }
-
-    // 1. LinkFinder Engine: Deep reconnaissance of endpoints, parameters, methods, and full URLs
-    const linkFinderEndpoints = extractLinkFinderEndpoints(file.path, file.content);
-    for (const ep of linkFinderEndpoints) {
-      const exists = apiEndpoints.some(
-        existing => existing.file === ep.file && existing.path === ep.path && existing.method === ep.method
-      );
-      if (!exists) {
-        apiEndpoints.push(ep);
-      }
-    }
-
-    // 2. JS-Miner Engine: Source Maps, Cloud Storage Buckets, JWTs, Bundled Libraries & DOM Sinks
-    const jsMinerRes = analyzeWithJsMiner(file.path, file.content);
-    allSourceMaps.push(...jsMinerRes.sourceMaps);
-    allCloudBuckets.push(...jsMinerRes.cloudBuckets);
-    allJwtTokens.push(...jsMinerRes.jwtTokens);
-    allDependencies.push(...jsMinerRes.dependencies);
-    allDangerousSinks.push(...jsMinerRes.dangerousSinks);
   }
 
+  // 1. LinkFinder Engine: Deep reconnaissance of endpoints, parameters, methods, and full URLs
+  const linkFinderEndpoints = extractLinkFinderEndpoints(file.path, file.content);
+  for (const ep of linkFinderEndpoints) {
+    const exists = apiEndpoints.some(
+      existing => existing.file === ep.file && existing.path === ep.path && existing.method === ep.method
+    );
+    if (!exists) {
+      apiEndpoints.push(ep);
+    }
+  }
+
+  // 2. JS-Miner Engine: Source Maps, Cloud Storage Buckets, JWTs, Bundled Libraries & DOM Sinks
+  const jsMinerRes = analyzeWithJsMiner(file.path, file.content);
+  allSourceMaps.push(...jsMinerRes.sourceMaps);
+  allCloudBuckets.push(...jsMinerRes.cloudBuckets);
+  allJwtTokens.push(...jsMinerRes.jwtTokens);
+  allDependencies.push(...jsMinerRes.dependencies);
+  allDangerousSinks.push(...jsMinerRes.dangerousSinks);
+
+  return { isIgnored: false };
+}
+
+/**
+ * Common metrics calculation & report assembly
+ */
+function assembleScanReport(
+  scanId: string,
+  startTime: number,
+  files: ScannedFile[],
+  scannedCount: number,
+  ignoredCount: number,
+  findings: ScanFinding[],
+  apiEndpoints: ApiEndpointFinding[],
+  allSourceMaps: SourceMapFinding[],
+  allCloudBuckets: CloudBucketFinding[],
+  allJwtTokens: JwtTokenFinding[],
+  allDependencies: BundledDependencyFinding[],
+  allDangerousSinks: DangerousSinkFinding[],
+  onLog?: (event: AuditLogEvent) => void
+): ScanReport {
   // Construct JS Miner Results
   const jsMiner: JsMinerResults = {
     sourceMaps: allSourceMaps,
@@ -1038,6 +1041,332 @@ export function scanSourceFiles(
     durationMs
   };
 }
+
+/**
+ * Core scanning function that processes files against active regex rules synchronously
+ */
+export function scanSourceFiles(
+  files: ScannedFile[],
+  rules: RegexRule[],
+  customIgnorePatterns: string[] = [],
+  onLog?: (event: AuditLogEvent) => void,
+  onProgress?: (progress: ScanProgress) => void
+): ScanReport {
+  const startTime = performance.now();
+  const scanId = 'scan-' + Math.random().toString(36).substring(2, 9);
+  const findings: ScanFinding[] = [];
+  const apiEndpoints: ApiEndpointFinding[] = [];
+  const allSourceMaps: SourceMapFinding[] = [];
+  const allCloudBuckets: CloudBucketFinding[] = [];
+  const allJwtTokens: JwtTokenFinding[] = [];
+  const allDependencies: BundledDependencyFinding[] = [];
+  const allDangerousSinks: DangerousSinkFinding[] = [];
+
+  let scannedCount = 0;
+  let ignoredCount = 0;
+
+  onLog?.({
+    id: `log-${Date.now()}-0`,
+    timestamp: new Date().toLocaleTimeString(),
+    type: 'SCAN_START',
+    message: `Iniciando análise estática em ${files.length} arquivo(s)...`
+  });
+
+  onProgress?.({
+    percentage: 0,
+    currentFileIndex: 0,
+    totalFiles: files.length,
+    currentFileName: '',
+    currentFilePath: '',
+    phase: 'INITIALIZING',
+    phaseLabel: 'Inicializando motor SAST...',
+    findingsFoundCount: 0,
+    scannedCount: 0,
+    ignoredCount: 0,
+    elapsedMs: 0
+  });
+
+  const activeRules = rules.filter(r => r.enabled);
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const { isIgnored } = scanSingleFile(
+      file,
+      activeRules,
+      customIgnorePatterns,
+      findings,
+      apiEndpoints,
+      allSourceMaps,
+      allCloudBuckets,
+      allJwtTokens,
+      allDependencies,
+      allDangerousSinks,
+      onLog
+    );
+
+    if (isIgnored) {
+      ignoredCount++;
+    } else {
+      scannedCount++;
+    }
+
+    const currentPercentage = Math.min(85, Math.round(5 + ((i + 1) / Math.max(1, files.length)) * 80));
+    onProgress?.({
+      percentage: currentPercentage,
+      currentFileIndex: i + 1,
+      totalFiles: files.length,
+      currentFileName: file.name,
+      currentFilePath: file.path,
+      phase: 'SECRETS_SCAN',
+      phaseLabel: `Analisando: ${file.name} (${i + 1}/${files.length})`,
+      findingsFoundCount: findings.length,
+      scannedCount,
+      ignoredCount,
+      elapsedMs: Math.round(performance.now() - startTime)
+    });
+  }
+
+  onProgress?.({
+    percentage: 90,
+    currentFileIndex: files.length,
+    totalFiles: files.length,
+    currentFileName: '',
+    currentFilePath: '',
+    phase: 'DATA_FLOW',
+    phaseLabel: 'Mapeando Grafo de Fluxo de Dados & Sinks...',
+    findingsFoundCount: findings.length,
+    scannedCount,
+    ignoredCount,
+    elapsedMs: Math.round(performance.now() - startTime)
+  });
+
+  const report = assembleScanReport(
+    scanId,
+    startTime,
+    files,
+    scannedCount,
+    ignoredCount,
+    findings,
+    apiEndpoints,
+    allSourceMaps,
+    allCloudBuckets,
+    allJwtTokens,
+    allDependencies,
+    allDangerousSinks,
+    onLog
+  );
+
+  onProgress?.({
+    percentage: 100,
+    currentFileIndex: files.length,
+    totalFiles: files.length,
+    currentFileName: '',
+    currentFilePath: '',
+    phase: 'COMPLETED',
+    phaseLabel: `Varredura Concluída (${findings.length} achados em ${scannedCount} arquivos)`,
+    findingsFoundCount: findings.length,
+    scannedCount,
+    ignoredCount,
+    elapsedMs: report.durationMs
+  });
+
+  return report;
+}
+
+/**
+ * Asynchronous scanner that yields to the event loop between files to enable
+ * smooth global progress bar visualization (0% to 100%) and responsive UI telemetry
+ */
+export async function scanSourceFilesAsync(
+  files: ScannedFile[],
+  rules: RegexRule[],
+  customIgnorePatterns: string[] = [],
+  onLog?: (event: AuditLogEvent) => void,
+  onProgress?: (progress: ScanProgress) => void
+): Promise<ScanReport> {
+  const startTime = performance.now();
+  const scanId = 'scan-' + Math.random().toString(36).substring(2, 9);
+  const findings: ScanFinding[] = [];
+  const apiEndpoints: ApiEndpointFinding[] = [];
+  const allSourceMaps: SourceMapFinding[] = [];
+  const allCloudBuckets: CloudBucketFinding[] = [];
+  const allJwtTokens: JwtTokenFinding[] = [];
+  const allDependencies: BundledDependencyFinding[] = [];
+  const allDangerousSinks: DangerousSinkFinding[] = [];
+
+  let scannedCount = 0;
+  let ignoredCount = 0;
+
+  onLog?.({
+    id: `log-${Date.now()}-0`,
+    timestamp: new Date().toLocaleTimeString(),
+    type: 'SCAN_START',
+    message: `Iniciando análise estática assíncrona em ${files.length} arquivo(s)...`
+  });
+
+  onProgress?.({
+    percentage: 0,
+    currentFileIndex: 0,
+    totalFiles: files.length,
+    currentFileName: '',
+    currentFilePath: '',
+    phase: 'INITIALIZING',
+    phaseLabel: 'Inicializando motor SAST...',
+    findingsFoundCount: 0,
+    scannedCount: 0,
+    ignoredCount: 0,
+    elapsedMs: 0
+  });
+
+  // Small pause on start for optical smoothness
+  if (files.length <= 15) {
+    await new Promise(r => setTimeout(r, 40));
+  }
+
+  const activeRules = rules.filter(r => r.enabled);
+
+  // Progressive pacing: for small sample workspaces, provide slight pacing so progress is visually tangible;
+  // for large workspaces (> 20 files), yield with 0ms every 1-2 files so execution stays blazing fast.
+  const yieldMs = files.length <= 6 ? 45 : files.length <= 20 ? 15 : 0;
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+
+    // Compute progress: files map from 5% to 85%
+    const currentPercentage = Math.min(85, Math.round(5 + ((i + 1) / Math.max(1, files.length)) * 80));
+    
+    onProgress?.({
+      percentage: currentPercentage,
+      currentFileIndex: i + 1,
+      totalFiles: files.length,
+      currentFileName: file.name,
+      currentFilePath: file.path,
+      phase: 'SECRETS_SCAN',
+      phaseLabel: `Analisando: ${file.name} (${i + 1}/${files.length})`,
+      findingsFoundCount: findings.length,
+      scannedCount,
+      ignoredCount,
+      elapsedMs: Math.round(performance.now() - startTime)
+    });
+
+    if (yieldMs > 0) {
+      await new Promise(r => setTimeout(r, yieldMs));
+    } else if (i % 2 === 0) {
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    const { isIgnored } = scanSingleFile(
+      file,
+      activeRules,
+      customIgnorePatterns,
+      findings,
+      apiEndpoints,
+      allSourceMaps,
+      allCloudBuckets,
+      allJwtTokens,
+      allDependencies,
+      allDangerousSinks,
+      onLog
+    );
+
+    if (isIgnored) {
+      ignoredCount++;
+    } else {
+      scannedCount++;
+    }
+  }
+
+  // Phase: LinkFinder & JS Miner (88%)
+  onProgress?.({
+    percentage: 88,
+    currentFileIndex: files.length,
+    totalFiles: files.length,
+    currentFileName: '',
+    currentFilePath: '',
+    phase: 'LINK_FINDER',
+    phaseLabel: `Mapeando endpoints de API (${apiEndpoints.length} detectados)...`,
+    findingsFoundCount: findings.length,
+    scannedCount,
+    ignoredCount,
+    elapsedMs: Math.round(performance.now() - startTime)
+  });
+
+  if (files.length <= 15) {
+    await new Promise(r => setTimeout(r, 35));
+  }
+
+  // Phase: Data Flow Graph (93%)
+  onProgress?.({
+    percentage: 93,
+    currentFileIndex: files.length,
+    totalFiles: files.length,
+    currentFileName: '',
+    currentFilePath: '',
+    phase: 'DATA_FLOW',
+    phaseLabel: 'Construindo Grafo de Fluxo de Dados & Taint Analysis...',
+    findingsFoundCount: findings.length,
+    scannedCount,
+    ignoredCount,
+    elapsedMs: Math.round(performance.now() - startTime)
+  });
+
+  if (files.length <= 15) {
+    await new Promise(r => setTimeout(r, 35));
+  }
+
+  // Phase: Finalizing metrics (97%)
+  onProgress?.({
+    percentage: 97,
+    currentFileIndex: files.length,
+    totalFiles: files.length,
+    currentFileName: '',
+    currentFilePath: '',
+    phase: 'FINALIZING',
+    phaseLabel: 'Consolidando Risk Score & Quality Gates...',
+    findingsFoundCount: findings.length,
+    scannedCount,
+    ignoredCount,
+    elapsedMs: Math.round(performance.now() - startTime)
+  });
+
+  if (files.length <= 15) {
+    await new Promise(r => setTimeout(r, 35));
+  }
+
+  const report = assembleScanReport(
+    scanId,
+    startTime,
+    files,
+    scannedCount,
+    ignoredCount,
+    findings,
+    apiEndpoints,
+    allSourceMaps,
+    allCloudBuckets,
+    allJwtTokens,
+    allDependencies,
+    allDangerousSinks,
+    onLog
+  );
+
+  // Phase: Completed (100%)
+  onProgress?.({
+    percentage: 100,
+    currentFileIndex: files.length,
+    totalFiles: files.length,
+    currentFileName: '',
+    currentFilePath: '',
+    phase: 'COMPLETED',
+    phaseLabel: `Varredura Concluída (${findings.length} achados em ${scannedCount} arquivos)`,
+    findingsFoundCount: findings.length,
+    scannedCount,
+    ignoredCount,
+    elapsedMs: report.durationMs
+  });
+
+  return report;
+}
+
 
 /**
  * Exports report as structured JSON suitable for CI/CD integrations

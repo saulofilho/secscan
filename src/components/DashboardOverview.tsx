@@ -45,6 +45,7 @@ import { VulnerabilitySeverityPieChart } from './VulnerabilitySeverityPieChart';
 import { VulnerabilityTrendChart } from './VulnerabilityTrendChart';
 import { ScanTrendLineChart } from './ScanTrendLineChart';
 import { RiskScoreHistoryLineChart } from './RiskScoreHistoryLineChart';
+import { MitigationSuggestionsPanel } from './MitigationSuggestionsPanel';
 import { LastFiveScansTrend } from './LastFiveScansTrend';
 import { RecentScansHistory } from './RecentScansHistory';
 import { ScanSpeedometerGauge } from './ScanSpeedometerGauge';
@@ -1006,6 +1007,20 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             <button
+              id="btn-scroll-to-gemini-mitigations"
+              type="button"
+              onClick={() => {
+                const el = document.getElementById('gemini-mitigation-suggestions-panel');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-3 py-2 bg-[#141414] hover:bg-[#3366FF] hover:text-white text-white border border-[#3366FF]/40 font-mono text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              title="Visualizar sugestões de mitigação e refatoração com IA Gemini"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#3366FF]" />
+              <span>Mitigação IA (Top 3) &darr;</span>
+            </button>
+
+            <button
               id="btn-scroll-to-risk-history"
               type="button"
               onClick={() => {
@@ -1264,6 +1279,24 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Gemini AI Powered Mitigation Suggestions & Refactoring Steps for Top-3 Vulnerabilities */}
+      <MitigationSuggestionsPanel
+        report={report}
+        qualityGateLimit={qualityGateMaxRisk}
+        onNavigateToFinding={(findingId) => {
+          const target = report.findings.find((f) => f.id === findingId);
+          if (target) {
+            onSelectFinding(target);
+          }
+          onNavigateToTab('scanner');
+        }}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+        onNavigateToQualityGate={() => {
+          const el = document.getElementById('cumulative-risk-validation-section');
+          if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }}
+      />
 
       {/* Historical Line Chart of Cumulative Risk Score & Posture Evolution over Past Scans */}
       <RiskScoreHistoryLineChart

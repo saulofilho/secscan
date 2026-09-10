@@ -18,13 +18,14 @@ import {
   BookOpen,
   Clock
 } from 'lucide-react';
-import { ScanReport } from '../types';
+import { ScanReport, ScanProgress } from '../types';
 
 interface HeaderProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   report: ScanReport;
   isScanning: boolean;
+  scanProgress?: ScanProgress | null;
   onRunScan: () => void;
   onOpenExport: () => void;
   onResetWorkspace: () => void;
@@ -39,6 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveTab,
   report,
   isScanning,
+  scanProgress,
   onRunScan,
   onOpenExport,
   onResetWorkspace,
@@ -289,7 +291,11 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Play className={`w-3 h-3 fill-current ${isScanning ? 'animate-spin' : ''}`} />
-              <span>{isScanning ? 'ANALISANDO...' : 'EXECUTAR ANÁLISE'}</span>
+              <span>
+                {isScanning 
+                  ? `ANALISANDO${scanProgress ? ` (${scanProgress.percentage}%)` : '...'}` 
+                  : 'EXECUTAR ANÁLISE'}
+              </span>
             </button>
           </div>
         </div>

@@ -398,3 +398,56 @@ export interface WorkspaceRiskValidation {
   };
 }
 
+export interface GeminiRefactorStep {
+  findingId: string;
+  ruleName: string;
+  category: string;
+  severity: SeverityLevel;
+  file: string;
+  line: number;
+  riskImpact: string;
+  rootCauseAnalysis: string;
+  securePattern: string;
+  refactorSteps: string[];
+  beforeCode: string;
+  afterCode: string;
+  estimatedRiskReductionPoints: number;
+  mitigationPriority: 'P0 - BLOQUEANTE' | 'P1 - CRÍTICO' | 'P2 - ALTO';
+}
+
+export interface GeminiMitigationReport {
+  source: 'gemini' | 'rule_engine';
+  model: string;
+  timestamp: string;
+  executiveSummary: string;
+  totalPotentialRiskReduction: number;
+  projectedNewRiskScore: number;
+  willPassQualityGate: boolean;
+  suggestions: GeminiRefactorStep[];
+  actionPlan: string[];
+}
+
+export type ScanPhase = 
+  | 'INITIALIZING' 
+  | 'SECRETS_SCAN' 
+  | 'LINK_FINDER' 
+  | 'JS_MINER' 
+  | 'DATA_FLOW' 
+  | 'FINALIZING' 
+  | 'COMPLETED';
+
+export interface ScanProgress {
+  percentage: number; // 0 to 100
+  currentFileIndex: number;
+  totalFiles: number;
+  currentFileName: string;
+  currentFilePath: string;
+  phase: ScanPhase;
+  phaseLabel: string;
+  findingsFoundCount: number;
+  scannedCount: number;
+  ignoredCount: number;
+  elapsedMs: number;
+}
+
+
