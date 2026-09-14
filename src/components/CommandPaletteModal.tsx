@@ -1,0 +1,615 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  Search,
+  Command,
+  Play,
+  Download,
+  BookOpen,
+  Ban,
+  RotateCcw,
+  Compass,
+  FileCode2,
+  ShieldAlert,
+  Terminal,
+  Network,
+  Route,
+  Boxes,
+  SlidersHorizontal,
+  CloudCog,
+  Keyboard,
+  ArrowRight,
+  CornerDownLeft,
+  X,
+  FileText,
+  AlertTriangle,
+  CheckCircle2,
+  Filter,
+  Sparkles,
+  History,
+  ListOrdered,
+  Activity
+} from 'lucide-react';
+import { ScannedFile, RegexRule, ScanReport } from '../types';
+
+export interface CommandItem {
+  id: string;
+  title: string;
+  subtitle?: string;
+  category: 'Ações Rápidas' | 'Navegação' | 'Arquivos' | 'Regras & Filtros';
+  icon: React.ComponentType<{ className?: string }>;
+  shortcut?: string;
+  badge?: string;
+  badgeColor?: string;
+  action: () => void;
+  keywords?: string[];
+}
+
+interface CommandPaletteModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  onRunScan: () => void;
+  onOpenExport: () => void;
+  onOpenIgnoreModal: () => void;
+  onOpenGlossary: () => void;
+  onOpenTour: () => void;
+  onResetWorkspace: () => void;
+  onOpenShortcuts: () => void;
+  files: ScannedFile[];
+  onSelectFile: (file: ScannedFile) => void;
+  rules: RegexRule[];
+  report: ScanReport;
+  isScanning: boolean;
+}
+
+export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
+  isOpen,
+  onClose,
+  activeTab,
+  setActiveTab,
+  onRunScan,
+  onOpenExport,
+  onOpenIgnoreModal,
+  onOpenGlossary,
+  onOpenTour,
+  onResetWorkspace,
+  onOpenShortcuts,
+  files,
+  onSelectFile,
+  rules,
+  report,
+  isScanning
+}) => {
+  const [query, setQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const isMac = useMemo(() => {
+    return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  }, []);
+
+  const modKey = isMac ? '⌘' : 'Ctrl+';
+
+  // Build the list of commands
+  const allCommands = useMemo<CommandItem[]>(() => {
+    const list: CommandItem[] = [
+      // Quick Actions
+      {
+        id: 'cmd-run-scan',
+        title: isScanning ? 'Análise SAST em Execução...' : 'Executar Análise SAST de Segurança',
+        subtitle: 'Varre todos os arquivos por segredos, credenciais e vulnerabilidades',
+        category: 'Ações Rápidas',
+        icon: Play,
+        shortcut: `${modKey}S`,
+        badge: isScanning ? 'Em andamento' : 'Principal',
+        badgeColor: 'bg-[#00FF41]/15 text-[#00FF41] border-[#00FF41]/30',
+        action: () => {
+          onClose();
+          onRunScan();
+        },
+        keywords: ['scan', 'analise', 'executar', 'iniciar', 'verificar', 'segredos', 'vulnerabilidades', 'sast']
+      },
+      {
+        id: 'cmd-export-report',
+        title: 'Exportar Relatório de Segurança',
+        subtitle: 'Baixe em formato PDF Executivo, JSON, CSV, SARIF ou Markdown',
+        category: 'Ações Rápidas',
+        icon: Download,
+        shortcut: `${modKey}E`,
+        badge: 'Exportar',
+        badgeColor: 'bg-[#3366FF]/15 text-[#3366FF] border-[#3366FF]/30',
+        action: () => {
+          onClose();
+          onOpenExport();
+        },
+        keywords: ['exportar', 'download', 'pdf', 'json', 'csv', 'sarif', 'relatorio', 'report']
+      },
+      {
+        id: 'cmd-strategic-remediation-plan',
+        title: 'Strategic Remediation Plan (Tarefas de Desenvolvedor)',
+        subtitle: 'Plano priorizado de tarefas (P0-P3) com links diretos para docs de mitigação e scripts',
+        category: 'Ações Rápidas',
+        icon: ListOrdered,
+        badge: 'Dev Tasks',
+        badgeColor: 'bg-[#FF3E00]/15 text-[#FF3E00] border-[#FF3E00]/30',
+        action: () => {
+          onClose();
+          setActiveTab('dashboard');
+          setTimeout(() => {
+            const el = document.getElementById('strategic-remediation-plan');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        },
+        keywords: ['strategic', 'remediation', 'plan', 'plano', 'tarefas', 'developer', 'p0', 'p1', 'prioridade', 'docs']
+      },
+      {
+        id: 'cmd-open-glossary',
+        title: 'Glossário de Vulnerabilidades & Ameaças',
+        subtitle: 'Consulte referências CWE, OWASP Top 10 e guias de mitigação',
+        category: 'Ações Rápidas',
+        icon: BookOpen,
+        shortcut: `${modKey}G`,
+        badge: 'CWE / OWASP',
+        badgeColor: 'bg-[#FF3E00]/15 text-[#FF3E00] border-[#FF3E00]/30',
+        action: () => {
+          onClose();
+          onOpenGlossary();
+        },
+        keywords: ['glossario', 'cwe', 'owasp', 'mitigacao', 'ameacas', 'vulnerabilidades', 'wiki']
+      },
+      {
+        id: 'cmd-open-ignore',
+        title: 'Gerenciar Global Ignore List',
+        subtitle: 'Configure regras globais para ignorar arquivos ou padrões sensíveis',
+        category: 'Ações Rápidas',
+        icon: Ban,
+        shortcut: `${modKey}I`,
+        badge: 'Filtros',
+        badgeColor: 'bg-[#FF7A00]/15 text-[#FF7A00] border-[#FF7A00]/30',
+        action: () => {
+          onClose();
+          onOpenIgnoreModal();
+        },
+        keywords: ['ignore', 'exclusoes', 'desconsiderar', 'filtro', 'padroes', 'regras']
+      },
+      {
+        id: 'cmd-open-shortcuts',
+        title: 'Ver Atalhos de Teclado',
+        subtitle: 'Lista completa de todos os atalhos globais e comandos de navegação',
+        category: 'Ações Rápidas',
+        icon: Keyboard,
+        shortcut: `${modKey}/`,
+        action: () => {
+          onClose();
+          onOpenShortcuts();
+        },
+        keywords: ['atalhos', 'shortcuts', 'teclado', 'keyboard', 'hotkeys', 'ajuda']
+      },
+      {
+        id: 'cmd-open-tour',
+        title: 'Iniciar Tutorial Guiado do SecScan',
+        subtitle: 'Tour passo a passo pelos recursos de SAST e AppSec',
+        category: 'Ações Rápidas',
+        icon: Compass,
+        action: () => {
+          onClose();
+          onOpenTour();
+        },
+        keywords: ['tutorial', 'tour', 'guia', 'passo a passo', 'ajuda', 'introducao']
+      },
+      {
+        id: 'cmd-reset-demo',
+        title: 'Restaurar Arquivos de Exemplo (Workspace Demo)',
+        subtitle: 'Restaura a lista padrão de arquivos vulneráveis para testes',
+        category: 'Ações Rápidas',
+        icon: RotateCcw,
+        shortcut: `${modKey}B`,
+        action: () => {
+          onClose();
+          onResetWorkspace();
+        },
+        keywords: ['reset', 'restaurar', 'demo', 'exemplo', 'padrao', 'workspace']
+      },
+
+      // Navigation Modules
+      {
+        id: 'nav-dashboard',
+        title: 'Módulo: Dashboard & Métricas Executivas',
+        subtitle: 'Score de Risco, distribuição de severidade, sparkline e roadmap',
+        category: 'Navegação',
+        icon: ShieldAlert,
+        shortcut: `${modKey}1`,
+        action: () => {
+          onClose();
+          setActiveTab('dashboard');
+        },
+        keywords: ['dashboard', 'metricas', 'graficos', 'score', 'risco', 'roadmap', 'sparkline', 'executivo']
+      },
+      {
+        id: 'nav-cicd-pipeline-health',
+        title: 'Widget: CI/CD Pipeline Health & GitHub Actions',
+        subtitle: 'Status em tempo real do GitHub Actions, execuções de workflow, taxas de sucesso e logs de scan',
+        category: 'Navegação',
+        icon: Activity,
+        badge: 'Real-Time',
+        badgeColor: 'bg-[#00FF41]/15 text-[#00FF41] border-[#00FF41]/30',
+        action: () => {
+          onClose();
+          setActiveTab('dashboard');
+          setTimeout(() => {
+            const el = document.getElementById('cicd-pipeline-health-widget');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        },
+        keywords: ['cicd', 'pipeline', 'health', 'github actions', 'workflows', 'runs', 'logs', 'success rate', 'actions']
+      },
+      {
+        id: 'nav-scan-history',
+        title: 'Gráfico: Scan History (Últimos 10 Scans)',
+        subtitle: 'Visualização Recharts de progresso e remediação ao longo dos últimos 10 ciclos',
+        category: 'Navegação',
+        icon: History,
+        badge: '10 Scans',
+        badgeColor: 'bg-[#FF3E00]/15 text-[#FF3E00] border-[#FF3E00]/30',
+        action: () => {
+          onClose();
+          setActiveTab('dashboard');
+          setTimeout(() => {
+            const el = document.getElementById('dashboard-scan-history-chart-card');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 150);
+        },
+        keywords: ['scan history', 'historico', '10 scans', 'recharts', 'remediacao', 'progresso', 'grafico']
+      },
+      {
+        id: 'nav-scanner',
+        title: 'Módulo: Inspetor de Código & Vulnerabilidades',
+        subtitle: 'Editor de código interativo, destaque de snippets e triagem',
+        category: 'Navegação',
+        icon: FileCode2,
+        shortcut: `${modKey}2`,
+        badge: `${report.findings.length} achados`,
+        badgeColor: 'bg-[#FF3E00]/15 text-[#FF3E00] border-[#FF3E00]/30',
+        action: () => {
+          onClose();
+          setActiveTab('scanner');
+        },
+        keywords: ['scanner', 'codigo', 'inspetor', 'editor', 'findings', 'achados', 'segredos']
+      },
+      {
+        id: 'nav-endpoints',
+        title: 'Módulo: LinkFinder (Rotas & Endpoints de API)',
+        subtitle: 'Mapeamento de rotas REST, GraphQL, endpoints internos e públicos',
+        category: 'Navegação',
+        icon: Route,
+        shortcut: `${modKey}3`,
+        badge: `${report.apiEndpoints.length} rotas`,
+        badgeColor: 'bg-[#3366FF]/15 text-[#3366FF] border-[#3366FF]/30',
+        action: () => {
+          onClose();
+          setActiveTab('endpoints');
+        },
+        keywords: ['endpoints', 'rotas', 'linkfinder', 'api', 'urls', 'rest', 'graphql']
+      },
+      {
+        id: 'nav-jsminer',
+        title: 'Módulo: JS Miner & Asset Discovery',
+        subtitle: 'Varredura estática profunda de bundles e dependências client-side',
+        category: 'Navegação',
+        icon: Boxes,
+        shortcut: `${modKey}4`,
+        badge: report.jsMiner?.totalAssetsCount ? `${report.jsMiner.totalAssetsCount} assets` : undefined,
+        badgeColor: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('jsminer');
+        },
+        keywords: ['jsminer', 'javascript', 'miner', 'assets', 'bundles', 'sourcemap']
+      },
+      {
+        id: 'nav-dataflow',
+        title: 'Módulo: Fluxo de Dados & Taint Sinks (D3)',
+        subtitle: 'Grafo vetorial de propagação de dados não confiáveis e pontos vulneráveis',
+        category: 'Navegação',
+        icon: Network,
+        shortcut: `${modKey}5`,
+        badge: report.dataFlowGraph?.metrics.totalTaintFlows ? `${report.dataFlowGraph.metrics.totalTaintFlows} fluxos` : undefined,
+        badgeColor: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('dataflow');
+        },
+        keywords: ['fluxo', 'taint', 'dataflow', 'grafo', 'd3', 'sinks', 'sources']
+      },
+      {
+        id: 'nav-rules',
+        title: 'Módulo: Regras Regex & Entropia de Shannon',
+        subtitle: 'Configuração e teste de expressões regulares para detecção SAST',
+        category: 'Navegação',
+        icon: SlidersHorizontal,
+        shortcut: `${modKey}6`,
+        badge: `${rules.length} regras`,
+        badgeColor: 'bg-zinc-800 text-zinc-300 border-zinc-700',
+        action: () => {
+          onClose();
+          setActiveTab('rules');
+        },
+        keywords: ['regras', 'regex', 'entropia', 'shannon', 'padroes', 'rules', 'custom']
+      },
+      {
+        id: 'nav-cli',
+        title: 'Módulo: Terminal CLI Interativo',
+        subtitle: 'Console headless para automação de scans e scripts de segurança',
+        category: 'Navegação',
+        icon: Terminal,
+        shortcut: `${modKey}7`,
+        action: () => {
+          onClose();
+          setActiveTab('cli');
+        },
+        keywords: ['cli', 'terminal', 'linha de comando', 'bash', 'console', 'automacao']
+      },
+      {
+        id: 'nav-cicd',
+        title: 'Módulo: CI/CD & Integração Cloud',
+        subtitle: 'Templates para GitHub Actions, GitLab CI, Jenkins e quality gates',
+        category: 'Navegação',
+        icon: CloudCog,
+        shortcut: `${modKey}8`,
+        action: () => {
+          onClose();
+          setActiveTab('cicd');
+        },
+        keywords: ['cicd', 'github actions', 'gitlab', 'pipeline', 'devops', 'cloud', 'quality gate']
+      }
+    ];
+
+    // Workspace Files (Quick Jump)
+    files.forEach((file) => {
+      const fileFindingsCount = report.findings.filter(f => f.file === file.name).length;
+      const fileExt = file.extension || file.name.split('.').pop() || 'código';
+      list.push({
+        id: `file-${file.name}`,
+        title: `Abrir: ${file.name}`,
+        subtitle: file.path ? `${file.path} • ${fileExt}` : `Arquivo do Workspace • ${fileExt}`,
+        category: 'Arquivos',
+        icon: FileCode2,
+        badge: fileFindingsCount > 0 ? `${fileFindingsCount} achado${fileFindingsCount > 1 ? 's' : ''}` : 'Limpo',
+        badgeColor: fileFindingsCount > 0 ? 'bg-[#FF3E00]/15 text-[#FF3E00] border-[#FF3E00]/30' : 'bg-[#00FF41]/10 text-[#00FF41] border-[#00FF41]/30',
+        action: () => {
+          onClose();
+          onSelectFile(file);
+          setActiveTab('scanner');
+        },
+        keywords: [file.name, fileExt, 'arquivo', 'file', 'source', 'abrir']
+      });
+    });
+
+    // Rules & Filters Quick Jumps
+    rules.slice(0, 8).forEach((r) => {
+      list.push({
+        id: `rule-${r.id}`,
+        title: `Regra: ${r.name}`,
+        subtitle: `[${r.severity}] ${r.description}`,
+        category: 'Regras & Filtros',
+        icon: SlidersHorizontal,
+        badge: r.severity,
+        badgeColor: r.severity === 'CRITICAL' ? 'bg-[#FF3E00]/15 text-[#FF3E00] border-[#FF3E00]/30' : 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('rules');
+        },
+        keywords: [r.name, r.id, r.category, r.severity, 'regra', 'regex']
+      });
+    });
+
+    return list;
+  }, [files, rules, report, isScanning, modKey, onClose, onRunScan, onOpenExport, onOpenGlossary, onOpenIgnoreModal, onOpenShortcuts, onOpenTour, onResetWorkspace, onSelectFile, setActiveTab]);
+
+  // Filter commands by search query
+  const filteredCommands = useMemo(() => {
+    if (!query.trim()) {
+      return allCommands;
+    }
+    const cleanQuery = query.toLowerCase().trim();
+    return allCommands.filter((cmd) => {
+      const matchTitle = cmd.title.toLowerCase().includes(cleanQuery);
+      const matchSubtitle = cmd.subtitle?.toLowerCase().includes(cleanQuery);
+      const matchCategory = cmd.category.toLowerCase().includes(cleanQuery);
+      const matchKeywords = cmd.keywords?.some(k => k.toLowerCase().includes(cleanQuery));
+      return matchTitle || matchSubtitle || matchCategory || matchKeywords;
+    });
+  }, [allCommands, query]);
+
+  // Reset selected index when query changes or opens
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query, isOpen]);
+
+  // Focus input on open
+  useEffect(() => {
+    if (isOpen) {
+      setQuery('');
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+    }
+  }, [isOpen]);
+
+  // Handle keyboard navigation inside the palette
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev < filteredCommands.length - 1 ? prev + 1 : 0));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : filteredCommands.length - 1));
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (filteredCommands[selectedIndex]) {
+          filteredCommands[selectedIndex].action();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, filteredCommands, selectedIndex, onClose]);
+
+  // Keep selected item in view
+  useEffect(() => {
+    if (!listRef.current) return;
+    const selectedEl = listRef.current.querySelector(`[data-index="${selectedIndex}"]`);
+    if (selectedEl) {
+      selectedEl.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedIndex]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      id="command-palette-backdrop"
+      className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-start justify-center pt-[10vh] px-4 z-50 animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        id="command-palette-dialog"
+        className="bg-[#0A0A0A] border border-[#333] rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.8)] w-full max-w-2xl overflow-hidden flex flex-col max-h-[75vh] animate-in zoom-in-95 duration-150"
+      >
+        {/* Search Header */}
+        <div className="flex items-center px-4 py-3.5 border-b border-[#222] bg-[#0E0E0E] relative">
+          <Command className="w-5 h-5 text-[#FF3E00] shrink-0 mr-3 animate-pulse" />
+          <input
+            ref={inputRef}
+            id="command-palette-search-input"
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Digite um comando, arquivo, regra ou atalho... (ex: scan, exportar, authController, d3)"
+            className="w-full bg-transparent text-white placeholder-zinc-500 font-mono text-sm focus:outline-hidden"
+            autoComplete="off"
+            spellCheck="false"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              className="text-[#666] hover:text-white p-1 mr-1 transition-colors cursor-pointer"
+              title="Limpar busca"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <kbd className="hidden sm:inline-flex items-center text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#1A1A1A] text-zinc-400 border border-[#333]">
+            ESC
+          </kbd>
+        </div>
+
+        {/* Results List */}
+        <div ref={listRef} className="overflow-y-auto flex-1 p-2 space-y-1 divide-y divide-[#1A1A1A]">
+          {filteredCommands.length === 0 ? (
+            <div className="py-12 px-4 text-center text-zinc-500 font-mono text-xs">
+              <Search className="w-8 h-8 text-[#333] mx-auto mb-2" />
+              <p className="text-zinc-400 font-semibold">Nenhum comando ou arquivo correspondente.</p>
+              <p className="text-zinc-600 mt-1">Tente pesquisar por &quot;scan&quot;, &quot;exportar&quot;, &quot;dashboard&quot; ou o nome de um arquivo.</p>
+            </div>
+          ) : (
+            filteredCommands.map((cmd, index) => {
+              const Icon = cmd.icon;
+              const isSelected = index === selectedIndex;
+
+              return (
+                <div
+                  key={cmd.id}
+                  data-index={index}
+                  onClick={() => cmd.action()}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  className={`flex items-center justify-between p-2.5 rounded-md cursor-pointer transition-colors font-mono text-xs ${
+                    isSelected
+                      ? 'bg-[#181818] border border-[#FF3E00]/40 text-white'
+                      : 'hover:bg-[#121212] text-zinc-300 border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0 pr-2">
+                    <div
+                      className={`w-7 h-7 rounded flex items-center justify-center shrink-0 border ${
+                        isSelected
+                          ? 'bg-[#FF3E00]/15 text-[#FF3E00] border-[#FF3E00]/40'
+                          : 'bg-[#141414] text-zinc-400 border-[#222]'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-bold truncate ${isSelected ? 'text-white' : 'text-zinc-200'}`}>
+                          {cmd.title}
+                        </span>
+                        {cmd.badge && (
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded border font-semibold shrink-0 ${cmd.badgeColor || 'bg-zinc-800 text-zinc-300 border-zinc-700'}`}>
+                            {cmd.badge}
+                          </span>
+                        )}
+                      </div>
+                      {cmd.subtitle && (
+                        <p className="text-[10.5px] text-zinc-500 truncate mt-0.5">
+                          {cmd.subtitle}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {cmd.shortcut && (
+                      <kbd className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#161616] text-zinc-400 border border-[#2E2E2E] shadow-xs">
+                        {cmd.shortcut}
+                      </kbd>
+                    )}
+                    {isSelected && (
+                      <CornerDownLeft className="w-3.5 h-3.5 text-[#FF3E00] hidden sm:inline shrink-0" />
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Footer Navigation Hints */}
+        <div className="px-4 py-2.5 bg-[#080808] border-t border-[#1C1C1C] flex flex-wrap items-center justify-between text-[10px] font-mono text-zinc-500 gap-2">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1">
+              <kbd className="px-1 py-0.2 bg-[#1A1A1A] border border-[#333] rounded text-zinc-400">↑</kbd>
+              <kbd className="px-1 py-0.2 bg-[#1A1A1A] border border-[#333] rounded text-zinc-400">↓</kbd>
+              <span>Navegar</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.2 bg-[#1A1A1A] border border-[#333] rounded text-zinc-400">↵</kbd>
+              <span>Executar</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.2 bg-[#1A1A1A] border border-[#333] rounded text-zinc-400">esc</kbd>
+              <span>Fechar</span>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span>SecScan AppSec Quick Command Engine</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

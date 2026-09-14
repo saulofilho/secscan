@@ -44,10 +44,11 @@ interface RecentScansHistoryProps {
   onNavigateToScanner?: () => void;
 }
 
-const STORAGE_KEY = 'secscan_recent_scans_history_v1';
+export const RECENT_SCANS_STORAGE_KEY = 'secscan_recent_scans_history_v1';
+const STORAGE_KEY = RECENT_SCANS_STORAGE_KEY;
 
 // Helper to calculate human-friendly relative time
-function getRelativeTime(timestamp: string): string {
+export function getRelativeTime(timestamp: string): string {
   try {
     const diffMs = Date.now() - new Date(timestamp).getTime();
     if (isNaN(diffMs)) return 'Recente';
@@ -65,7 +66,7 @@ function getRelativeTime(timestamp: string): string {
 }
 
 // Generate 10 realistic past scan executions anchored to current report
-function generateBaselineRecentScans(currentReport: ScanReport): RecentScanRecord[] {
+export function generateBaselineRecentScans(currentReport: ScanReport): RecentScanRecord[] {
   const now = Date.now();
   const currentFindingsCount = currentReport.findings?.length ?? 6;
   const currentTotalFiles = currentReport.totalFiles ?? 8;

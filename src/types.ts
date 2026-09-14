@@ -509,5 +509,73 @@ export interface GlobalComplianceAssessment {
   evaluatedControls: EvaluatedComplianceControl[];
 }
 
+// CI/CD Pipeline Health & GitHub Actions Integration Types
+export type WorkflowRunStatus = 'completed' | 'in_progress' | 'queued';
+export type WorkflowConclusion = 'success' | 'failure' | 'cancelled' | 'timed_out';
+export type WorkflowTriggerEvent = 'push' | 'pull_request' | 'workflow_dispatch' | 'schedule';
+
+export interface WorkflowLogLine {
+  timestamp: string;
+  level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG';
+  message: string;
+  findingId?: string;
+  highlight?: boolean;
+}
+
+export interface WorkflowLogStep {
+  id: string;
+  name: string;
+  status: 'success' | 'failed' | 'running' | 'skipped';
+  durationSeconds: number;
+  lines: WorkflowLogLine[];
+}
+
+export interface WorkflowRun {
+  id: string;
+  runNumber: number;
+  title: string;
+  event: WorkflowTriggerEvent;
+  status: WorkflowRunStatus;
+  conclusion: WorkflowConclusion | null;
+  branch: string;
+  commitSha: string;
+  commitMessage: string;
+  actor: {
+    name: string;
+    avatar?: string;
+    isBot?: boolean;
+  };
+  startedAt: string;
+  durationSeconds: number;
+  findingsCount: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    total: number;
+  };
+  riskScore: number;
+  qualityGateStatus: 'PASSED' | 'FAILED_CRITICAL' | 'FAILED_THRESHOLD';
+  sarifUploaded: boolean;
+  workflowFile: string;
+  steps: WorkflowLogStep[];
+  rawLogs?: string;
+}
+
+export interface CiCdPipelineHealthSummary {
+  successRatePercentage: number;
+  totalRuns: number;
+  successfulRuns: number;
+  failedRuns: number;
+  inProgressRuns: number;
+  averageDurationSeconds: number;
+  lastRunStatus: 'success' | 'failure' | 'in_progress' | 'unknown';
+  lastRunTimestamp: string;
+  runnerStatus: 'ONLINE' | 'BUSY' | 'OFFLINE';
+  webhookStatus: 'ACTIVE' | 'PENDING' | 'ERROR';
+  branchProtectionActive: boolean;
+  sarifCodeScanningActive: boolean;
+}
+
 
 

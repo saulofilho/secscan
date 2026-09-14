@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   ShieldAlert, 
   Play, 
@@ -16,7 +16,9 @@ import {
   Compass,
   Ban,
   BookOpen,
-  Clock
+  Clock,
+  Command,
+  Keyboard
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
 
@@ -33,6 +35,8 @@ interface HeaderProps {
   onOpenIgnoreModal?: () => void;
   activeIgnoreCount?: number;
   onOpenGlossary?: () => void;
+  onOpenCommandPalette?: () => void;
+  onOpenShortcuts?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -47,8 +51,14 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenTour,
   onOpenIgnoreModal,
   activeIgnoreCount,
-  onOpenGlossary
+  onOpenGlossary,
+  onOpenCommandPalette,
+  onOpenShortcuts
 }) => {
+  const isMac = useMemo(() => {
+    return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  }, []);
+
   const criticalCount = report.metrics.criticalCount;
   const isHealthy = criticalCount === 0;
 
@@ -216,6 +226,22 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
+            {/* Command Palette Button */}
+            {onOpenCommandPalette && (
+              <button
+                id="btn-header-open-command-palette"
+                onClick={onOpenCommandPalette}
+                className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-white bg-[#181818] hover:bg-[#222] border border-[#333] hover:border-[#FF3E00]/60 transition-all cursor-pointer shadow-xs group"
+                title={`Abrir Command Palette (${isMac ? '⌘K' : 'Ctrl+K'})`}
+              >
+                <Command className="w-3.5 h-3.5 text-[#FF3E00] group-hover:scale-110 transition-transform shrink-0" />
+                <span className="hidden lg:inline text-zinc-200">Comandos</span>
+                <kbd className="hidden sm:inline-flex items-center text-[9px] font-mono px-1 py-0.2 rounded bg-[#0A0A0A] text-zinc-400 border border-[#333] font-semibold">
+                  {isMac ? '⌘K' : 'Ctrl+K'}
+                </kbd>
+              </button>
+            )}
+
             {/* Tutorial Button */}
             <button
               id="btn-quick-tour"
@@ -233,7 +259,7 @@ export const Header: React.FC<HeaderProps> = ({
                 id="btn-header-open-ignore"
                 onClick={onOpenIgnoreModal}
                 className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-[#AAA] hover:text-white bg-[#0F0F0F] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#444] transition-all cursor-pointer"
-                title="Configurações da Global Ignore List"
+                title={`Configurações da Global Ignore List (${isMac ? '⌘I' : 'Ctrl+I'})`}
               >
                 <Ban className="w-3.5 h-3.5 text-[#FF3E00] shrink-0" />
                 <span className="hidden xl:inline">Exclusões</span>
@@ -251,7 +277,7 @@ export const Header: React.FC<HeaderProps> = ({
                 id="btn-header-open-glossary"
                 onClick={onOpenGlossary}
                 className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-[#AAA] hover:text-white bg-[#0F0F0F] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#444] transition-all cursor-pointer"
-                title="Glossário de Vulnerabilidades & Ameaças (CWE / OWASP)"
+                title={`Glossário de Vulnerabilidades & Ameaças (${isMac ? '⌘G' : 'Ctrl+G'})`}
               >
                 <BookOpen className="w-3.5 h-3.5 text-[#FF3E00] shrink-0" />
                 <span className="hidden xl:inline">Glossário</span>
@@ -263,17 +289,32 @@ export const Header: React.FC<HeaderProps> = ({
               id="btn-export-report"
               onClick={onOpenExport}
               className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-[#0F0F0F] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#444] transition-all cursor-pointer"
-              title="Exportar Relatório de Segurança"
+              title={`Exportar Relatório de Segurança (${isMac ? '⌘E' : 'Ctrl+E'})`}
             >
               <Download className="w-3.5 h-3.5 shrink-0" />
               <span className="hidden sm:inline">Exportar</span>
+              <kbd className="hidden 2xl:inline-flex items-center text-[9px] font-mono px-1 py-0.2 rounded bg-[#1A1A1A] text-zinc-400 border border-[#333]">
+                {isMac ? '⌘E' : 'Ctrl+E'}
+              </kbd>
             </button>
+
+            {/* Keyboard Shortcuts Cheat Sheet Button */}
+            {onOpenShortcuts && (
+              <button
+                id="btn-header-open-shortcuts"
+                onClick={onOpenShortcuts}
+                title={`Atalhos Globais de Teclado (${isMac ? '⌘/' : 'Ctrl+/'} ou ?)`}
+                className="h-8 w-8 rounded flex items-center justify-center text-zinc-400 hover:text-white bg-[#0F0F0F] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#444] transition-colors cursor-pointer shrink-0"
+              >
+                <Keyboard className="w-3.5 h-3.5 text-zinc-400" />
+              </button>
+            )}
 
             {/* Reset Workspace */}
             <button
               id="btn-reset-demo"
               onClick={onResetWorkspace}
-              title="Restaurar arquivos de exemplo"
+              title={`Restaurar arquivos de exemplo (${isMac ? '⌘B' : 'Ctrl+B'})`}
               className="h-8 w-8 rounded flex items-center justify-center text-[#777] hover:text-white bg-[#0F0F0F] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#444] transition-colors cursor-pointer shrink-0"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -284,6 +325,7 @@ export const Header: React.FC<HeaderProps> = ({
               id="btn-run-scan"
               onClick={onRunScan}
               disabled={isScanning}
+              title={`Executar Análise SAST (${isMac ? '⌘S' : 'Ctrl+S'})`}
               className={`h-8 px-3.5 sm:px-4 rounded inline-flex items-center gap-2 font-mono text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm shrink-0 ${
                 isScanning
                   ? 'bg-[#262626] text-[#777] cursor-not-allowed border border-[#333]'
@@ -296,6 +338,9 @@ export const Header: React.FC<HeaderProps> = ({
                   ? `ANALISANDO${scanProgress ? ` (${scanProgress.percentage}%)` : '...'}` 
                   : 'EXECUTAR ANÁLISE'}
               </span>
+              <kbd className="hidden sm:inline-flex items-center text-[9px] font-mono px-1.5 py-0.2 rounded bg-black/10 border border-current/25 font-bold">
+                {isMac ? '⌘S' : 'Ctrl+S'}
+              </kbd>
             </button>
           </div>
         </div>

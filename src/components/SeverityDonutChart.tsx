@@ -112,25 +112,28 @@ export const SeverityDonutChart: React.FC<SeverityDonutChartProps> = ({
     : null;
 
   return (
-    <div className="bg-[#080808] p-6 border border-[#222] flex flex-col justify-between">
+    <div 
+      id="severity-donut-chart-card"
+      className="bg-[#080808] p-4 sm:p-5 lg:p-6 border border-[#222] flex flex-col justify-between w-full min-w-0 overflow-hidden h-full"
+    >
       {/* Header */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[11px] font-black tracking-[0.2em] text-white uppercase flex items-center gap-2">
-            <AlertOctagon className="w-4 h-4 text-[#FF3E00]" />
-            <span>Severity Distribution</span>
+      <div className="min-w-0">
+        <div className="flex items-center justify-between gap-2 mb-3 min-w-0">
+          <h2 className="text-[11px] font-black tracking-[0.15em] text-white uppercase flex items-center gap-1.5 truncate">
+            <AlertOctagon className="w-4 h-4 text-[#FF3E00] shrink-0" />
+            <span className="truncate">Severity Distribution</span>
           </h2>
-          <span className="text-[10px] font-mono px-2 py-0.5 bg-[#111] text-[#888] border border-[#262626] uppercase">
+          <span className="text-[10px] font-mono px-2 py-0.5 bg-[#111] text-[#888] border border-[#262626] uppercase shrink-0">
             {totalFindings} {totalFindings === 1 ? 'finding' : 'findings'}
           </span>
         </div>
-        <p className="text-[10px] font-mono text-[#666] leading-relaxed mb-2">
+        <p className="text-[10px] font-mono text-[#666] leading-relaxed mb-2 line-clamp-2">
           Proportional breakdown of discovered vulnerabilities by severity classification (Critical, High, Medium, Low).
         </p>
       </div>
 
       {/* Donut Chart Canvas with Center Stat */}
-      <div className="relative h-60 w-full flex items-center justify-center my-2">
+      <div className="relative h-52 sm:h-56 w-full flex items-center justify-center my-1 min-w-0 overflow-hidden">
         {totalFindings > 0 ? (
           <>
             <ResponsiveContainer width="100%" height="100%">
@@ -139,8 +142,8 @@ export const SeverityDonutChart: React.FC<SeverityDonutChartProps> = ({
                   data={chartData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={62}
-                  outerRadius={88}
+                  innerRadius={50}
+                  outerRadius={74}
                   paddingAngle={chartData.length > 1 ? 4 : 0}
                   dataKey="value"
                   stroke="#080808"
@@ -172,9 +175,9 @@ export const SeverityDonutChart: React.FC<SeverityDonutChartProps> = ({
                     if (active && payload && payload.length) {
                       const data = payload[0].payload as SeveritySlice;
                       return (
-                        <div className="bg-[#0D0D0D] border border-[#333] shadow-2xl p-3 font-mono text-xs space-y-1">
+                        <div className="bg-[#0D0D0D] border border-[#333] shadow-2xl p-3 font-mono text-xs space-y-1 z-50">
                           <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 inline-block" style={{ backgroundColor: data.color }} />
+                            <span className="w-2.5 h-2.5 inline-block shrink-0" style={{ backgroundColor: data.color }} />
                             <span className="font-bold text-white uppercase">{data.name}</span>
                           </div>
                           <div className="text-[#AAA] flex items-center justify-between gap-4 pt-1 border-t border-[#222]">
@@ -197,38 +200,38 @@ export const SeverityDonutChart: React.FC<SeverityDonutChartProps> = ({
             {/* Center Donut Label */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center select-none">
               {activeItem ? (
-                <div className="space-y-0.5 animate-in fade-in duration-150">
+                <div className="space-y-0.5 animate-in fade-in duration-150 px-2">
                   <span 
-                    className="text-[10px] font-black uppercase tracking-wider block font-mono"
+                    className="text-[9.5px] font-black uppercase tracking-wider block font-mono truncate max-w-[90px]"
                     style={{ color: activeItem.color }}
                   >
                     {activeItem.name}
                   </span>
-                  <div className="text-2xl font-black text-white font-mono tracking-tight">
+                  <div className="text-xl sm:text-2xl font-black text-white font-mono tracking-tight">
                     {activeItem.value}
                   </div>
-                  <span className="text-[9px] font-mono text-[#888] block">
-                    {activeItem.percentage}% of total
+                  <span className="text-[8.5px] font-mono text-[#888] block">
+                    {activeItem.percentage}% total
                   </span>
                 </div>
               ) : (
-                <div className="space-y-0.5">
-                  <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#666] block font-mono">
+                <div className="space-y-0.5 px-2">
+                  <span className="text-[8.5px] font-black uppercase tracking-[0.2em] text-[#666] block font-mono">
                     TOTAL
                   </span>
-                  <div className="text-2xl font-black text-white font-mono tracking-tight">
+                  <div className="text-xl sm:text-2xl font-black text-white font-mono tracking-tight">
                     {totalFindings}
                   </div>
-                  <span className="text-[9px] font-mono text-[#888] block uppercase">
-                    Findings
+                  <span className="text-[8.5px] font-mono text-[#888] block uppercase">
+                    Achados
                   </span>
                 </div>
               )}
             </div>
           </>
         ) : (
-          <div className="text-center text-[#666] font-mono text-xs py-10">
-            <CheckCircle2 className="w-9 h-9 text-[#00FF41] mx-auto mb-2" />
+          <div className="text-center text-[#666] font-mono text-xs py-8">
+            <CheckCircle2 className="w-8 h-8 text-[#00FF41] mx-auto mb-2" />
             <span className="font-bold text-white block">ZERO_FINDINGS</span>
             <span className="text-[10px] text-[#666]">Nenhuma vulnerabilidade detectada</span>
           </div>
@@ -236,33 +239,33 @@ export const SeverityDonutChart: React.FC<SeverityDonutChartProps> = ({
       </div>
 
       {/* 4 Severity Level Cards / Legend (Critical, High, Medium, Low) */}
-      <div className="grid grid-cols-2 gap-2 pt-4 border-t border-[#1A1A1A] font-mono text-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-2 pt-3 border-t border-[#1A1A1A] font-mono text-xs w-full min-w-0">
         {severityItems.map((item) => (
           <div 
             key={item.name}
             onClick={() => onSelectSeverity && onSelectSeverity(item.severity)}
-            className={`p-2.5 border transition-all cursor-pointer ${
+            className={`p-2 sm:p-2.5 border transition-all cursor-pointer min-w-0 overflow-hidden flex flex-col justify-between ${
               activeItem?.name === item.name 
                 ? 'border-white bg-[#141414]' 
                 : 'border-[#1E1E1E] bg-[#0A0A0A] hover:border-[#333]'
             }`}
           >
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-none" style={{ backgroundColor: item.color }} />
-                <span className="text-[11px] font-bold text-white tracking-wide uppercase">
+            <div className="flex items-center justify-between gap-1 mb-1 min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0 truncate">
+                <span className="w-2 h-2 shrink-0 rounded-none" style={{ backgroundColor: item.color }} />
+                <span className="text-[10px] sm:text-[11px] font-bold text-white tracking-wide uppercase truncate">
                   {item.name}
                 </span>
               </div>
-              <span className="text-[9px] text-[#666] font-bold">
+              <span className="text-[9px] text-[#888] font-bold shrink-0 ml-1">
                 {item.percentage}%
               </span>
             </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-base font-black text-white">
+            <div className="flex items-baseline justify-between gap-1 min-w-0 mt-0.5">
+              <span className="text-sm sm:text-base font-black text-white font-mono shrink-0">
                 {item.value}
               </span>
-              <span className="text-[9px] text-[#555] uppercase">
+              <span className="text-[9px] text-[#666] uppercase font-mono truncate">
                 {item.value === 1 ? 'achado' : 'achados'}
               </span>
             </div>

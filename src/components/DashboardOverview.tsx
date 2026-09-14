@@ -39,7 +39,9 @@ import {
   Copy,
   Target,
   Scale,
-  Grid
+  Grid,
+  Ticket,
+  ListOrdered
 } from 'lucide-react';
 import { ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem } from '../types';
 import { BreachHeatmap } from './BreachHeatmap';
@@ -51,11 +53,19 @@ import { RiskTrendChart } from './RiskTrendChart';
 import { RiskThresholdConfigPanel } from './RiskThresholdConfigPanel';
 import { MitigationSuggestionsPanel } from './MitigationSuggestionsPanel';
 import { RiskReductionRoadmap } from './RiskReductionRoadmap';
+import { RemediationRoadmapCard } from './RemediationRoadmapCard';
+import { StrategicRemediationPlan } from './StrategicRemediationPlan';
+import { CiCdPipelineHealthWidget } from './CiCdPipelineHealthWidget';
+import { SecScanWorkflowModal } from './SecScanWorkflowModal';
+import { RiskMitigationStrategies } from './RiskMitigationStrategies';
 import { ComplianceReadinessPanel } from './ComplianceReadinessPanel';
 import { LastFiveScansTrend } from './LastFiveScansTrend';
+import { SecurityPostureSummary } from './SecurityPostureSummary';
 import { RecentScansHistory } from './RecentScansHistory';
+import { ScanHistoryChart } from './ScanHistoryChart';
 import { ScanSpeedometerGauge } from './ScanSpeedometerGauge';
 import { SeverityDonutChart } from './SeverityDonutChart';
+import { SecurityRiskHeatmapCard } from './SecurityRiskHeatmapCard';
 import { VulnerabilityTypeBarChart } from './VulnerabilityTypeBarChart';
 import { SecurityImpactPanel } from './SecurityImpactPanel';
 import { FindingRiskScoreTable } from './FindingRiskScoreTable';
@@ -125,6 +135,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const safeIgnorePatterns = Array.isArray(ignorePatterns) ? ignorePatterns : [];
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfSuccess, setPdfSuccess] = useState(false);
+  const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
 
   // Critical Finding Threshold configuration state (persisted in safe storage)
   const DEFAULT_CRITICAL_THRESHOLD = 1;
@@ -533,6 +544,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <span>COMPLIANCE (SOC2/HIPAA/OWASP) &darr;</span>
             </button>
             <button
+              id="dashboard-header-cicd-health-btn"
+              onClick={() => {
+                const el = document.getElementById('cicd-pipeline-health-widget');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="text-[10px] font-mono text-white hover:text-[#00FF41] bg-[#141414] hover:bg-[#1A1A1A] px-2 py-0.5 border border-[#333] hover:border-[#00FF41]/50 uppercase font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+              title="Visualizar Saúde do Pipeline CI/CD, Execuções do GitHub Actions e Logs de Scan"
+            >
+              <Activity className="w-3 h-3 text-[#00FF41]" />
+              <span>CI/CD HEALTH &darr;</span>
+            </button>
+            <button
               onClick={() => {
                 const el = document.getElementById('critical-threshold-config');
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -619,6 +642,66 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           >
             <Grid className="w-3.5 h-3.5 text-[#FF3E00] group-hover:scale-110 transition-transform" />
             <span>Heatmap Grid</span>
+          </button>
+          <button
+            id="btn-nav-d3-heatmap-hero"
+            onClick={() => {
+              const el = document.getElementById('security-risk-heatmap-card');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="px-4 py-3.5 border border-[#333] hover:border-[#00FF66] bg-[#0A0A0A] hover:bg-[#141414] text-white font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 group cursor-pointer"
+            title="Navegar para o D3 Security Risk Heatmap (Densidade por Diretório)"
+          >
+            <FolderTree className="w-3.5 h-3.5 text-[#00FF66] group-hover:scale-110 transition-transform" />
+            <span>D3 Heatmap</span>
+          </button>
+          <button
+            id="btn-nav-posture-hero"
+            onClick={() => {
+              const el = document.getElementById('security-posture-summary-card');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="px-4 py-3.5 border border-[#333] hover:border-[#00FF66] bg-[#0A0A0A] hover:bg-[#141414] text-white font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 group cursor-pointer"
+            title="Navegar para o Security Posture Summary (Achados vs Resolvidas nos Últimos 5 Scans)"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-[#00FF66] group-hover:scale-110 transition-transform" />
+            <span>Postura (5 Scans)</span>
+          </button>
+          <button
+            id="btn-nav-mitigation-strategies-hero"
+            onClick={() => {
+              const el = document.getElementById('risk-mitigation-strategies-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="px-4 py-3.5 border border-[#333] hover:border-[#FF7A00] bg-[#0A0A0A] hover:bg-[#141414] text-white font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 group cursor-pointer"
+            title="Navegar para as Estratégias de Mitigação de Risco (Playbooks & Tickets)"
+          >
+            <Ticket className="w-3.5 h-3.5 text-[#FF7A00] group-hover:scale-110 transition-transform" />
+            <span>Mitigação & Tickets</span>
+          </button>
+          <button
+            id="btn-nav-remediation-roadmap-hero"
+            onClick={() => {
+              const el = document.getElementById('remediation-roadmap-card');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="px-4 py-3.5 border border-[#333] hover:border-[#00FF66] bg-[#0A0A0A] hover:bg-[#141414] text-white font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 group cursor-pointer"
+            title="Navegar para o Remediation Roadmap (Passos de Correção, TTR e Glossário de Ameaças)"
+          >
+            <ListOrdered className="w-3.5 h-3.5 text-[#00FF66] group-hover:scale-110 transition-transform" />
+            <span>Remediation Roadmap</span>
+          </button>
+          <button
+            id="btn-nav-cicd-health-hero"
+            onClick={() => {
+              const el = document.getElementById('cicd-pipeline-health-widget');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="px-4 py-3.5 border border-[#333] hover:border-[#00FF41] bg-[#0A0A0A] hover:bg-[#141414] text-white font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 group cursor-pointer"
+            title="Visualizar Saúde do Pipeline CI/CD, Execuções do GitHub Actions e Logs de Scan"
+          >
+            <Activity className="w-3.5 h-3.5 text-[#00FF41] group-hover:scale-110 transition-transform" />
+            <span>CI/CD Health</span>
           </button>
           {onOpenIgnoreModal && (
             <button
@@ -1147,6 +1230,62 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         }}
       />
 
+      {/* Risk Mitigation Strategies: Maps High-Risk Findings to Specific Remediation Workflows and External Security Tickets */}
+      <RiskMitigationStrategies
+        report={report}
+        onSelectFinding={onSelectFinding}
+        onNavigateToFinding={(findingId) => {
+          const target = report.findings.find((f) => f.id === findingId);
+          if (target && onSelectFinding) {
+            onSelectFinding(target);
+          }
+          onNavigateToTab('scanner');
+        }}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+        onNavigateToFile={onNavigateToFile}
+      />
+
+      {/* Remediation Roadmap: Prioritized Active Vulnerabilities, Fix Steps, TTR, and Security Glossary Deep Links */}
+      <RemediationRoadmapCard
+        report={report}
+        onSelectFinding={onSelectFinding}
+        onNavigateToFinding={(findingId) => {
+          const target = report.findings.find((f) => f.id === findingId);
+          if (target && onSelectFinding) {
+            onSelectFinding(target);
+          }
+          onNavigateToTab('scanner');
+        }}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+        onNavigateToFile={onNavigateToFile}
+        onOpenGlossary={onOpenGlossary}
+      />
+
+      {/* Strategic Remediation Plan: Prioritized Task List for Developers with Direct Links to Remediation Docs */}
+      <StrategicRemediationPlan
+        report={report}
+        onSelectFinding={onSelectFinding}
+        onNavigateToFinding={(findingId) => {
+          const target = report.findings.find((f) => f.id === findingId);
+          if (target && onSelectFinding) {
+            onSelectFinding(target);
+          }
+          onNavigateToTab('scanner');
+        }}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+        onNavigateToFile={onNavigateToFile}
+        onOpenGlossary={onOpenGlossary}
+      />
+
+      {/* CI/CD Pipeline Health: Real-time Status of GitHub Actions Integration, Workflow Runs, Success/Failure Rates & Triggered Scan Logs */}
+      <CiCdPipelineHealthWidget
+        report={report}
+        qualityGateMaxRisk={qualityGateMaxRisk}
+        onSelectFinding={onSelectFinding}
+        onNavigateToTab={onNavigateToTab}
+        onOpenWorkflowModal={() => setIsWorkflowModalOpen(true)}
+      />
+
       {/* Compliance Readiness: Regulatory Framework Mapping (SOC2, HIPAA, OWASP Top 10, PCI-DSS, ISO 27001) */}
       <ComplianceReadinessPanel
         report={report}
@@ -1564,21 +1703,32 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       </div>
 
       {/* Visual Analytics & Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch w-full min-w-0">
         {/* Severity Distribution Donut Chart using Recharts */}
-        <SeverityDonutChart 
-          report={report} 
-          onSelectSeverity={() => onNavigateToTab('scanner')} 
-        />
+        <div className="xl:col-span-4 min-w-0 w-full flex">
+          <SeverityDonutChart 
+            report={report} 
+            onSelectSeverity={() => onNavigateToTab('scanner')} 
+          />
+        </div>
 
         {/* Recharts Bar Chart: Vulnerabilities by Type (Secret vs Path vs Asset) & Over Time */}
-        <div className="lg:col-span-2">
+        <div className="xl:col-span-8 min-w-0 w-full">
           <VulnerabilityTypeBarChart 
             report={report} 
             onNavigateToTab={onNavigateToTab} 
           />
         </div>
       </div>
+
+      {/* New D3.js Security Risk Heatmap (Directory Vulnerability Density Matrix) */}
+      <SecurityRiskHeatmapCard
+        findings={findings}
+        report={report}
+        onSelectFinding={onSelectFinding}
+        onNavigateToFile={onNavigateToFile}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+      />
 
       {/* Recharts Severity Distribution Pie Chart (Heatmap Complement) */}
       <VulnerabilitySeverityPieChart
@@ -1631,6 +1781,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         onNavigateToScanner={() => onNavigateToTab('scanner')}
       />
 
+      {/* Security Posture Summary: Trend Line Chart Comparing Findings vs Resolved Vulnerabilities Over Last 5 Scans */}
+      <SecurityPostureSummary
+        report={report}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+        onNavigateToFile={onNavigateToFile}
+      />
+
       {/* Small Line Chart & Trend Indicator: Last 5 Scans Finding Counts */}
       <LastFiveScansTrend
         report={report}
@@ -1645,6 +1802,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
       {/* D3 30-Day Historical Vulnerability Trend Line Chart */}
       <VulnerabilityTrendChart report={report} />
+
+      {/* Recharts Scan History: Total Findings Over the Last 10 Scans to Track Remediation Progress */}
+      <ScanHistoryChart
+        report={report}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+      />
 
       {/* Recent Scans Execution History: Last 10 Scans with Timestamps, File Counts & Findings */}
       <RecentScansHistory
@@ -1827,6 +1990,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* SecScan Workflow Modal for viewing and generating .github/workflows YAML */}
+      <SecScanWorkflowModal
+        isOpen={isWorkflowModalOpen}
+        onClose={() => setIsWorkflowModalOpen(false)}
+        ignorePatterns={safeIgnorePatterns}
+      />
     </div>
   );
 };

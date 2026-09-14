@@ -33,6 +33,8 @@ import { SnippetHighlighter } from './components/SnippetHighlighter';
 import { WorkspaceFilesMetaPopover } from './components/WorkspaceFilesMetaPopover';
 import { ValidationSeverityDonutChart } from './components/ValidationSeverityDonutChart';
 import { GlobalScanProgressBar } from './components/GlobalScanProgressBar';
+import { CommandPaletteModal } from './components/CommandPaletteModal';
+import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -103,6 +105,13 @@ export default function App() {
   const [showIgnoreModal, setShowIgnoreModal] = useState<boolean>(false);
   const [showGlossaryModal, setShowGlossaryModal] = useState<boolean>(false);
   const [selectedGlossaryId, setSelectedGlossaryId] = useState<string | undefined>(undefined);
+  const [showCommandPalette, setShowCommandPalette] = useState<boolean>(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState<boolean>(false);
+  const [shortcutToast, setShortcutToast] = useState<{ message: string; key?: string } | null>(null);
+
+  const isMac = useMemo(() => {
+    return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  }, []);
   const [validationNotice, setValidationNotice] = useState<{
     type: 'error' | 'warning' | 'success';
     title: string;
@@ -868,6 +877,146 @@ export default function App() {
     }
   };
 
+  // Global Keyboard Shortcuts (Cmd+K, Cmd+S, Cmd+E, Cmd+G, Cmd+I, Cmd+B, Cmd+/, ?, 1-8, Esc)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      const target = e.target as HTMLElement | null;
+      const isInputElement = target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+      );
+
+      // Cmd+K / Ctrl+K: Toggle Command Palette
+      if (isCmdOrCtrl && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setShowCommandPalette(prev => !prev);
+        return;
+      }
+
+      // Cmd+S / Ctrl+S: Trigger SAST Scan
+      if (isCmdOrCtrl && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        if (!isScanning) {
+          executeScan(files, rules, ignorePatterns);
+          setShortcutToast({
+            message: 'Análise SAST iniciada via atalho',
+            key: isMac ? '⌘S' : 'Ctrl+S'
+          });
+          setTimeout(() => setShortcutToast(null), 2500);
+        }
+        return;
+      }
+
+      // Cmd+E / Ctrl+E: Open Export Modal
+      if (isCmdOrCtrl && (e.key === 'e' || e.key === 'E')) {
+        e.preventDefault();
+        setShowExportModal(true);
+        return;
+      }
+
+      // Cmd+G / Ctrl+G: Open Security Glossary
+      if (isCmdOrCtrl && (e.key === 'g' || e.key === 'G')) {
+        e.preventDefault();
+        handleOpenGlossary();
+        return;
+      }
+
+      // Cmd+I / Ctrl+I: Open Global Ignore List Modal
+      if (isCmdOrCtrl && (e.key === 'i' || e.key === 'I')) {
+        e.preventDefault();
+        setShowIgnoreModal(true);
+        return;
+      }
+
+      // Cmd+B / Ctrl+B: Reset Demo Workspace
+      if (isCmdOrCtrl && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        handleResetWorkspace();
+        setShortcutToast({
+          message: 'Workspace demo restaurado via atalho',
+          key: isMac ? '⌘B' : 'Ctrl+B'
+        });
+        setTimeout(() => setShortcutToast(null), 2500);
+        return;
+      }
+
+      // Cmd+/ or Ctrl+/ or ?: Open Keyboard Shortcuts modal
+      if ((isCmdOrCtrl && e.key === '/') || (!isInputElement && e.key === '?')) {
+        e.preventDefault();
+        setShowShortcutsModal(true);
+        return;
+      }
+
+      // Escape: Close active modals
+      if (e.key === 'Escape') {
+        if (showCommandPalette) {
+          setShowCommandPalette(false);
+          return;
+        }
+        if (showShortcutsModal) {
+          setShowShortcutsModal(false);
+          return;
+        }
+        if (showExportModal) {
+          setShowExportModal(false);
+          return;
+        }
+        if (showIgnoreModal) {
+          setShowIgnoreModal(false);
+          return;
+        }
+        if (showGlossaryModal) {
+          setShowGlossaryModal(false);
+          return;
+        }
+        if (showTour) {
+          handleCloseTour();
+          return;
+        }
+      }
+
+      // Navigation: 1 through 8
+      const tabMap: Record<string, string> = {
+        '1': 'dashboard',
+        '2': 'scanner',
+        '3': 'endpoints',
+        '4': 'jsminer',
+        '5': 'dataflow',
+        '6': 'rules',
+        '7': 'cli',
+        '8': 'cicd'
+      };
+
+      if (!isInputElement && !isCmdOrCtrl && !e.altKey && tabMap[e.key]) {
+        setActiveTab(tabMap[e.key]);
+      } else if (isCmdOrCtrl && !e.altKey && !e.shiftKey && tabMap[e.key]) {
+        e.preventDefault();
+        setActiveTab(tabMap[e.key]);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    isScanning,
+    files,
+    rules,
+    ignorePatterns,
+    showCommandPalette,
+    showShortcutsModal,
+    showExportModal,
+    showIgnoreModal,
+    showGlossaryModal,
+    showTour,
+    executeScan,
+    handleResetWorkspace,
+    handleCloseTour,
+    isMac
+  ]);
+
   return (
     <div className="min-h-screen bg-[#050505] text-[#E0E0E0] flex flex-col font-sans selection:bg-[#FF3E00] selection:text-white relative">
       {/* Global Real-time Scan Progress Bar (0% to 100%) */}
@@ -891,6 +1040,8 @@ export default function App() {
         onOpenIgnoreModal={() => setShowIgnoreModal(true)}
         activeIgnoreCount={ignorePatterns.filter(p => p.enabled).length}
         onOpenGlossary={() => handleOpenGlossary()}
+        onOpenCommandPalette={() => setShowCommandPalette(true)}
+        onOpenShortcuts={() => setShowShortcutsModal(true)}
       />
 
       {/* Main Container Content */}
@@ -899,7 +1050,7 @@ export default function App() {
         {validationNotice && (
           <div 
             id="workspace-validation-notice"
-            className={`mb-6 p-3.5 sm:p-4.5 rounded-xl border flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 transition-all duration-200 ${
+            className={`mb-6 p-3.5 sm:p-4.5 rounded-xl border flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 transition-all duration-200 w-full min-w-0 overflow-hidden ${
               validationNotice.type === 'error'
                 ? 'bg-rose-950/40 border-rose-800/60 text-rose-200'
                 : validationNotice.type === 'warning'
@@ -988,8 +1139,8 @@ export default function App() {
                         <Terminal className="w-3.5 h-3.5 text-white/70" />
                         Código & Regras de Ingestão Segura
                       </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9.5px] text-white/60">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[9.5px] text-white/60 shrink-0">
                           {validationNotice.details?.reduce((acc, d) => acc + (d.findings?.length || (d.blockedReason ? 1 : 0)), 0) || 0} achado(s)
                         </span>
                         <button
@@ -1465,9 +1616,9 @@ export default function App() {
         )}
       </main>
 
-      {/* Footer Status Bar */}
+      {/* Footer Status Bar with Shortcuts Bar */}
       <footer className="border-t border-[#1F1F1F] bg-[#0A0A0A] py-3 px-4 sm:px-8 text-[11px] font-mono text-[#666] flex flex-col sm:flex-row items-center justify-between gap-2">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3.5 flex-wrap">
           <span className="flex items-center gap-1.5 text-white font-bold">
             <span className="w-2 h-2 rounded-none bg-[#00FF41] inline-block animate-pulse"></span>
             SECSCAN_ENGINE // OPERATIONAL
@@ -1476,8 +1627,30 @@ export default function App() {
           <span>RULES_V4_LOADED: {rules.length}</span>
           <span className="text-[#444] hidden sm:inline">|</span>
           <span className="hidden sm:inline">IGNORE_PATTERNS: {ignorePatterns.filter(p => p.enabled).length} ATIVOS</span>
-          <span className="text-[#444] hidden sm:inline">|</span>
-          <span className="hidden sm:inline">MEMORY: LOCAL_CONTAINER</span>
+          <span className="text-[#444] hidden md:inline">|</span>
+          <button
+            type="button"
+            onClick={() => setShowCommandPalette(true)}
+            className="hidden md:inline-flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            title={`Abrir Command Palette (${isMac ? '⌘K' : 'Ctrl+K'})`}
+          >
+            <kbd className="px-1.5 py-0.2 rounded bg-[#181818] border border-[#333] text-zinc-300 font-bold text-[9.5px]">
+              {isMac ? '⌘K' : 'Ctrl+K'}
+            </kbd>
+            <span>Comandos</span>
+          </button>
+          <span className="text-[#444] hidden md:inline">•</span>
+          <button
+            type="button"
+            onClick={() => setShowShortcutsModal(true)}
+            className="hidden md:inline-flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            title={`Ver atalhos globais (${isMac ? '⌘/' : 'Ctrl+/'} ou ?)`}
+          >
+            <kbd className="px-1.5 py-0.2 rounded bg-[#181818] border border-[#333] text-zinc-300 font-bold text-[9.5px]">
+              ?
+            </kbd>
+            <span>Atalhos</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-4 text-[#888]">
@@ -1520,6 +1693,55 @@ export default function App() {
         onClose={() => setShowGlossaryModal(false)}
         selectedEntryId={selectedGlossaryId}
       />
+
+      {/* Command Palette Modal */}
+      <CommandPaletteModal
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onRunScan={() => executeScan(files, rules, ignorePatterns)}
+        onOpenExport={() => setShowExportModal(true)}
+        onOpenIgnoreModal={() => setShowIgnoreModal(true)}
+        onOpenGlossary={() => handleOpenGlossary()}
+        onOpenTour={() => setShowTour(true)}
+        onResetWorkspace={handleResetWorkspace}
+        onOpenShortcuts={() => setShowShortcutsModal(true)}
+        files={files}
+        onSelectFile={(f) => {
+          setSelectedFile(f);
+          setActiveTab('scanner');
+        }}
+        rules={rules}
+        report={report}
+        isScanning={isScanning}
+      />
+
+      {/* Keyboard Shortcuts Reference Modal */}
+      <KeyboardShortcutsModal
+        isOpen={showShortcutsModal}
+        onClose={() => setShowShortcutsModal(false)}
+        onOpenCommandPalette={() => {
+          setShowShortcutsModal(false);
+          setShowCommandPalette(true);
+        }}
+      />
+
+      {/* Non-intrusive Shortcut Toast Feedback */}
+      {shortcutToast && (
+        <div
+          id="shortcut-toast-feedback"
+          className="fixed bottom-14 right-6 z-50 bg-[#0F0F0F] border border-[#00FF41]/50 shadow-[0_0_24px_rgba(0,255,65,0.25)] px-4 py-2.5 rounded-lg flex items-center gap-3 font-mono text-xs text-white animate-in fade-in slide-in-from-bottom-2 duration-150"
+        >
+          <span className="w-2 h-2 rounded-full bg-[#00FF41] animate-ping" />
+          <span className="font-medium">{shortcutToast.message}</span>
+          {shortcutToast.key && (
+            <kbd className="px-2 py-0.5 rounded bg-[#1B1B1B] border border-[#333] text-[#00FF41] font-bold text-[11px]">
+              {shortcutToast.key}
+            </kbd>
+          )}
+        </div>
+      )}
     </div>
   );
 }

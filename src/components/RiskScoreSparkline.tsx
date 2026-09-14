@@ -292,31 +292,31 @@ export const RiskScoreSparkline: React.FC<RiskScoreSparklineProps> = ({
   return (
     <div
       id="risk-score-historical-sparkline"
-      className="w-full mt-2.5 pt-2.5 border-t border-white/10 font-mono flex flex-col gap-2"
+      className="w-full mt-3 pt-3 border-t border-white/10 font-mono flex flex-col gap-2.5 min-w-0 overflow-hidden"
     >
       {/* Sparkline Header: Title, Telemetry, and Immediate Trend Context */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px]">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 text-[10px] min-w-0 w-full">
         {/* Left Side: Title & Current Score Badge */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-white">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-white shrink-0">
             <Sparkles className="w-3.5 h-3.5 text-[#3366FF] shrink-0" />
             <span>Progresso do Risk Score</span>
             <span className="text-white/40 font-normal hidden sm:inline">(Últimas 5 Varreduras)</span>
           </div>
 
           {/* Current Score Tag */}
-          <div className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${currentLevelBadge.bg} ${currentLevelBadge.textCol} ${currentLevelBadge.border} flex items-center gap-1`}>
+          <div className={`px-2 py-0.5 rounded text-[9px] font-bold border ${currentLevelBadge.bg} ${currentLevelBadge.textCol} ${currentLevelBadge.border} flex items-center gap-1 shrink-0`}>
             <span>Atual: {latestPoint.riskScore}/100</span>
             <span className="text-[7.5px] uppercase opacity-80">({currentLevelBadge.text})</span>
           </div>
         </div>
 
         {/* Right Side: Trend Context Badges & Mode Switcher */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           {/* Trend Delta Pill (Immediate Trend Context) */}
           <div
             id="sparkline-trend-delta-pill"
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9.5px] font-bold border shadow-xs ${
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9.5px] font-bold border shadow-xs shrink-0 ${
               isScoreImproved
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                 : isScoreRegressed
@@ -339,7 +339,7 @@ export const RiskScoreSparkline: React.FC<RiskScoreSparklineProps> = ({
 
           {/* Quality Gate Compliance Indicator */}
           <div
-            className={`hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border shrink-0 ${
               isQualityGatePassed
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                 : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
@@ -355,11 +355,11 @@ export const RiskScoreSparkline: React.FC<RiskScoreSparklineProps> = ({
           </div>
 
           {/* Metric Selector Tabs */}
-          <div className="flex items-center rounded bg-black/60 border border-white/10 p-0.5 text-[9px]">
+          <div className="flex items-center rounded bg-black/60 border border-white/10 p-0.5 text-[9px] shrink-0">
             <button
               type="button"
               onClick={() => setActiveMetricMode('RISK_SCORE')}
-              className={`px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+              className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
                 activeMetricMode === 'RISK_SCORE'
                   ? 'bg-[#3366FF] text-white font-bold'
                   : 'text-white/60 hover:text-white'
@@ -371,7 +371,7 @@ export const RiskScoreSparkline: React.FC<RiskScoreSparklineProps> = ({
             <button
               type="button"
               onClick={() => setActiveMetricMode('FINDINGS')}
-              className={`px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+              className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
                 activeMetricMode === 'FINDINGS'
                   ? 'bg-[#3366FF] text-white font-bold'
                   : 'text-white/60 hover:text-white'
@@ -384,8 +384,8 @@ export const RiskScoreSparkline: React.FC<RiskScoreSparklineProps> = ({
         </div>
       </div>
 
-      {/* Sparkline Canvas (AreaChart) */}
-      <div className="w-full h-14 bg-black/30 rounded border border-white/5 p-1 relative overflow-hidden">
+      {/* Sparkline Canvas (AreaChart) - Generous, comfortable height */}
+      <div className="w-full h-20 sm:h-24 bg-black/40 rounded-lg border border-white/10 p-1.5 relative overflow-hidden min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={runs}
@@ -505,10 +505,10 @@ export const RiskScoreSparkline: React.FC<RiskScoreSparklineProps> = ({
       </div>
 
       {/* Footer Progression Telemetry & Step Sequence */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[9px] text-white/50 pt-0.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[9.5px] text-white/60 pt-1 min-w-0 w-full">
         {/* Sequence from first scan to current */}
-        <div className="flex items-center gap-1.5">
-          <span>Início (Scan #{firstPoint.scanIndex}): <strong className="text-white/80">{activeMetricMode === 'RISK_SCORE' ? `${firstPoint.riskScore} pts` : `${firstPoint.totalFindings} achados`}</strong></span>
+        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+          <span>Início (Scan #{firstPoint.scanIndex}): <strong className="text-white/90">{activeMetricMode === 'RISK_SCORE' ? `${firstPoint.riskScore} pts` : `${firstPoint.totalFindings} achados`}</strong></span>
           <span>&rarr;</span>
           <span>Atual (Scan #{latestPoint.scanIndex}): <strong className="text-white">{activeMetricMode === 'RISK_SCORE' ? `${latestPoint.riskScore} pts` : `${latestPoint.totalFindings} achados`}</strong></span>
           <span className="text-white/30">|</span>
@@ -518,14 +518,14 @@ export const RiskScoreSparkline: React.FC<RiskScoreSparklineProps> = ({
         </div>
 
         {/* 5-Step Pips sequence with quick tooltips */}
-        <div className="flex items-center gap-1">
-          <span className="text-[8px] uppercase tracking-wider text-white/40 mr-1">5 Scans:</span>
+        <div className="flex flex-wrap items-center gap-1 shrink-0">
+          <span className="text-[8.5px] uppercase tracking-wider text-white/40 mr-1">5 Scans:</span>
           {runs.map((r, i) => (
             <button
               key={`spark-pip-${i}`}
               type="button"
               onClick={() => onSelectScan && onSelectScan(r)}
-              className={`px-1.5 py-0.5 rounded text-[8.5px] font-mono transition-all cursor-pointer border ${
+              className={`px-2 py-0.5 rounded text-[9px] font-mono transition-all cursor-pointer border ${
                 r.isCurrent
                   ? 'bg-[#3366FF] text-white font-black border-[#3366FF] shadow-xs'
                   : 'bg-black/40 text-white/70 border-white/10 hover:border-white/30 hover:text-white'

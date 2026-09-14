@@ -97,21 +97,21 @@ export const ValidationSeverityDonutChart: React.FC<ValidationSeverityDonutChart
   return (
     <div 
       id="validation-severity-progress-bar"
-      className="p-2.5 rounded bg-black/50 border border-white/10 font-mono text-[10px] shadow-sm transition-all"
+      className="p-3.5 sm:p-4 md:p-5 rounded-xl bg-black/60 border border-white/15 font-mono text-[10px] shadow-sm transition-all w-full min-w-0 overflow-hidden space-y-4"
     >
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        {/* Left Side: Compact Donut Chart HUD */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="relative w-[84px] h-[84px] shrink-0 flex items-center justify-center">
-            <PieChart width={84} height={84}>
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center w-full min-w-0">
+        {/* Left Side: Donut Chart HUD + Summary */}
+        <div className="md:col-span-7 flex flex-col sm:flex-row items-center sm:items-center gap-3.5 min-w-0 w-full">
+          <div className="relative w-[96px] h-[96px] shrink-0 flex items-center justify-center">
+            <PieChart width={96} height={96}>
               <Pie
                 data={chartData}
                 dataKey="value"
                 nameKey="name"
-                cx={42}
-                cy={42}
-                innerRadius={24}
-                outerRadius={38}
+                cx={48}
+                cy={48}
+                innerRadius={28}
+                outerRadius={44}
                 paddingAngle={hasMultipleSlices ? 3 : 0}
                 stroke="#0A0A0A"
                 strokeWidth={1.5}
@@ -163,38 +163,38 @@ export const ValidationSeverityDonutChart: React.FC<ValidationSeverityDonutChart
 
             {/* Center HUD Count */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className={`font-mono text-xs font-black leading-none ${
+              <span className={`font-mono text-sm font-black leading-none ${
                 total === 0 ? 'text-emerald-400' : 'text-white'
               }`}>
                 {total}
               </span>
-              <span className="text-[7.5px] font-mono text-white/50 uppercase tracking-tighter leading-none mt-0.5">
+              <span className="text-[8px] font-mono text-white/50 uppercase tracking-tighter leading-none mt-0.5">
                 {total === 0 ? 'OK' : 'TOTAL'}
               </span>
             </div>
           </div>
 
           {/* Quick Context Summary next to donut */}
-          <div className="space-y-1 text-[10px]">
-            <div className="flex items-center gap-1.5 font-bold text-white uppercase tracking-wider">
+          <div className="space-y-1 text-[10px] min-w-0 flex-1 text-center sm:text-left">
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 font-bold text-white uppercase tracking-wider">
               <span>Distribuição de Severidade</span>
               <span className="text-white/40 font-normal">({total} achados)</span>
             </div>
-            <p className="text-white/60 text-[9.5px] max-w-xs leading-tight">
+            <p className="text-white/60 text-[9.5px] leading-relaxed break-words">
               {total === 0 
                 ? 'Nenhuma violação de severidade detectada nesta ingestão de código.'
-                : 'Proporção entre ameaças Críticas, Altas e Avisos mapeados.'}
+                : 'Proporção entre ameaças Críticas, Altas e Avisos mapeados no workspace.'}
             </p>
           </div>
         </div>
 
         {/* Right Side: Interactive Breakdown Badges & Legend */}
-        <div className="flex flex-wrap sm:flex-col items-end sm:items-end gap-1.5 w-full sm:w-auto shrink-0">
+        <div className="md:col-span-5 grid grid-cols-1 sm:grid-cols-3 md:grid-cols-1 gap-2 w-full min-w-0">
           {/* Critical Slice */}
           <button
             type="button"
             onClick={() => onSelectSeverity && onSelectSeverity('CRITICAL')}
-            className={`px-2 py-1 rounded inline-flex items-center justify-between gap-2 text-[10px] font-mono border transition-all cursor-pointer w-full sm:w-auto ${
+            className={`px-2.5 py-1.5 rounded-lg inline-flex items-center justify-between gap-2 text-[10px] font-mono border transition-all cursor-pointer w-full min-w-0 ${
               critical > 0
                 ? activeFilters?.CRITICAL !== false
                   ? 'bg-rose-500/20 text-rose-200 border-rose-500/40 hover:bg-rose-500/30'
@@ -203,11 +203,11 @@ export const ValidationSeverityDonutChart: React.FC<ValidationSeverityDonutChart
             }`}
             title="Alternar filtro de achados Críticos"
           >
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 min-w-0 truncate">
               <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-              <span className="font-bold uppercase tracking-wider">Crítico</span>
+              <span className="font-bold uppercase tracking-wider truncate">Crítico</span>
             </div>
-            <div className="flex items-center gap-1.5 font-bold">
+            <div className="flex items-center gap-1.5 font-bold shrink-0">
               <span className="text-white">{critical}</span>
               <span className="text-[8.5px] text-white/50">
                 ({total > 0 ? Math.round((critical / total) * 100) : 0}%)
@@ -219,7 +219,7 @@ export const ValidationSeverityDonutChart: React.FC<ValidationSeverityDonutChart
           <button
             type="button"
             onClick={() => onSelectSeverity && onSelectSeverity('HIGH')}
-            className={`px-2 py-1 rounded inline-flex items-center justify-between gap-2 text-[10px] font-mono border transition-all cursor-pointer w-full sm:w-auto ${
+            className={`px-2.5 py-1.5 rounded-lg inline-flex items-center justify-between gap-2 text-[10px] font-mono border transition-all cursor-pointer w-full min-w-0 ${
               high > 0
                 ? activeFilters?.HIGH !== false
                   ? 'bg-amber-500/20 text-amber-200 border-amber-500/40 hover:bg-amber-500/30'
@@ -228,11 +228,11 @@ export const ValidationSeverityDonutChart: React.FC<ValidationSeverityDonutChart
             }`}
             title="Alternar filtro de achados Altos"
           >
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 min-w-0 truncate">
               <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-              <span className="font-bold uppercase tracking-wider">Alto</span>
+              <span className="font-bold uppercase tracking-wider truncate">Alto</span>
             </div>
-            <div className="flex items-center gap-1.5 font-bold">
+            <div className="flex items-center gap-1.5 font-bold shrink-0">
               <span className="text-white">{high}</span>
               <span className="text-[8.5px] text-white/50">
                 ({total > 0 ? Math.round((high / total) * 100) : 0}%)
@@ -244,7 +244,7 @@ export const ValidationSeverityDonutChart: React.FC<ValidationSeverityDonutChart
           <button
             type="button"
             onClick={() => onSelectSeverity && onSelectSeverity('WARNING')}
-            className={`px-2 py-1 rounded inline-flex items-center justify-between gap-2 text-[10px] font-mono border transition-all cursor-pointer w-full sm:w-auto ${
+            className={`px-2.5 py-1.5 rounded-lg inline-flex items-center justify-between gap-2 text-[10px] font-mono border transition-all cursor-pointer w-full min-w-0 ${
               warning > 0
                 ? activeFilters?.WARNING !== false
                   ? 'bg-yellow-500/20 text-yellow-200 border-yellow-500/40 hover:bg-yellow-500/30'
@@ -253,11 +253,11 @@ export const ValidationSeverityDonutChart: React.FC<ValidationSeverityDonutChart
             }`}
             title="Alternar filtro de achados de Aviso"
           >
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 min-w-0 truncate">
               <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
-              <span className="font-bold uppercase tracking-wider">Aviso</span>
+              <span className="font-bold uppercase tracking-wider truncate">Aviso</span>
             </div>
-            <div className="flex items-center gap-1.5 font-bold">
+            <div className="flex items-center gap-1.5 font-bold shrink-0">
               <span className="text-white">{warning}</span>
               <span className="text-[8.5px] text-white/50">
                 ({total > 0 ? Math.round((warning / total) * 100) : 0}%)
@@ -267,7 +267,7 @@ export const ValidationSeverityDonutChart: React.FC<ValidationSeverityDonutChart
 
           {/* Compliant Indicator if 0 */}
           {total === 0 && (
-            <div className="px-2 py-1 rounded inline-flex items-center gap-1.5 text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+            <div className="px-2.5 py-1.5 rounded-lg inline-flex items-center justify-center gap-1.5 text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 w-full">
               <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
               <span>Conforme (0 violações)</span>
             </div>
