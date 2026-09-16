@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Clock, ShieldAlert, Timer, Wrench, AlertTriangle, AlertCircle, Info } from 'lucide-react';
+import { Clock, ShieldAlert, Timer, Wrench, Sparkles } from 'lucide-react';
+import { SecScanGlobalConfig } from '../types';
+import { getSecScanConfig, DEFAULT_SECSCAN_CONFIG } from '../lib/secscanConfig';
 
 export type SeverityLevel = 'CRITICAL' | 'HIGH' | 'WARNING';
 
@@ -167,21 +168,18 @@ export const Tooltip: React.FC<TooltipProps> = ({
     >
       {children}
 
-      <AnimatePresence>
-        {isVisible && (
-          <motion.div
-            id={id}
-            role="tooltip"
-            initial={{ opacity: 0, y: position === 'top' ? 4 : -4, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: position === 'top' ? 4 : -4, scale: 0.96 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-            className={`absolute ${positionClasses} ${alignClasses} z-50 pointer-events-none`}
-          >
-            {content}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div
+        id={id}
+        role="tooltip"
+        aria-hidden={!isVisible}
+        className={`absolute ${positionClasses} ${alignClasses} z-50 pointer-events-none transition-all duration-150 ease-out transform ${
+          isVisible
+            ? 'opacity-100 scale-100 translate-y-0'
+            : 'opacity-0 scale-95 pointer-events-none ' + (position === 'top' ? 'translate-y-1' : '-translate-y-1')
+        }`}
+      >
+        {isVisible && content}
+      </div>
     </div>
   );
 };
@@ -192,12 +190,14 @@ interface SeverityTooltipProps {
   isActive?: boolean;
   position?: 'top' | 'bottom';
   align?: 'left' | 'center' | 'right';
+  remediationTime?: string; // Dynamic remediation time (MTTR) parameter from SecScan global config
+  config?: SecScanGlobalConfig; // Optional SecScan global config object override
   children: React.ReactNode;
 }
 
 /**
  * Dedicated explanatory Tooltip component for severity badges, detailing:
- * - Tempo Médio de Remediação (MTTR)
+ * - Tempo Médio de Remediação (MTTR) [Dinâmico via Configuração Global SecScan]
  * - SLA / Prazo Alvo
  * - Impacto e Ação de Resolução
  */
@@ -207,9 +207,26 @@ export const SeverityTooltip: React.FC<SeverityTooltipProps> = ({
   isActive = true,
   position = 'bottom',
   align = 'center',
+  remediationTime,
+  config,
   children
 }) => {
+  const globalConfig = config || getSecScanConfig();
   const data = SEVERITY_REMEDIATION_DATA[severity];
+
+  // Dynamic remediation time resolution:
+  // 1. Explicit remediationTime parameter passed into component
+  // 2. config.remediationTime[severity] or config.severityConfig[severity].remediationTime from SecScan global config
+  // 3. Fallback to default averageRemediationTime
+  const dynamicRemediationTime =
+    remediationTime ||
+    globalConfig.severityConfig?.[severity]?.remediationTime ||
+    globalConfig.remediationTime?.[severity] ||
+    data.averageRemediationTime;
+
+  const dynamicSlaTarget =
+    globalConfig.severityConfig?.[severity]?.slaTarget ||
+    data.slaTarget;
 
   const content = (
     <div
@@ -244,9 +261,16 @@ export const SeverityTooltip: React.FC<SeverityTooltipProps> = ({
               Tempo Médio de Remediação:
             </span>
           </div>
-          <span className={`text-xs font-black tracking-wide ${data.theme.titleColor}`}>
-            {data.averageRemediationTime}
-          </span>
+          <div className="flex items-center gap-1">
+            <span className={`text-xs font-black tracking-wide ${data.theme.titleColor}`}>
+              {dynamicRemediationTime}
+            </span>
+            {remediationTime && remediationTime !== data.averageRemediationTime && (
+              <span className="text-[8px] uppercase tracking-wider px-1 py-0.2 rounded bg-white/10 text-zinc-300 border border-white/10" title="Valor dinâmico calculado">
+                dinâmico
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-between text-[10px] pt-1 border-t border-white/10 text-zinc-400">
@@ -254,7 +278,7 @@ export const SeverityTooltip: React.FC<SeverityTooltipProps> = ({
             <Timer className="w-3 h-3 text-zinc-500" />
             <span>SLA Recomendado:</span>
           </span>
-          <span className="font-semibold text-zinc-200">{data.slaTarget}</span>
+          <span className="font-semibold text-zinc-200">{dynamicSlaTarget}</span>
         </div>
       </div>
 

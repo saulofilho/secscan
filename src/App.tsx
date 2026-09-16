@@ -14,7 +14,8 @@ import {
   Check,
   Trash2,
   RefreshCw,
-  FileText
+  FileText,
+  Clock
 } from 'lucide-react';
 import { Header } from './components/Header';
 import { DashboardOverview } from './components/DashboardOverview';
@@ -36,13 +37,15 @@ import { GlobalScanProgressBar } from './components/GlobalScanProgressBar';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { SeverityTooltip } from './components/Tooltip';
+import { SecScanMttrConfigModal } from './components/SecScanMttrConfigModal';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
 import { scanSourceFiles, scanSourceFilesAsync, exportToJson, DEFAULT_GLOBAL_IGNORE_PATTERNS } from './lib/scanner';
-import { RegexRule, ScannedFile, ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem, ScanProgress } from './types';
+import { RegexRule, ScannedFile, ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem, ScanProgress, SecScanGlobalConfig } from './types';
 import { SecurityGlossaryEntry } from './lib/securityGlossary';
 import { safeGetItem, safeSetItem } from './lib/storage';
+import { getSecScanConfig, calculateDynamicRemediationTime } from './lib/secscanConfig';
 import { 
   validateFileForSensitivePatterns, 
   isForbiddenWorkspaceFile,
@@ -108,7 +111,22 @@ export default function App() {
   const [selectedGlossaryId, setSelectedGlossaryId] = useState<string | undefined>(undefined);
   const [showCommandPalette, setShowCommandPalette] = useState<boolean>(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState<boolean>(false);
+  const [showMttrConfigModal, setShowMttrConfigModal] = useState<boolean>(false);
   const [shortcutToast, setShortcutToast] = useState<{ message: string; key?: string } | null>(null);
+
+  // Global SecScan configuration for dynamic remediationTime (MTTR) parameters
+  const [secScanConfig, setSecScanConfig] = useState<SecScanGlobalConfig>(() => getSecScanConfig());
+
+  useEffect(() => {
+    const handleConfigChange = (e: Event) => {
+      const customEvent = e as CustomEvent<SecScanGlobalConfig>;
+      if (customEvent.detail) {
+        setSecScanConfig(customEvent.detail);
+      }
+    };
+    window.addEventListener('secscan-config-changed', handleConfigChange);
+    return () => window.removeEventListener('secscan-config-changed', handleConfigChange);
+  }, []);
 
   const isMac = useMemo(() => {
     return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -1293,6 +1311,12 @@ export default function App() {
                           severity="CRITICAL"
                           count={noticeSeverityDistribution.critical}
                           isActive={noticeSeverityFilters.CRITICAL}
+                          remediationTime={
+                            secScanConfig.dynamicMttrCalculation !== false
+                              ? calculateDynamicRemediationTime('CRITICAL', noticeSeverityDistribution.critical, secScanConfig)
+                              : (secScanConfig.severityConfig.CRITICAL.remediationTime || secScanConfig.remediationTime.CRITICAL)
+                          }
+                          config={secScanConfig}
                           align="left"
                           position="bottom"
                         >
@@ -1319,6 +1343,12 @@ export default function App() {
                           severity="HIGH"
                           count={noticeSeverityDistribution.high}
                           isActive={noticeSeverityFilters.HIGH}
+                          remediationTime={
+                            secScanConfig.dynamicMttrCalculation !== false
+                              ? calculateDynamicRemediationTime('HIGH', noticeSeverityDistribution.high, secScanConfig)
+                              : (secScanConfig.severityConfig.HIGH.remediationTime || secScanConfig.remediationTime.HIGH)
+                          }
+                          config={secScanConfig}
                           align="center"
                           position="bottom"
                         >
@@ -1345,6 +1375,12 @@ export default function App() {
                           severity="WARNING"
                           count={noticeSeverityDistribution.warning}
                           isActive={noticeSeverityFilters.WARNING}
+                          remediationTime={
+                            secScanConfig.dynamicMttrCalculation !== false
+                              ? calculateDynamicRemediationTime('WARNING', noticeSeverityDistribution.warning, secScanConfig)
+                              : (secScanConfig.severityConfig.WARNING.remediationTime || secScanConfig.remediationTime.WARNING)
+                          }
+                          config={secScanConfig}
                           align="right"
                           position="bottom"
                         >
@@ -1378,6 +1414,18 @@ export default function App() {
                             Mostrar Todos
                           </button>
                         )}
+
+                        {/* Direct MTTR Global Config modal trigger button */}
+                        <button
+                          id="btn-configure-mttr-remediation"
+                          type="button"
+                          onClick={() => setShowMttrConfigModal(true)}
+                          className="px-1.5 py-0.5 rounded text-[9.5px] font-mono text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-colors cursor-pointer inline-flex items-center gap-1"
+                          title="Ajustar parâmetros de remediationTime (MTTR) no objeto de configuração global do SecScan"
+                        >
+                          <Clock className="w-2.5 h-2.5 text-zinc-400" />
+                          <span>MTTR Config</span>
+                        </button>
                       </div>
                     </div>
 
@@ -1814,6 +1862,14 @@ export default function App() {
           setShowShortcutsModal(false);
           setShowCommandPalette(true);
         }}
+      />
+
+      {/* Global SecScan MTTR Configuration Modal */}
+      <SecScanMttrConfigModal
+        isOpen={showMttrConfigModal}
+        onClose={() => setShowMttrConfigModal(false)}
+        config={secScanConfig}
+        onUpdateConfig={setSecScanConfig}
       />
 
       {/* Non-intrusive Shortcut Toast Feedback */}

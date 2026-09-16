@@ -663,5 +663,35 @@ export interface SuggestedFixResult {
   };
 }
 
+export type RemediationSeverityKey = 'CRITICAL' | 'HIGH' | 'WARNING';
+
+export interface SeverityRemediationConfig {
+  remediationTime: string; // Dynamic MTTR (e.g. '1.5h – 2h')
+  slaTarget?: string;
+  tier?: string;
+  badgeCode?: string;
+  urgencyLevel?: string;
+  description?: string;
+  recommendedAction?: string;
+}
+
+export interface SecScanGlobalConfig {
+  version: string;
+  appName: string;
+  remediationTime: {
+    CRITICAL: string;
+    HIGH: string;
+    WARNING: string;
+  };
+  severityConfig: {
+    CRITICAL: SeverityRemediationConfig;
+    HIGH: SeverityRemediationConfig;
+    WARNING: SeverityRemediationConfig;
+    [key: string]: SeverityRemediationConfig;
+  };
+  dynamicMttrCalculation?: boolean;
+  [key: string]: unknown;
+}
+
 
 
