@@ -143,7 +143,8 @@ export const RiskScoreSparkline: React.FC<RiskScoreSparklineProps> = ({
 
   const storageKey = `${LOCAL_SPARKLINE_KEY_PREFIX}${fileSetKey}`;
 
-  const [activeMetricMode, setActiveMetricMode] = useState<'RISK_SCORE' | 'FINDINGS'>('RISK_SCORE');
+  // Defaults to FINDINGS trend to satisfy user requirement for findings progression over last 5 scans
+  const [activeMetricMode, setActiveMetricMode] = useState<'RISK_SCORE' | 'FINDINGS'>('FINDINGS');
 
   // Load and synchronize the 5-scan history
   const [runs, setRuns] = useState<RiskScoreScanPoint[]>(() => {
@@ -276,39 +277,55 @@ export const RiskScoreSparkline: React.FC<RiskScoreSparklineProps> = ({
   const currentLevelBadge = getRiskLevelBadge(latestPoint.riskLevel);
   const isQualityGatePassed = latestPoint.riskScore <= qualityGateLimit;
 
-  // Chart styling colors based on trend & risk posture
-  const strokeColor = isScoreImproved
-    ? '#00FF41' // Green
-    : isScoreRegressed
-      ? '#FF3E00' // Red
-      : '#3366FF'; // Blue/Cyan
+  // Chart styling colors based on metric mode and trend
+  const strokeColor = activeMetricMode === 'FINDINGS'
+    ? (isFindingsImproved
+        ? '#00FF41' // Green on findings decrease
+        : findingsDelta > 0
+          ? '#FF0055' // Red on findings increase
+          : '#3366FF')
+    : (isScoreImproved
+        ? '#00FF41' // Green on score decrease
+        : isScoreRegressed
+          ? '#FF3E00' // Red on score increase
+          : '#3366FF');
 
-  const fillColor = isScoreImproved
-    ? '#00FF41'
-    : isScoreRegressed
-      ? '#FF3E00'
-      : '#3366FF';
+  const fillColor = strokeColor;
 
   return (
     <div
-      id="risk-score-historical-sparkline"
+      id="validation-findings-sparkline"
+      data-testid="findings-trend-sparkline"
       className="w-full mt-3 pt-3 border-t border-white/10 font-mono flex flex-col gap-2.5 min-w-0 overflow-hidden"
     >
       {/* Sparkline Header: Title, Telemetry, and Immediate Trend Context */}
       <div className="flex flex-wrap items-center justify-between gap-2.5 text-[10px] min-w-0 w-full">
-        {/* Left Side: Title & Current Score Badge */}
+        {/* Left Side: Title & Current Score/Findings Badge */}
         <div className="flex flex-wrap items-center gap-2 min-w-0">
           <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-white shrink-0">
-            <Sparkles className="w-3.5 h-3.5 text-[#3366FF] shrink-0" />
-            <span>Progresso do Risk Score</span>
+            <Sparkles className="w-3.5 h-3.5 text-[#00FF41] shrink-0" />
+            <span>{activeMetricMode === 'FINDINGS' ? 'Tendência de Achados' : 'Progresso do Risk Score'}</span>
             <span className="text-white/40 font-normal hidden sm:inline">(Últimas 5 Varreduras)</span>
           </div>
 
-          {/* Current Score Tag */}
-          <div className={`px-2 py-0.5 rounded text-[9px] font-bold border ${currentLevelBadge.bg} ${currentLevelBadge.textCol} ${currentLevelBadge.border} flex items-center gap-1 shrink-0`}>
-            <span>Atual: {latestPoint.riskScore}/100</span>
-            <span className="text-[7.5px] uppercase opacity-80">({currentLevelBadge.text})</span>
-          </div>
+          {/* Current Metric Tag */}
+          {activeMetricMode === 'FINDINGS' ? (
+            <div className={`px-2 py-0.5 rounded text-[9px] font-bold border flex items-center gap-1 shrink-0 ${
+              isFindingsImproved 
+                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' 
+                : findingsDelta > 0 
+                  ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' 
+                  : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+            }`}>
+              <span>Atual: {latestPoint.totalFindings} achados</span>
+              <span className="text-[7.5px] uppercase opacity-80">({latestPoint.criticalCount} crít)</span>
+            </div>
+          ) : (
+            <div className={`px-2 py-0.5 rounded text-[9px] font-bold border ${currentLevelBadge.bg} ${currentLevelBadge.textCol} ${currentLevelBadge.border} flex items-center gap-1 shrink-0`}>
+              <span>Atual: {latestPoint.riskScore}/100</span>
+              <span className="text-[7.5px] uppercase opacity-80">({currentLevelBadge.text})</span>
+            </div>
+          )}
         </div>
 
         {/* Right Side: Trend Context Badges & Mode Switcher */}
@@ -317,24 +334,50 @@ export const RiskScoreSparkline: React.FC<RiskScoreSparklineProps> = ({
           <div
             id="sparkline-trend-delta-pill"
             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9.5px] font-bold border shadow-xs shrink-0 ${
-              isScoreImproved
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                : isScoreRegressed
-                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                  : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+              activeMetricMode === 'FINDINGS'
+                ? (isFindingsImproved
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : findingsDelta > 0
+                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                      : 'bg-zinc-800 text-zinc-300 border-zinc-700')
+                : (isScoreImproved
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : isScoreRegressed
+                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                      : 'bg-zinc-800 text-zinc-300 border-zinc-700')
             }`}
-            title={`Evolução do Risk Score nas últimas 5 varreduras: ${isScoreImproved ? 'Melhoria' : isScoreRegressed ? 'Regressão' : 'Estável'}`}
+            title={activeMetricMode === 'FINDINGS'
+              ? `Evolução dos achados nas últimas 5 varreduras: ${isFindingsImproved ? 'Melhoria de Segurança' : findingsDelta > 0 ? 'Regressão' : 'Estável'}`
+              : `Evolução do Risk Score nas últimas 5 varreduras: ${isScoreImproved ? 'Melhoria' : isScoreRegressed ? 'Regressão' : 'Estável'}`
+            }
           >
-            {isScoreImproved && <TrendingDown className="w-3 h-3 text-emerald-400" />}
-            {isScoreRegressed && <TrendingUp className="w-3 h-3 text-rose-400" />}
-            {isScoreNeutral && <Minus className="w-3 h-3 text-zinc-400" />}
-            <span>
-              {isScoreImproved
-                ? `${scoreDelta} pts (Melhoria)`
-                : isScoreRegressed
-                  ? `+${scoreDelta} pts (Regressão)`
-                  : '0 pts (Estável)'}
-            </span>
+            {activeMetricMode === 'FINDINGS' ? (
+              <>
+                {isFindingsImproved && <TrendingDown className="w-3 h-3 text-emerald-400" />}
+                {findingsDelta > 0 && <TrendingUp className="w-3 h-3 text-rose-400" />}
+                {findingsDelta === 0 && <Minus className="w-3 h-3 text-zinc-400" />}
+                <span>
+                  {isFindingsImproved
+                    ? `▼ ${Math.abs(findingsDelta)} achados (Melhoria)`
+                    : findingsDelta > 0
+                      ? `▲ +${findingsDelta} achados (Regressão)`
+                      : '0 achados (Estável)'}
+                </span>
+              </>
+            ) : (
+              <>
+                {isScoreImproved && <TrendingDown className="w-3 h-3 text-emerald-400" />}
+                {isScoreRegressed && <TrendingUp className="w-3 h-3 text-rose-400" />}
+                {isScoreNeutral && <Minus className="w-3 h-3 text-zinc-400" />}
+                <span>
+                  {isScoreImproved
+                    ? `${scoreDelta} pts (Melhoria)`
+                    : isScoreRegressed
+                      ? `+${scoreDelta} pts (Regressão)`
+                      : '0 pts (Estável)'}
+                </span>
+              </>
+            )}
           </div>
 
           {/* Quality Gate Compliance Indicator */}
@@ -358,27 +401,27 @@ export const RiskScoreSparkline: React.FC<RiskScoreSparklineProps> = ({
           <div className="flex items-center rounded bg-black/60 border border-white/10 p-0.5 text-[9px] shrink-0">
             <button
               type="button"
+              onClick={() => setActiveMetricMode('FINDINGS')}
+              className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
+                activeMetricMode === 'FINDINGS'
+                  ? 'bg-[#00FF41] text-black font-bold'
+                  : 'text-white/60 hover:text-white'
+              }`}
+              title="Exibir tendência de achados de segurança ao longo das últimas 5 varreduras"
+            >
+              Achados
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveMetricMode('RISK_SCORE')}
               className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
                 activeMetricMode === 'RISK_SCORE'
                   ? 'bg-[#3366FF] text-white font-bold'
                   : 'text-white/60 hover:text-white'
               }`}
-              title="Exibir tendência do Risk Score (0-100)"
+              title="Exibir tendência do Risk Score ponderado (0-100)"
             >
               Risk Score
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveMetricMode('FINDINGS')}
-              className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
-                activeMetricMode === 'FINDINGS'
-                  ? 'bg-[#3366FF] text-white font-bold'
-                  : 'text-white/60 hover:text-white'
-              }`}
-              title="Exibir tendência de contagem de achados"
-            >
-              Achados
             </button>
           </div>
         </div>
@@ -512,8 +555,14 @@ export const RiskScoreSparkline: React.FC<RiskScoreSparklineProps> = ({
           <span>&rarr;</span>
           <span>Atual (Scan #{latestPoint.scanIndex}): <strong className="text-white">{activeMetricMode === 'RISK_SCORE' ? `${latestPoint.riskScore} pts` : `${latestPoint.totalFindings} achados`}</strong></span>
           <span className="text-white/30">|</span>
-          <span className={isScoreImproved ? 'text-emerald-400 font-bold' : isScoreRegressed ? 'text-rose-400 font-bold' : 'text-white/60'}>
-            Delta: {activeMetricMode === 'RISK_SCORE' ? (isScoreImproved ? `${scoreDelta} pts` : isScoreRegressed ? `+${scoreDelta} pts` : '0 pts') : (isFindingsImproved ? `${findingsDelta}` : `+${findingsDelta}`)}
+          <span className={
+            activeMetricMode === 'FINDINGS'
+              ? (isFindingsImproved ? 'text-emerald-400 font-bold' : findingsDelta > 0 ? 'text-rose-400 font-bold' : 'text-white/60')
+              : (isScoreImproved ? 'text-emerald-400 font-bold' : isScoreRegressed ? 'text-rose-400 font-bold' : 'text-white/60')
+          }>
+            Delta: {activeMetricMode === 'RISK_SCORE' 
+              ? (isScoreImproved ? `${scoreDelta} pts` : isScoreRegressed ? `+${scoreDelta} pts` : '0 pts') 
+              : (isFindingsImproved ? `${findingsDelta} achados` : findingsDelta > 0 ? `+${findingsDelta} achados` : '0 achados')}
           </span>
         </div>
 

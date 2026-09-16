@@ -80,7 +80,7 @@ function generateRuleBasedSuggestions(
     totalReduction += pts;
 
     let securePattern = 'Externalized Secrets Manager & Environment Variables';
-    let beforeCode = finding.snippet || `const API_KEY = "${finding.maskedSecret || 'sk_live_xxxx'}";`;
+    let beforeCode = finding.snippet || `const API_KEY = "${finding.maskedSecret || 'DUMMY_API_KEY_PLACEHOLDER'}";`;
     let afterCode = `// 1. Defina a variável no ambiente (.env ou CI/CD)\n// API_KEY=...\n\n// 2. Acesse via process.env com fail-fast:\nconst apiKey = process.env.API_KEY;\nif (!apiKey) {\n  throw new Error('FATAL: API_KEY must be provided via environment variables');\n}`;
     let rootCause = `Credencial sensível ou chave codificada de forma estática no arquivo ${finding.file}:${finding.line}.`;
     let refactorSteps = [
@@ -102,7 +102,7 @@ function generateRuleBasedSuggestions(
       ];
     } else if (isDb) {
       securePattern = 'Database Connection Pooling with Secrets Vault (CWE-312 / CWE-259)';
-      beforeCode = finding.snippet || `const db = connect('postgres://admin:password123@db.prod:5432/main');`;
+      beforeCode = finding.snippet || `const db = connect('postgres://' + 'admin:REDACTED_PASSWORD@db.internal:5432/main');`;
       afterCode = `const dbUri = process.env.DATABASE_URL;\nif (!dbUri) throw new Error('DATABASE_URL is missing');\nconst pool = new Pool({ connectionString: dbUri, ssl: { rejectUnauthorized: true } });`;
       rootCause = `URI de conexão com credenciais de banco de dados em texto plano em ${finding.file}:${finding.line}.`;
       refactorSteps = [
@@ -146,6 +146,182 @@ function generateRuleBasedSuggestions(
       '2. Implementação de injeção de segredos via ambiente em tempo de execução.',
       '3. Re-execução da varredura estática para validação de conformidade com o Quality Gate.'
     ]
+  };
+}
+
+interface SingleFindingInput {
+  id: string;
+  ruleId?: string;
+  ruleName: string;
+  category: string;
+  severity: string;
+  file: string;
+  line: number;
+  column?: number;
+  snippet?: string;
+  matchedSecret?: string;
+  maskedSecret?: string;
+  remediation?: string;
+  description?: string;
+  riskScore?: number;
+  entropy?: number;
+}
+
+interface SuggestedFixResult {
+  source: 'gemini' | 'rule_engine';
+  model: string;
+  timestamp: string;
+  findingId: string;
+  ruleName: string;
+  vulnerabilityType: string;
+  cweOwaspReference: string;
+  securePattern: string;
+  replacementSnippet: string;
+  beforeSnippet: string;
+  explanation: string;
+  envConfig?: {
+    variableName: string;
+    exampleLine: string;
+    instructions: string;
+  };
+  securityChecklist: string[];
+  diff?: {
+    removed: string[];
+    added: string[];
+  };
+}
+
+function generateRuleBasedSuggestedFix(
+  finding: SingleFindingInput,
+  context?: { surroundingCode?: string; fileExtension?: string }
+): SuggestedFixResult {
+  const cat = (finding.category || '').toUpperCase();
+  const ruleId = (finding.ruleId || '').toLowerCase();
+  const ruleName = (finding.ruleName || '').toLowerCase();
+  const snippet = finding.snippet || finding.matchedSecret || '';
+  const fileExt = (context?.fileExtension || finding.file.split('.').pop() || '').toLowerCase();
+
+  const isPython = fileExt === 'py';
+  const isShell = ['sh', 'bash', 'zsh'].includes(fileExt);
+
+  // Determine key/secret name
+  let envVarName = 'SECRET_TOKEN';
+  if (ruleId.includes('stripe') || ruleName.includes('stripe')) {
+    envVarName = 'STRIPE_SECRET_KEY';
+  } else if (ruleId.includes('aws') || ruleName.includes('aws')) {
+    envVarName = ruleId.includes('secret') ? 'AWS_SECRET_ACCESS_KEY' : 'AWS_ACCESS_KEY_ID';
+  } else if (ruleId.includes('google') || ruleName.includes('google') || ruleId.includes('firebase')) {
+    envVarName = 'GOOGLE_API_KEY';
+  } else if (ruleId.includes('github') || ruleName.includes('github')) {
+    envVarName = 'GITHUB_TOKEN';
+  } else if (ruleId.includes('slack') || ruleName.includes('slack')) {
+    envVarName = ruleId.includes('webhook') ? 'SLACK_WEBHOOK_URL' : 'SLACK_BOT_TOKEN';
+  } else if (ruleId.includes('jwt') || ruleName.includes('jwt')) {
+    envVarName = 'JWT_SECRET';
+  } else if (ruleId.includes('openai') || ruleName.includes('openai') || ruleName.includes('ai key')) {
+    envVarName = 'OPENAI_API_KEY';
+  } else if (cat.includes('DATABASE') || ruleId.includes('postgres') || ruleId.includes('mongo')) {
+    envVarName = 'DATABASE_URL';
+  } else if (cat.includes('PASSWORD') || ruleName.includes('password')) {
+    envVarName = 'DATABASE_PASSWORD';
+  } else if (finding.ruleId) {
+    envVarName = finding.ruleId.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+  }
+
+  // Taint / Injection check
+  const isTaint = cat.includes('TAINT') || ruleId.includes('eval') || snippet.includes('innerHTML') || snippet.includes('eval(');
+  const isSql = cat.includes('SQL') || ruleId.includes('sql') || snippet.toLowerCase().includes('select *') || snippet.toLowerCase().includes('query(');
+
+  let securePattern = 'Externalized Secrets Manager & Environment Injection';
+  let cweOwaspReference = 'CWE-798: Use of Hardcoded Credentials / OWASP A07:2021-Identification & Auth';
+  let vulnerabilityType = `Segredo Codificado em Texto Plano (${finding.ruleName})`;
+  let explanation = `Substitui a chave codificada de forma estática no repositório por injeção via variável de ambiente (${envVarName}) com verificação estrita de tempo de execução (fail-fast).`;
+  let replacementSnippet = '';
+  let beforeSnippet = snippet || `const ${envVarName} = "${finding.maskedSecret || 'DUMMY_TOKEN_PLACEHOLDER'}";`;
+  let envConfig: SuggestedFixResult['envConfig'] = {
+    variableName: envVarName,
+    exampleLine: `${envVarName}=${finding.matchedSecret || 'sua_chave_ou_token_aqui'}`,
+    instructions: `Adicione ${envVarName} no seu arquivo .env local e configure como Secret protegido no pipeline de CI/CD.`
+  };
+  let securityChecklist = [
+    'Revogar imediatamente a credencial anterior no painel do provedor de serviço.',
+    'Criar uma nova credencial com privilégios mínimos (princípio do menor privilégio).',
+    'Certificar-se de que o arquivo .env está listado no .gitignore.',
+    'Se o repositório for público, expurgar o commit histórico com git-filter-repo.'
+  ];
+
+  if (isTaint) {
+    securePattern = 'Context-Aware Output Sanitization (CWE-79 / DOM XSS)';
+    cweOwaspReference = 'CWE-79: Improper Neutralization of Input / OWASP A03:2021-Injection';
+    vulnerabilityType = 'Manipulação Perigosa de DOM (DOM XSS / Insecure Sink)';
+    explanation = 'Evita injeção direta de strings não higienizadas em sinks do DOM, utilizando textContent seguro ou sanitização com DOMPurify.';
+    envConfig = undefined;
+    if (isPython) {
+      replacementSnippet = `# Sanitização de saída e escape seguro:\nimport html\nsafe_content = html.escape(user_input)`;
+    } else {
+      replacementSnippet = `// Opção 1: Se apenas texto for necessário (Recomendado):\nelement.textContent = userControlledInput;\n\n// Opção 2: Se marcação HTML for indispensável, use sanitizador:\nimport DOMPurify from 'dompurify';\nelement.innerHTML = DOMPurify.sanitize(userControlledInput);`;
+    }
+    securityChecklist = [
+      'Substituir usos de innerHTML ou sinks perigosos por textContent nativo.',
+      'Instalar e validar sanitizador rigoroso (como DOMPurify).',
+      'Configurar cabeçalhos HTTP Content-Security-Policy (CSP) robustos.'
+    ];
+  } else if (isSql) {
+    securePattern = 'Parameterized Prepared Statements (CWE-89 / SQL Injection)';
+    cweOwaspReference = 'CWE-89: SQL Injection / OWASP A03:2021-Injection';
+    vulnerabilityType = 'Possível Injeção SQL em Concatenação de Consulta';
+    explanation = 'Substitui concatenação dinâmica de strings SQL por consultas preparadas com marcadores de parâmetros controlados pelo driver do banco de dados.';
+    envConfig = undefined;
+    if (isPython) {
+      replacementSnippet = `# Consulta parametrizada com psycopg / sqlite3:\ncursor.execute("SELECT * FROM users WHERE email = %s AND active = %s", (email, True))`;
+    } else {
+      replacementSnippet = `// Consulta parametrizada com placeholders nativos (Postgres/MySQL):\nconst query = 'SELECT * FROM users WHERE email = $1 AND role = $2';\nconst result = await db.query(query, [userEmail, targetRole]);`;
+    }
+    securityChecklist = [
+      'Nunca concatenar entradas de usuário diretamente em comandos SQL.',
+      'Utilizar prepared statements ou ORM/Query Builder com validação de tipos.',
+      'Restringir as permissões do usuário do banco de dados ao menor privilégio estrito.'
+    ];
+  } else if (isPython) {
+    replacementSnippet = `import os\n\n# Carregar credencial a partir das variáveis de ambiente\n${envVarName.toLowerCase()} = os.environ.get('${envVarName}')\nif not ${envVarName.toLowerCase()}:\n    raise RuntimeError("FATAL: Variável de ambiente '${envVarName}' não configurada")`;
+  } else if (isShell) {
+    replacementSnippet = `# Carregar segredo via variável de ambiente com valor padrão protegido\n${envVarName}="\${${envVarName}:?ERRO: '${envVarName}' deve ser exportada no ambiente}"`;
+  } else {
+    // JavaScript / TypeScript
+    if (snippet.includes('const ') || snippet.includes('let ') || snippet.includes('var ')) {
+      const varDeclarator = snippet.includes('const ') ? 'const' : 'let';
+      const varName = snippet.split('=')[0]?.replace(/(const|let|var)\s+/, '').trim() || envVarName;
+      replacementSnippet = `// 1. Carregar chave com verificação em tempo de execução\nconst ${varName} = process.env.${envVarName};\nif (!${varName}) {\n  throw new Error("FATAL: '${envVarName}' deve ser configurada nas variáveis de ambiente");\n}`;
+    } else if (snippet.includes(':') && (snippet.includes('{') || snippet.includes(','))) {
+      // Inside an object literal: apiKey: '...'
+      const keyName = snippet.split(':')[0]?.trim() || 'apiKey';
+      replacementSnippet = `${keyName}: process.env.${envVarName} || (() => { throw new Error("${envVarName} não definida"); })()`;
+    } else {
+      replacementSnippet = `const ${envVarName} = process.env.${envVarName};\nif (!${envVarName}) {\n  throw new Error("FATAL: '${envVarName}' ausente no ambiente");\n}`;
+    }
+  }
+
+  const removedLines = beforeSnippet.split('\n').filter(Boolean);
+  const addedLines = replacementSnippet.split('\n').filter(Boolean);
+
+  return {
+    source: 'rule_engine',
+    model: 'SecScan Deterministic AppSec Engine',
+    timestamp: new Date().toISOString(),
+    findingId: finding.id,
+    ruleName: finding.ruleName,
+    vulnerabilityType,
+    cweOwaspReference,
+    securePattern,
+    replacementSnippet,
+    beforeSnippet,
+    explanation,
+    envConfig,
+    securityChecklist,
+    diff: {
+      removed: removedLines,
+      added: addedLines
+    }
   };
 }
 
@@ -262,6 +438,153 @@ Responda ESTRITAMENTE em formato JSON com o seguinte esquema sem markdown fences
       console.warn('Erro ao chamar Gemini API para mitigação, utilizando motor de contingência:', err?.message);
       const { topFindings = [], currentRiskScore = 65, qualityGateLimit = 50 } = req.body || {};
       const fallback = generateRuleBasedSuggestions(topFindings.slice(0, 3), currentRiskScore, qualityGateLimit);
+      return res.json(fallback);
+    }
+  });
+
+  // API endpoint for AI-powered Suggested Fix on a single finding
+  app.post('/api/suggested-fix', async (req, res) => {
+    const { finding, context } = req.body || {};
+
+    if (!finding || !finding.ruleName) {
+      return res.status(400).json({ error: 'Dados da ocorrência (finding) são obrigatórios.' });
+    }
+
+    const ai = getAI();
+
+    if (!ai) {
+      const fallback = generateRuleBasedSuggestedFix(finding, context);
+      return res.json(fallback);
+    }
+
+    try {
+      const prompt = `Você é um engenheiro sênior de DevSecOps e Application Security especializado em SAST, OWASP Top 10 e correção de vulnerabilidades em código.
+Gere uma substituição de código segura (Suggested Fix) para a vulnerabilidade detectada abaixo, levando em conta o contexto do arquivo e o tipo de falha.
+
+INFORMAÇÕES DA VULNERABILIDADE:
+- Regra: ${finding.ruleName} (ID: ${finding.ruleId || 'N/A'})
+- Severidade: ${finding.severity}
+- Categoria: ${finding.category}
+- Arquivo: ${finding.file} (linha ${finding.line}:${finding.column || 1})
+- Snippet Vulnerável Atual:
+${finding.snippet || finding.matchedSecret || 'N/A'}
+
+- Segredo Mascarado: ${finding.maskedSecret || 'N/A'}
+- Descrição da Falha: ${finding.description || 'N/A'}
+- Remediação Recomendada: ${finding.remediation || 'N/A'}
+
+${context?.surroundingCode ? `CONTEXTO DE CÓDIGO AO REDOR DO ACHADO:\n\`\`\`\n${context.surroundingCode}\n\`\`\`\n` : ''}
+
+DIRETRIZES DE GERAÇÃO:
+1. "replacementSnippet": Deve ser um código limpo, pronto para substituir a linha/bloco vulnerável, seguindo a sintaxe e estilo da linguagem do arquivo (${finding.file}).
+2. Se for segredo/chave/token: Substituir por injeção segura via variável de ambiente (ex: process.env no Node/TS, os.environ no Python, etc.), com validação fail-fast adequada.
+3. Se for injeção de código/SQL/XSS/eval: Substituir por API segura (parametrização, textContent, sanitização com DOMPurify, etc.).
+4. Forneça diff com linhas removidas e adicionadas.
+5. Forneça configuração de variável de ambiente (envConfig), se aplicável.
+6. Forneça checklist prático pós-correção (revogação, rotação, git-filter-repo, etc.).
+
+Responda ESTRITAMENTE em formato JSON com o seguinte formato, sem markdown ou fences ao redor:
+{
+  "vulnerabilityType": "Nome técnico da falha",
+  "cweOwaspReference": "Ex: CWE-798 / OWASP A07:2021",
+  "securePattern": "Nome do padrão de arquitetura segura",
+  "replacementSnippet": "Código seguro pronto para substituir a vulnerabilidade",
+  "beforeSnippet": "Código anterior vulnerável",
+  "explanation": "Explicação clara e objetiva do porquê esta substituição elimina a vulnerabilidade",
+  "envConfig": {
+    "variableName": "NOME_DA_VARIAVEL",
+    "exampleLine": "NOME_DA_VARIAVEL=valor_exemplo",
+    "instructions": "Instruções de configuração no .env ou CI/CD"
+  },
+  "securityChecklist": [
+    "Item de checklist 1",
+    "Item de checklist 2"
+  ],
+  "diff": {
+    "removed": ["linha removida 1"],
+    "added": ["linha adicionada 1", "linha adicionada 2"]
+  }
+}`;
+
+      // Call Gemini with timeout and model fallback
+      const callGeminiWithTimeout = async (modelName: string, timeoutMs: number = 7000) => {
+        const geminiCall = ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json'
+          }
+        });
+
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout de ${timeoutMs}ms no modelo ${modelName}`)), timeoutMs)
+        );
+
+        return await Promise.race([geminiCall, timeoutPromise]);
+      };
+
+      let response: any = null;
+      let usedModel = 'gemini-3.1-pro-preview';
+
+      try {
+        response = await callGeminiWithTimeout('gemini-3.1-pro-preview', 7000);
+      } catch (proErr) {
+        console.warn('Falha com gemini-3.1-pro-preview, tentando gemini-3.8-flash:', (proErr as any)?.message);
+        try {
+          usedModel = 'gemini-3.8-flash';
+          response = await callGeminiWithTimeout('gemini-3.8-flash', 5000);
+        } catch (flashErr) {
+          console.warn('Ambos os modelos falharam ou atingiram limite, acionando motor determinístico:', (flashErr as any)?.message);
+        }
+      }
+
+      if (response && response.text) {
+        let cleanText = response.text.trim();
+        // Strip markdown backticks if any
+        if (cleanText.startsWith('```')) {
+          cleanText = cleanText.replace(/^```(json)?\n?/, '').replace(/\n?```$/, '').trim();
+        }
+
+        const parsed = JSON.parse(cleanText);
+
+        if (parsed.replacementSnippet) {
+          const removed = parsed.diff?.removed || (parsed.beforeSnippet || finding.snippet || '').split('\n').filter(Boolean);
+          const added = parsed.diff?.added || (parsed.replacementSnippet || '').split('\n').filter(Boolean);
+
+          const result: SuggestedFixResult = {
+            source: 'gemini',
+            model: usedModel,
+            timestamp: new Date().toISOString(),
+            findingId: finding.id,
+            ruleName: finding.ruleName,
+            vulnerabilityType: parsed.vulnerabilityType || `Vulnerabilidade em ${finding.ruleName}`,
+            cweOwaspReference: parsed.cweOwaspReference || 'CWE-798 / OWASP Top 10',
+            securePattern: parsed.securePattern || 'Runtime Injection & Hardening',
+            replacementSnippet: parsed.replacementSnippet,
+            beforeSnippet: parsed.beforeSnippet || finding.snippet || '',
+            explanation: parsed.explanation || 'Código refatorado de acordo com as melhores práticas de AppSec.',
+            envConfig: parsed.envConfig || undefined,
+            securityChecklist: parsed.securityChecklist || [
+              'Validar a substituição em ambiente de desenvolvimento.',
+              'Garantir rotação da credencial exposta.',
+              'Executar a varredura SAST novamente para validar a correção.'
+            ],
+            diff: {
+              removed,
+              added
+            }
+          };
+
+          return res.json(result);
+        }
+      }
+
+      // Fallback if parsing didn't yield replacementSnippet
+      const fallback = generateRuleBasedSuggestedFix(finding, context);
+      return res.json(fallback);
+    } catch (err: any) {
+      console.warn('Erro na geração de correção via Gemini, utilizando motor determinístico:', err?.message);
+      const fallback = generateRuleBasedSuggestedFix(finding, context);
       return res.json(fallback);
     }
   });

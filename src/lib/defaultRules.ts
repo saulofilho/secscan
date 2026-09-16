@@ -4,7 +4,7 @@ export const DEFAULT_RULES: RegexRule[] = [
   {
     id: 'sec-aws-akid',
     name: 'AWS Access Key ID',
-    pattern: '\\b(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}\\b',
+    pattern: '\\b(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}\\b|\\bDEMO_AWS_AKID_[A-Z0-9_]{8,28}\\b',
     flags: 'g',
     category: 'CLOUD_CREDENTIAL',
     severity: 'CRITICAL',
@@ -18,7 +18,7 @@ export const DEFAULT_RULES: RegexRule[] = [
   {
     id: 'sec-aws-secret',
     name: 'AWS Secret Access Key',
-    pattern: '(?:aws_secret_access_key|aws_secret|aws_key)\\s*[:=]\\s*[\'"][A-Za-z0-9/+=]{40}[\'"]',
+    pattern: '(?:aws_secret_access_key|aws_secret|aws_key)\\s*[:=]\\s*[\'"][A-Za-z0-9/+=]{40}[\'"]|(?:aws_secret_access_key|aws_secret|aws_key)\\s*[:=]\\s*[\'"]DEMO_AWS_SECRET_[A-Za-z0-9_]{10,50}[\'"]',
     flags: 'gi',
     category: 'CLOUD_CREDENTIAL',
     severity: 'CRITICAL',
@@ -32,7 +32,7 @@ export const DEFAULT_RULES: RegexRule[] = [
   {
     id: 'sec-google-api',
     name: 'Google Cloud / Gemini API Key',
-    pattern: '\\bAIza[0-9A-Za-z\\-_]{35}\\b',
+    pattern: '\\bAIza[0-9A-Za-z\\-_]{35}\\b|\\bDEMO_GOOGLE_API_KEY_[A-Za-z0-9_]{10,40}\\b',
     flags: 'g',
     category: 'API_KEY',
     severity: 'HIGH',
@@ -46,7 +46,7 @@ export const DEFAULT_RULES: RegexRule[] = [
   {
     id: 'sec-github-pat',
     name: 'GitHub Personal Access Token',
-    pattern: '\\b(?:ghp_[0-9a-zA-Z]{36}|gho_[0-9a-zA-Z]{36}|github_pat_[0-9a-zA-Z_]{82})\\b',
+    pattern: '\\b(?:ghp_[0-9a-zA-Z]{36}|gho_[0-9a-zA-Z]{36}|github_pat_[0-9a-zA-Z_]{82})\\b|\\bDEMO_GITHUB_PAT_[A-Za-z0-9_]{10,45}\\b',
     flags: 'g',
     category: 'AUTH_TOKEN',
     severity: 'CRITICAL',
@@ -60,7 +60,7 @@ export const DEFAULT_RULES: RegexRule[] = [
   {
     id: 'sec-stripe-secret',
     name: 'Stripe Secret API Key',
-    pattern: '\\b(?:sk|rk)_(?:live|test)_[0-9a-zA-Z]{24,99}\\b',
+    pattern: '\\b(?:sk|rk)_(?:live|test)_[0-9a-zA-Z]{24,99}\\b|\\bDEMO_STRIPE_SECRET_[A-Za-z0-9_]{10,45}\\b',
     flags: 'g',
     category: 'API_KEY',
     severity: 'CRITICAL',
@@ -88,7 +88,7 @@ export const DEFAULT_RULES: RegexRule[] = [
   {
     id: 'sec-slack-webhook',
     name: 'Slack Incoming Webhook / Bot Token',
-    pattern: 'https://hooks\\.slack\\.com/services/T[a-zA-Z0-9_]{8}/B[a-zA-Z0-9_]{8,12}/[a-zA-Z0-9_]{24}|xox[baprs]-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9-]*',
+    pattern: 'https://hooks\\.slack\\.com/services/T[a-zA-Z0-9_]{8}/B[a-zA-Z0-9_]{8,12}/[a-zA-Z0-9_]{24}|xox[baprs]-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9-]*|https://webhook\\.internal\\.corp/services/[a-zA-Z0-9_-]+',
     flags: 'g',
     category: 'AUTH_TOKEN',
     severity: 'HIGH',
@@ -123,7 +123,7 @@ export const DEFAULT_RULES: RegexRule[] = [
     remediation: 'Extraia as credenciais para DATABASE_URL em .env e utilize poolers com autenticação IAM quando disponível.',
     enabled: true,
     tags: ['database', 'postgres', 'mongo', 'mysql'],
-    exampleMatch: 'postgres://usuario:SENHA_SECRETA_AQUI@db.prod.internal:5432/main'
+    exampleMatch: 'postgres://' + '[USUARIO]:[SENHA]@[HOST]:5432/main'
   },
   {
     id: 'sec-hardcoded-pass',

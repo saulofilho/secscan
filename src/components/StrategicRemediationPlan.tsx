@@ -250,7 +250,7 @@ function buildDeveloperTasks(findings: ScanFinding[]): DeveloperRemediationTask[
         taskTitle = `Rotacionar Chaves de API de Serviços Terceiros (${primary.ruleName})`;
         taskDescription =
           'Chaves de produção para provedores de pagamento ou serviços de IA detectadas. Crie novas credenciais restritas por IP/origem e remova do controle de versão.';
-        cliCommand = `# Configurar no gerenciador local seguro (.env ignorado)\nSTRIPE_SECRET_KEY=sk_live_...\nOPENAI_API_KEY=sk-proj-...\n\n# Verificar se .env está no .gitignore\ngrep -q '^\\.env$' .gitignore || echo '.env' >> .gitignore`;
+        cliCommand = `# Configurar no gerenciador local seguro (.env ignorado)\nSTRIPE_SECRET_KEY=SUA_CHAVE_PRIVADA_AQUI\nOPENAI_API_KEY=SUA_CHAVE_API_AQUI\n\n# Verificar se .env está no .gitignore\ngrep -q '^\\.env$' .gitignore || echo '.env' >> .gitignore`;
         cliDescription = 'Configuração segura com .env e garantia de .gitignore';
       } else if (primary.category === 'AUTH_TOKEN') {
         taskTitle = 'Revogar Tokens de Autenticação Pessoal (PAT) e Sessões JWT';

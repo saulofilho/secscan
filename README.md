@@ -51,11 +51,11 @@
 
 ### 4. 🔍 Matriz de Detecção de Segredos & Entropia de Shannon
 - **Cobertura Extensa de Padrões:**
-  - **Nuvem:** AWS Access Key ID (`AKIA...`), Secret Access Key, Google Cloud API & Gemini (`AIzaSy...`), Azure.
-  - **Autenticação:** GitHub Tokens (`ghp_...`, `github_pat_...`), JWTs (`eyJ...`), Slack Webhooks e bot tokens.
-  - **Finanças & Pagamentos:** Chaves secretas da Stripe (`sk_live_...`, `rk_live_...`).
-  - **Bancos de Dados:** URIs completas com credenciais (`postgres://`, `mongodb://`, `mysql://`, `redis://`).
-  - **IA & LLMs:** OpenAI API Keys (`sk-proj-...`, `sk-...`), Anthropic, HuggingFace.
+  - **Nuvem:** AWS Access Key ID, Secret Access Key, Google Cloud API & Gemini, Azure.
+  - **Autenticação:** GitHub Personal Access Tokens (PATs), tokens JWT, Slack Webhooks e tokens de bots.
+  - **Finanças & Pagamentos:** Chaves de API de provedores de pagamento (ex.: Stripe).
+  - **Bancos de Dados:** URIs completas com credenciais (PostgreSQL, MongoDB, MySQL, Redis).
+  - **IA & LLMs:** Chaves de API OpenAI, Anthropic, HuggingFace.
   - **Criptografia & Infra:** Chaves privadas PEM, RSA, SSH e blocos de certificados.
 - **Cálculo de Entropia de Shannon:** Medição da densidade de informação para mitigar falsos positivos e capturar chaves simétricas pseudoaleatórias.
 - **Ponderação por Criticidade de Arquivo:** Avaliação do risco contextual do achado baseado na sensibilidade do arquivo (`.env`, `docker-compose`, `k8s/`, rotas de backend vs. testes).

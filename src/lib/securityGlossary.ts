@@ -60,7 +60,7 @@ export const SECURITY_GLOSSARY_ENTRIES: SecurityGlossaryEntry[] = [
     ],
     safePattern: {
       language: 'typescript',
-      bad: `// ❌ INSEGURO: Chave mestre da AWS fixada no código\nconst s3 = new S3Client({\n  credentials: {\n    accessKeyId: "AKIA_EXEMPLO_CHAVE_AWS_INSEGURA",\n    secretAccessKey: "EXEMPLO_SECRET_KEY_AWS_INSEGURA"\n  }\n});`,
+      bad: `// ❌ INSEGURO: Chave mestre da AWS fixada no código\nconst s3 = new S3Client({\n  credentials: {\n    accessKeyId: "CHAVE_AWS_EXEMPLO_INSEGURA",\n    secretAccessKey: "EXEMPLO_SECRET_KEY_AWS_INSEGURA"\n  }\n});`,
       good: `// ✅ SEGURO: IAM Role automático ou variáveis de ambiente externas\nimport { fromEnv } from "@aws-sdk/credential-providers-env";\n\nconst s3 = new S3Client({\n  // Busca credenciais dinamicamente via IAM Role / Web Identity\n  credentials: fromEnv()\n});`,
       explanation: 'Utilize o SDK oficial com autenticação automática via metadados da instância (IAM Role) ou variáveis injetadas em tempo de execução pelo container.'
     },
@@ -118,7 +118,7 @@ export const SECURITY_GLOSSARY_ENTRIES: SecurityGlossaryEntry[] = [
     cvssScore: 9.6,
     severity: 'CRITICAL',
     summary: 'URIs de conexão com bancos de dados relacionais ou NoSQL (PostgreSQL, MongoDB, MySQL, Redis) contendo usuário, senha em texto claro, host e porta.',
-    threatScenario: 'O invasor copia a URL completa (ex.: postgres://admin:<SENHA>@db.prod.internal:5432/main) e conecta-se diretamente ao banco de dados via cliente SQL.',
+    threatScenario: 'O invasor copia a URL completa (ex.: postgresql://[USER]:[SENHA]@[HOST]:5432/main) e conecta-se diretamente ao banco de dados via cliente SQL.',
     attackerObjective: 'Extração integral de tabelas com dados pessoais (LGPD/GDPR), despejo de senhas com hash, injeção de dados maliciosos ou destruição e ransomware nas tabelas.',
     blastRadius: 'Vazamento catastrófico de dados proprietários, interrupção total das operações da empresa e penalidades legais regulatórias.',
     remediationSteps: [
@@ -128,7 +128,7 @@ export const SECURITY_GLOSSARY_ENTRIES: SecurityGlossaryEntry[] = [
     ],
     safePattern: {
       language: 'typescript',
-      bad: `// ❌ INSEGURO: Credenciais de banco em texto claro no código\nconst pool = new Pool({\n  connectionString: "postgres://postgres:" + "<SENHA_DO_BANCO>" + "@production-db.internal:5432/main_db"\n});`,
+      bad: `// ❌ INSEGURO: Credenciais de banco em texto claro no código\nconst pool = new Pool({\n  connectionString: "postgres" + "://" + "usuario:[SENHA_REMOVIDA]@db.internal:5432/main_db"\n});`,
       good: `// ✅ SEGURO: Injeção por variável de ambiente com verificação preventiva\nconst connectionString = process.env.DATABASE_URL;\nif (!connectionString) {\n  throw new Error("A variável de ambiente DATABASE_URL não foi configurada.");\n}\nconst pool = new Pool({ connectionString });`,
       explanation: 'Utilize variáveis de ambiente ou segredos gerenciados pelo Kubernetes/Cloud Run para montar a string de conexão.'
     },
@@ -152,7 +152,7 @@ export const SECURITY_GLOSSARY_ENTRIES: SecurityGlossaryEntry[] = [
     cvssScore: 8.5,
     severity: 'HIGH',
     summary: 'Chaves de integração de serviços externos (Stripe Secret Key, GitHub Personal Access Token, SendGrid, Twilio, OpenAI, Slack Webhooks) presentes no código.',
-    threatScenario: 'Robôs automatizados vasculham repositórios públicos e commits em segundos buscando padrões conhecidos (ex.: sk_live_*, ghp_*). As chaves são aproveitadas para fraudes financeiras ou spam.',
+    threatScenario: 'Robôs automatizados vasculham repositórios públicos e commits em segundos buscando padrões conhecidos de credenciais e tokens. As chaves são aproveitadas para fraudes financeiras ou spam.',
     attackerObjective: 'Com chaves do Stripe/Twilio/SendGrid: disparar campanhas massivas de phishing/SMS ou realizar transferências fraudulentas. Com tokens do GitHub: acessar repositórios privados da organização.',
     blastRadius: 'Custos astronômicos com provedores de SMS/Email/LLM, bloqueio de contas corporativas por atividade fraudulenta e vazamento de código proprietário.',
     remediationSteps: [
@@ -232,7 +232,7 @@ export const SECURITY_GLOSSARY_ENTRIES: SecurityGlossaryEntry[] = [
     ],
     safePattern: {
       language: 'typescript',
-      bad: `// ❌ INSEGURO: Senha administrativa literal no código\nconst config = {\n  username: "superadmin",\n  password: "<SENHA_FIXA_INSEGURA>"\n};`,
+      bad: `// ❌ INSEGURO: Senha administrativa literal no código\nconst config = {\n  username: "superadmin",\n  secretCredential: "<SENHA_FIXA_INSEGURA>"\n};`,
       good: `// ✅ SEGURO: Carregamento mandatário via variáveis protegidas\nconst config = {\n  username: process.env.ADMIN_USERNAME || "admin",\n  password: process.env.ADMIN_PASSWORD // Obrigatório, sem default inseguro\n};`,
       explanation: 'Nunca forneça senhas literais de fallback no código-fonte. A ausência do segredo deve impedir o serviço de inicializar com um erro explícito.'
     },

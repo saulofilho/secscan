@@ -69,7 +69,7 @@ interface AlertTriggerEvent {
   channel: string;
 }
 
-const DEFAULT_WEBHOOK_URL = 'https://hooks.slack.com/services/T00/B00/secscan-alerts';
+const DEFAULT_WEBHOOK_URL = 'https://webhook.internal.corp/services/secscan-alerts';
 
 function playAlertTone() {
   try {
@@ -1043,7 +1043,7 @@ fi
                     type="text"
                     value={webhookUrl}
                     onChange={(e) => setWebhookUrl(e.target.value)}
-                    placeholder="https://hooks.slack.com/services/..."
+                    placeholder="https://webhook.internal.corp/services/..."
                     className="w-full h-9 bg-[#0C0C0C] border border-[#333] text-white font-mono text-xs px-3 outline-none focus:border-[#FF3E00]"
                   />
                 </div>

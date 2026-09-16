@@ -361,7 +361,9 @@ export function buildInitialWorkflowRuns(
     rawLogs: run152Logs.rawLogs
   };
 
-  // Run #151 (PR #48 Failed Quality Gate: hardcoded token)
+  // Run #151 (PR #48 Failed Quality Gate: hardcoded token simulation)
+  const mockToken = 'DEMO_GITHUB_PAT_SAMPLE_CI_TOKEN';
+
   const dummyLeakFinding: ScanFinding = {
     id: 'sim-finding-151',
     ruleId: 'sec-github-pat',
@@ -371,9 +373,9 @@ export function buildInitialWorkflowRuns(
     file: 'scripts/deploy.sh',
     line: 14,
     column: 1,
-    matchedSecret: 'ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890',
-    snippet: 'export GITHUB_TOKEN="ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"',
-    maskedSecret: 'ghp_ABCDE********************7890',
+    matchedSecret: mockToken,
+    snippet: `export GITHUB_TOKEN="${mockToken}"`,
+    maskedSecret: 'DEMO_PAT_***_REDACTED',
     entropy: 4.62,
     description: 'Hardcoded GitHub PAT detected in automation shell script',
     remediation: 'Revogar token no GitHub e utilizar Secrets de repositório.',

@@ -10,9 +10,17 @@ import {
   Upload, 
   AlertCircle,
   HelpCircle,
-  Tag
+  Tag,
+  Wrench,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  ChevronUp,
+  Terminal
 } from 'lucide-react';
 import { RegexRule, FindingCategory, SeverityLevel } from '../types';
+import { RegexRuleBuilder } from './RegexRuleBuilder';
+import { RegexSandbox } from './RegexSandbox';
 
 interface CustomRulesViewProps {
   rules: RegexRule[];
@@ -32,6 +40,14 @@ export const CustomRulesView: React.FC<CustomRulesViewProps> = ({
   onImportRules
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [modalTab, setModalTab] = useState<'visual' | 'manual' | 'sandbox'>('visual');
+  const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+  const [isSandboxOpen, setIsSandboxOpen] = useState(true);
+
+  // Sandbox current active state to allow passing patterns across builder/sandbox
+  const [sandboxPattern, setSandboxPattern] = useState('(?<prefix>AKIA|ASIA|sk_live_|ghp_)(?<token>[0-9A-Za-z_]{16,40})');
+  const [sandboxFlags, setSandboxFlags] = useState('g');
+  const [sandboxText, setSandboxText] = useState<string | undefined>(undefined);
 
   // New rule form state
   const [name, setName] = useState('');
@@ -70,6 +86,41 @@ export const CustomRulesView: React.FC<CustomRulesViewProps> = ({
         error: err.message
       });
     }
+  };
+
+  // Connect builder to sandbox
+  const handleSendToSandbox = (pat: string, testStr: string) => {
+    setSandboxPattern(pat);
+    if (testStr) setSandboxText(testStr);
+    setIsSandboxOpen(true);
+    setTimeout(() => {
+      const sandboxElem = document.getElementById('regex-sandbox-section');
+      if (sandboxElem) {
+        sandboxElem.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 50);
+  };
+
+  // Connect builder to playground
+  const handleSendToPlayground = (pat: string, testStr: string) => {
+    handleTestRegex(pat, testStr);
+    handleSendToSandbox(pat, testStr);
+  };
+
+  // Open modal pre-filled with builder values for deep manual editing
+  const handleOpenAdvancedModal = (initialValues: Partial<RegexRule>) => {
+    if (initialValues.name) setName(initialValues.name);
+    if (initialValues.pattern) setPattern(initialValues.pattern);
+    if (initialValues.flags) setFlags(initialValues.flags);
+    if (initialValues.category) setCategory(initialValues.category);
+    if (initialValues.severity) setSeverity(initialValues.severity);
+    if (initialValues.description) setDescription(initialValues.description);
+    if (initialValues.remediation) setRemediation(initialValues.remediation);
+    if (initialValues.minEntropy !== undefined) setMinEntropy(initialValues.minEntropy);
+    if (initialValues.exampleMatch) setExampleMatch(initialValues.exampleMatch);
+
+    setModalTab('manual');
+    setShowAddModal(true);
   };
 
   const handleSaveRule = () => {
@@ -147,6 +198,36 @@ export const CustomRulesView: React.FC<CustomRulesViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            type="button"
+            id="btn-toggle-regex-sandbox"
+            onClick={() => setIsSandboxOpen(!isSandboxOpen)}
+            className={`inline-flex items-center gap-2 px-3.5 py-3 text-[10px] font-black uppercase tracking-[0.2em] border transition-colors cursor-pointer ${
+              isSandboxOpen 
+                ? 'bg-[#00FF41]/10 text-[#00FF41] border-[#00FF41]/50 shadow-[0_0_12px_rgba(0,255,65,0.15)]' 
+                : 'bg-[#111] text-zinc-300 border-[#333] hover:border-white hover:text-white'
+            }`}
+          >
+            <Terminal className="w-3.5 h-3.5 text-[#00FF41]" />
+            <span>Regex Sandbox</span>
+            {isSandboxOpen ? <ChevronUp className="w-3 h-3 text-[#00FF41]" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+
+          <button
+            type="button"
+            id="btn-toggle-visual-builder"
+            onClick={() => setIsBuilderOpen(!isBuilderOpen)}
+            className={`inline-flex items-center gap-2 px-3.5 py-3 text-[10px] font-black uppercase tracking-[0.2em] border transition-colors cursor-pointer ${
+              isBuilderOpen 
+                ? 'bg-[#FF3E00]/10 text-[#FF3E00] border-[#FF3E00]/50 shadow-[0_0_12px_rgba(255,62,0,0.15)]' 
+                : 'bg-[#111] text-zinc-300 border-[#333] hover:border-white hover:text-white'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-[#FF3E00]" />
+            <span>Construtor Visual</span>
+            {isBuilderOpen ? <ChevronUp className="w-3 h-3 text-[#FF3E00]" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+
           <label className="inline-flex items-center gap-2 px-3.5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white bg-[#111] hover:bg-white hover:text-black border border-[#333] cursor-pointer transition-colors">
             <Upload className="w-3.5 h-3.5" />
             <span>Importar</span>
@@ -162,7 +243,10 @@ export const CustomRulesView: React.FC<CustomRulesViewProps> = ({
           </button>
 
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => {
+              setModalTab('sandbox');
+              setShowAddModal(true);
+            }}
             className="inline-flex items-center gap-2 px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-black bg-white hover:bg-[#FF3E00] hover:text-white transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -171,8 +255,35 @@ export const CustomRulesView: React.FC<CustomRulesViewProps> = ({
         </div>
       </div>
 
+      {/* Primary Feature: Interactive Regex Sandbox with Live Highlighting & Group Visualizer */}
+      {isSandboxOpen && (
+        <div id="regex-sandbox-section" className="space-y-2">
+          <RegexSandbox
+            initialPattern={sandboxPattern}
+            initialFlags={sandboxFlags}
+            initialText={sandboxText}
+            activeRules={rules}
+            onSaveRule={(newRule) => {
+              onAddRule(newRule);
+            }}
+            onOpenManualModal={handleOpenAdvancedModal}
+          />
+        </div>
+      )}
+
+      {/* Visual Regex Rule Builder (Guided Archetype Engine) */}
+      {isBuilderOpen && (
+        <div id="visual-regex-rule-builder-section" className="space-y-2">
+          <RegexRuleBuilder
+            onAddRule={onAddRule}
+            onSendToPlayground={handleSendToSandbox}
+            onOpenAdvancedModal={handleOpenAdvancedModal}
+          />
+        </div>
+      )}
+
       {/* Interactive Live Regex Playground */}
-      <div className="bg-[#080808] border border-[#222] p-6 space-y-4">
+      <div id="live-regex-playground" className="bg-[#080808] border border-[#222] p-6 space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-[#222]">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-[#FF3E00]" />
@@ -329,136 +440,210 @@ export const CustomRulesView: React.FC<CustomRulesViewProps> = ({
       {/* Add Rule Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0A0A0A] max-w-xl w-full p-6 border border-[#333] space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className={`bg-[#0A0A0A] w-full border border-[#333] space-y-4 max-h-[92vh] overflow-y-auto ${modalTab !== 'manual' ? 'max-w-4xl p-5 sm:p-7' : 'max-w-xl p-6'}`}>
             <div className="flex items-center justify-between pb-3 border-b border-[#222]">
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white flex items-center gap-2">
-                <Plus className="w-4 h-4 text-[#FF3E00]" />
-                <span>Criar Nova Regra Regex</span>
-              </h3>
-              <button onClick={() => setShowAddModal(false)} className="text-[#666] hover:text-white text-lg font-bold">
+              <div className="flex items-center gap-3">
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-[#FF3E00]" />
+                  <span>Nova Regra de Detecção Regex</span>
+                </h3>
+                <div className="flex items-center border border-[#333] bg-[#050505] p-0.5 text-[9px] font-mono">
+                  <button
+                    type="button"
+                    onClick={() => setModalTab('sandbox')}
+                    className={`px-2.5 py-1 uppercase font-bold transition-colors cursor-pointer ${
+                      modalTab === 'sandbox' 
+                        ? 'bg-[#00FF41] text-black' 
+                        : 'text-[#888] hover:text-white'
+                    }`}
+                  >
+                    Sandbox Interativo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalTab('visual')}
+                    className={`px-2.5 py-1 uppercase font-bold transition-colors cursor-pointer ${
+                      modalTab === 'visual' 
+                        ? 'bg-[#FF3E00] text-white' 
+                        : 'text-[#888] hover:text-white'
+                    }`}
+                  >
+                    Construtor Visual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalTab('manual')}
+                    className={`px-2.5 py-1 uppercase font-bold transition-colors cursor-pointer ${
+                      modalTab === 'manual' 
+                        ? 'bg-white text-black' 
+                        : 'text-[#888] hover:text-white'
+                    }`}
+                  >
+                    Manual (Avançado)
+                  </button>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowAddModal(false)} 
+                className="text-[#666] hover:text-white text-xl font-bold w-7 h-7 flex items-center justify-center cursor-pointer"
+              >
                 &times;
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Nome da Regra *</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Token de Pagamento Interno"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-[#050505] border border-[#222] text-white font-mono focus:border-[#FF3E00] focus:outline-none"
+            {modalTab === 'sandbox' ? (
+              <div className="space-y-4">
+                <RegexSandbox
+                  initialPattern={pattern || sandboxPattern}
+                  initialFlags={flags || sandboxFlags}
+                  onSaveRule={(r) => {
+                    onAddRule(r);
+                    setShowAddModal(false);
+                  }}
+                  onOpenManualModal={(vals) => {
+                    handleOpenAdvancedModal(vals);
+                  }}
                 />
               </div>
-
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Categoria</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as FindingCategory)}
-                  className="w-full px-3 py-2 text-xs bg-[#050505] border border-[#222] text-white font-mono focus:border-[#FF3E00] focus:outline-none"
-                >
-                  <option value="CUSTOM_REGEX">Regra Customizada Geral</option>
-                  <option value="API_KEY">Chave de API</option>
-                  <option value="CLOUD_CREDENTIAL">Credencial de Nuvem</option>
-                  <option value="AUTH_TOKEN">Token de Autenticação</option>
-                  <option value="DATABASE_URI">URI de Banco de Dados</option>
-                  <option value="PASSWORD">Senha Hardcoded</option>
-                  <option value="API_PATH">Caminho de Rota de API</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Padrão Regex (Pattern) *</label>
-              <input
-                type="text"
-                placeholder="Ex: \\bCORP-[A-Z0-9]{20,32}\\b"
-                value={pattern}
-                onChange={(e) => setPattern(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-[#050505] border border-[#222] font-mono text-[#00FF41] focus:border-[#FF3E00] focus:outline-none"
-              />
-              <p className="text-[10px] font-mono text-[#666] mt-1">Lembre-se de escapar barras invertidas (ex: \\b para limites de palavra).</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Severidade</label>
-                <select
-                  value={severity}
-                  onChange={(e) => setSeverity(e.target.value as SeverityLevel)}
-                  className="w-full px-3 py-2 text-xs bg-[#050505] border border-[#222] text-white font-mono focus:border-[#FF3E00] focus:outline-none"
-                >
-                  <option value="CRITICAL">Crítica</option>
-                  <option value="HIGH">Alta</option>
-                  <option value="MEDIUM">Média</option>
-                  <option value="LOW">Baixa</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Flags</label>
-                <input
-                  type="text"
-                  value={flags}
-                  onChange={(e) => setFlags(e.target.value)}
-                  placeholder="g, gi"
-                  className="w-full px-3 py-2 text-xs bg-[#050505] border border-[#222] text-white font-mono focus:border-[#FF3E00] focus:outline-none"
+            ) : modalTab === 'visual' ? (
+              <div className="space-y-4">
+                <RegexRuleBuilder
+                  onAddRule={(r) => {
+                    onAddRule(r);
+                    setShowAddModal(false);
+                  }}
+                  onSendToPlayground={(pat, testStr) => {
+                    setShowAddModal(false);
+                    handleSendToPlayground(pat, testStr);
+                  }}
+                  onOpenAdvancedModal={(vals) => {
+                    handleOpenAdvancedModal(vals);
+                  }}
                 />
               </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Nome da Regra *</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Token de Pagamento Interno"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-[#050505] border border-[#222] text-white font-mono focus:border-[#FF3E00] focus:outline-none"
+                    />
+                  </div>
 
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Entropia Mínima</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="8"
-                  value={minEntropy}
-                  onChange={(e) => setMinEntropy(parseFloat(e.target.value))}
-                  className="w-full px-3 py-2 text-xs bg-[#050505] border border-[#222] text-white font-mono focus:border-[#FF3E00] focus:outline-none"
-                />
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Categoria</label>
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value as FindingCategory)}
+                      className="w-full px-3 py-2 text-xs bg-[#050505] border border-[#222] text-white font-mono focus:border-[#FF3E00] focus:outline-none"
+                    >
+                      <option value="CUSTOM_REGEX">Regra Customizada Geral</option>
+                      <option value="API_KEY">Chave de API</option>
+                      <option value="CLOUD_CREDENTIAL">Credencial de Nuvem</option>
+                      <option value="AUTH_TOKEN">Token de Autenticação</option>
+                      <option value="DATABASE_URI">URI de Banco de Dados</option>
+                      <option value="PASSWORD">Senha Hardcoded</option>
+                      <option value="API_PATH">Caminho de Rota de API</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Padrão Regex (Pattern) *</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: \\bCORP-[A-Z0-9]{20,32}\\b"
+                    value={pattern}
+                    onChange={(e) => setPattern(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-[#050505] border border-[#222] font-mono text-[#00FF41] focus:border-[#FF3E00] focus:outline-none"
+                  />
+                  <p className="text-[10px] font-mono text-[#666] mt-1">Lembre-se de escapar barras invertidas (ex: \\b para limites de palavra).</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Severidade</label>
+                    <select
+                      value={severity}
+                      onChange={(e) => setSeverity(e.target.value as SeverityLevel)}
+                      className="w-full px-3 py-2 text-xs bg-[#050505] border border-[#222] text-white font-mono focus:border-[#FF3E00] focus:outline-none"
+                    >
+                      <option value="CRITICAL">Crítica</option>
+                      <option value="HIGH">Alta</option>
+                      <option value="MEDIUM">Média</option>
+                      <option value="LOW">Baixa</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Flags</label>
+                    <input
+                      type="text"
+                      value={flags}
+                      onChange={(e) => setFlags(e.target.value)}
+                      placeholder="g, gi"
+                      className="w-full px-3 py-2 text-xs bg-[#050505] border border-[#222] text-white font-mono focus:border-[#FF3E00] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Entropia Mínima</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="8"
+                      value={minEntropy}
+                      onChange={(e) => setMinEntropy(parseFloat(e.target.value))}
+                      className="w-full px-3 py-2 text-xs bg-[#050505] border border-[#222] text-white font-mono focus:border-[#FF3E00] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Descrição do Problema</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Explique o que essa chave confere de acesso e por que não deve ficar exposta..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full p-2.5 text-xs bg-[#050505] border border-[#222] text-white font-mono focus:border-[#FF3E00] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Instrução de Remediação</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Ex: Rotacione o token no serviço de autenticação e injete via process.env..."
+                    value={remediation}
+                    onChange={(e) => setRemediation(e.target.value)}
+                    className="w-full p-2.5 text-xs bg-[#050505] border border-[#222] text-white font-mono focus:border-[#FF3E00] focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-3 border-t border-[#222]">
+                  <button
+                    onClick={() => setShowAddModal(false)}
+                    className="px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-[#888] hover:text-white border border-[#222] cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSaveRule}
+                    disabled={!name.trim() || !pattern.trim()}
+                    className="px-5 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-black bg-white hover:bg-[#FF3E00] hover:text-white disabled:opacity-40 transition-colors cursor-pointer"
+                  >
+                    Salvar Regra
+                  </button>
+                </div>
               </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Descrição do Problema</label>
-              <textarea
-                rows={2}
-                placeholder="Explique o que essa chave confere de acesso e por que não deve ficar exposta..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full p-2.5 text-xs bg-[#050505] border border-[#222] text-white font-mono focus:border-[#FF3E00] focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-wider text-[#888] block mb-1">Instrução de Remediação</label>
-              <textarea
-                rows={2}
-                placeholder="Ex: Rotacione o token no serviço de autenticação e injete via process.env..."
-                value={remediation}
-                onChange={(e) => setRemediation(e.target.value)}
-                className="w-full p-2.5 text-xs bg-[#050505] border border-[#222] text-white font-mono focus:border-[#FF3E00] focus:outline-none"
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-3 border-t border-[#222]">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-[#888] hover:text-white border border-[#222]"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveRule}
-                disabled={!name.trim() || !pattern.trim()}
-                className="px-5 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-black bg-white hover:bg-[#FF3E00] hover:text-white disabled:opacity-40 transition-colors"
-              >
-                Salvar Regra
-              </button>
-            </div>
+            )}
           </div>
         </div>
       )}

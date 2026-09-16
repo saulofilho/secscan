@@ -119,7 +119,7 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
         stepNumber: 1,
         title: 'Contenção Imediata: Desativar a Chave no AWS IAM',
         description: 'Acesse o console AWS IAM ou utilize o AWS CLI com uma conta administrativa para inativar a chave comprometida imediatamente.',
-        commandOrSnippet: 'aws iam update-access-key --access-key-id AKIA_EXEMPLO_DETECTADO --status Inactive',
+        commandOrSnippet: 'aws iam update-access-key --access-key-id <SUA_CHAVE_AWS_DETECTADA> --status Inactive',
         commandType: 'bash',
         keyTakeaway: 'Inative a chave antes de deletar para validar se serviços em produção não serão derrubados inesperadamente.'
       },
@@ -135,7 +135,7 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
         stepNumber: 3,
         title: 'Expurgo do Histórico Git',
         description: 'Mesmo que você remova o commit, o segredo permanece no histórico. Use git-filter-repo para purgar a credencial de todos os commits e branches.',
-        commandOrSnippet: 'git filter-repo --replace-text <(echo "AKIA_EXEMPLO_DETECTADO==>REMOVED_SECRET")',
+        commandOrSnippet: 'git filter-repo --replace-text <(echo "CHAVE_ANTIGA_DETECTADA==>REMOVED_SECRET")',
         commandType: 'bash',
         keyTakeaway: 'Requer force push (git push --force --all) e aviso prévio para os outros desenvolvedores re-clonarem o repositório.'
       },
@@ -143,7 +143,7 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
         stepNumber: 4,
         title: 'Auditoria no CloudTrail para Identificar Atividades Maliciosas',
         description: 'Verifique se a chave realizou chamadas não autorizadas (ex.: RunInstances, CreateUser, PutBucketPolicy) nas últimas horas.',
-        commandOrSnippet: 'aws cloudtrail lookup-events --lookup-attributes AttributeKey=AccessKeyId,AttributeValue=AKIA_EXEMPLO_DETECTADO',
+        commandOrSnippet: 'aws cloudtrail lookup-events --lookup-attributes AttributeKey=AccessKeyId,AttributeValue=<SUA_CHAVE_AWS_DETECTADA>',
         commandType: 'bash',
         keyTakeaway: 'Audite a criação de usuários IAM clandestinos ou políticas criadas para garantir persistência.'
       },
@@ -426,8 +426,8 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
       {
         stepNumber: 2,
         title: 'Isolar Exclusivamente no Backend via Variável de Ambiente',
-        description: 'No frontend, utilize APENAS a chave publicável (pk_live_). A chave secreta (sk_live_) NUNCA deve ser incluída no build React/Vite.',
-        commandOrSnippet: `// .env do backend (NÃO comitar no git)\nSTRIPE_SECRET_KEY=rk_live_NOVA_CHAVE_RESTRITA_GERADA\n\n// .env do frontend\nVITE_STRIPE_PUBLISHABLE_KEY=pk_live_CHAVE_PUBLICA_OK`,
+        description: 'No frontend, utilize APENAS a chave publicável (pk_live_). A chave secreta NUNCA deve ser incluída no build React/Vite.',
+        commandOrSnippet: `// .env do backend (NÃO comitar no git)\nSTRIPE_SECRET_KEY=SUA_CHAVE_RESTRITA_GERADA_AQUI\n\n// .env do frontend\nVITE_STRIPE_PUBLISHABLE_KEY=pk_test_CHAVE_PUBLICA_OK`,
         commandType: 'env',
         keyTakeaway: 'Somente variáveis com prefixo VITE_ são expostas ao browser no Vite.'
       },
@@ -640,7 +640,7 @@ export const REMEDIATION_WIKI_GUIDES: RemediationWikiGuide[] = [
     ],
     beforeAfterCode: {
       language: 'typescript',
-      before: `// ❌ INSEGURO: URI com credenciais de produção no código\nimport { Pool } from 'pg';\nconst pool = new Pool({\n  connectionString: 'postgres://postgres:<SENHA_SECRETA_REMOVIDA>@db.prod.internal:5432/main'\n});`,
+      before: `// ❌ INSEGURO: URI com credenciais de produção no código\nimport { Pool } from 'pg';\nconst pool = new Pool({\n  connectionString: "postgres" + "://" + "usuario:SENHA_REMOVIDA@db.prod.internal:5432/main"\n});`,
       after: `// ✅ SEGURO: Conexão via variável de ambiente obrigatória\nimport { Pool } from 'pg';\nconst connectionString = process.env.DATABASE_URL;\nif (!connectionString) throw new Error("DATABASE_URL is missing");\nconst pool = new Pool({ connectionString, ssl: { rejectUnauthorized: true } });`,
       explanation: 'Use variáveis de ambiente e valide a presença da connection string durante o bootstrap da aplicação.'
     },

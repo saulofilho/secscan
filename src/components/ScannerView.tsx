@@ -25,6 +25,8 @@ import { SecurityGlossaryTooltip, SecurityGlossaryInlineCard } from './SecurityG
 import { SecurityGlossaryEntry } from '../lib/securityGlossary';
 import { SecurityRemediationWikiModal } from './SecurityRemediationWikiModal';
 import { getOfficialDocLinksForFinding } from '../lib/remediationWikiData';
+import { SuggestedFixPanel } from './SuggestedFixPanel';
+import { SuggestedFixModal } from './SuggestedFixModal';
 
 interface ScannerViewProps {
   files: ScannedFile[];
@@ -38,6 +40,7 @@ interface ScannerViewProps {
   onQuickIgnore?: (pattern: string, description?: string) => void;
   onOpenGlossary?: (entry?: SecurityGlossaryEntry) => void;
   onOpenRemediationWiki?: (finding?: ScanFinding) => void;
+  onApplyFix?: (finding: ScanFinding, newSnippet: string) => void;
 }
 
 export const ScannerView: React.FC<ScannerViewProps> = ({
@@ -51,7 +54,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   onOpenIgnoreModal,
   onQuickIgnore,
   onOpenGlossary,
-  onOpenRemediationWiki
+  onOpenRemediationWiki,
+  onApplyFix
 }) => {
   const safeFiles = Array.isArray(files) ? files : [];
   const safeFindings = Array.isArray(findings) ? findings : [];
@@ -68,6 +72,15 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   // Security Remediation Wiki Modal State
   const [isRemediationWikiOpen, setIsRemediationWikiOpen] = useState(false);
   const [selectedWikiFinding, setSelectedWikiFinding] = useState<ScanFinding | null>(null);
+
+  // Suggested Fix Modal State
+  const [isSuggestedFixModalOpen, setIsSuggestedFixModalOpen] = useState(false);
+  const [suggestedFixFinding, setSuggestedFixFinding] = useState<ScanFinding | null>(null);
+
+  const handleTriggerSuggestedFix = (finding: ScanFinding) => {
+    setSuggestedFixFinding(finding);
+    setIsSuggestedFixModalOpen(true);
+  };
 
   const handleOpenRemediationWiki = (finding?: ScanFinding) => {
     setSelectedWikiFinding(finding || null);
@@ -466,6 +479,19 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                         <Wrench className="w-3 h-3 text-[#FF3E00] group-hover:text-white transition-colors" />
                         <span className="font-bold">Wiki de Remediação</span>
                       </button>
+
+                      {/* AI Suggested Fix Trigger Button */}
+                      <button
+                        type="button"
+                        id={`btn-suggested-fix-${finding.id}`}
+                        onClick={() => handleTriggerSuggestedFix(finding)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-[#00FF41]/10 hover:bg-[#00FF41] text-[#00FF41] hover:text-black border border-[#00FF41]/40 hover:border-[#00FF41] text-[10px] font-mono font-bold transition-all group cursor-pointer"
+                        title="Acionar prompt de IA para gerar substituição segura de código"
+                      >
+                        <Sparkles className="w-3 h-3 text-[#00FF41] group-hover:text-black transition-colors" />
+                        <span>Suggested Fix</span>
+                        <span className="px-1 py-0.2 bg-[#00FF41]/20 group-hover:bg-black/20 text-[9px] font-bold">AI</span>
+                      </button>
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -514,15 +540,33 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                       <span className="text-[11px] text-[#888] font-mono truncate mr-2">
                         &gt; SUGESTÃO: <code className="bg-[#141414] px-1.5 py-0.5 text-[#00FF41] border border-[#222]">{getSafeSnippet(finding)}</code>
                       </span>
-                      <button
-                        onClick={() => handleCopy(getSafeSnippet(finding), `snippet-${finding.id}`)}
-                        className="shrink-0 px-3 py-1 text-[10px] font-black uppercase tracking-[0.15em] border border-[#333] hover:border-white text-white hover:bg-white hover:text-black inline-flex items-center gap-1.5 transition-all"
-                      >
-                        {copiedIndex === `snippet-${finding.id}` ? <Check className="w-3 h-3 text-[#00FF41]" /> : <Copy className="w-3 h-3" />}
-                        <span>Copiar Código</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleTriggerSuggestedFix(finding)}
+                          className="shrink-0 px-3 py-1 text-[10px] font-black uppercase tracking-[0.15em] bg-[#00FF41] hover:bg-white text-black inline-flex items-center gap-1.5 transition-all shadow-[0_0_10px_rgba(0,255,65,0.25)] cursor-pointer"
+                          title="Acionar prompt de IA para gerar código seguro de substituição"
+                        >
+                          <Sparkles className="w-3 h-3 fill-black" />
+                          <span>Suggested Fix (IA)</span>
+                        </button>
+                        <button
+                          onClick={() => handleCopy(getSafeSnippet(finding), `snippet-${finding.id}`)}
+                          className="shrink-0 px-3 py-1 text-[10px] font-black uppercase tracking-[0.15em] border border-[#333] hover:border-white text-white hover:bg-white hover:text-black inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          {copiedIndex === `snippet-${finding.id}` ? <Check className="w-3 h-3 text-[#00FF41]" /> : <Copy className="w-3 h-3" />}
+                          <span>Copiar Código</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Inline AI Suggested Fix Component */}
+                  <SuggestedFixPanel
+                    finding={finding}
+                    fileContent={activeFile?.content}
+                    onApplyFix={onApplyFix}
+                  />
 
                   {/* Official Security Documentation References (OWASP & Snyk) */}
                   {(() => {
@@ -602,6 +646,15 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             onSelectFile(targetFile);
           }
         }}
+      />
+
+      {/* AI Suggested Fix Modal */}
+      <SuggestedFixModal
+        isOpen={isSuggestedFixModalOpen}
+        onClose={() => setIsSuggestedFixModalOpen(false)}
+        finding={suggestedFixFinding}
+        fileContent={activeFile?.content}
+        onApplyFix={onApplyFix}
       />
 
       {/* Paste Code Modal */}

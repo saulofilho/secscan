@@ -37,6 +37,66 @@ export interface RegexRule {
   exampleMatch?: string;
 }
 
+export interface RegexUnitTestCase {
+  id: string;
+  name: string;
+  pattern: string;
+  flags: string;
+  testInput: string;
+  expectedMatchCount: number;
+  expectedMatches: string[];
+  expectedGroups?: {
+    groupIndex: number;
+    name?: string;
+    value: string;
+  }[];
+  category?: FindingCategory;
+  severity?: SeverityLevel;
+  tags?: string[];
+  description?: string;
+  createdAt: string;
+  lastRunStatus?: 'PASSED' | 'FAILED' | 'PENDING';
+  lastRunMessage?: string;
+  lastRunAt?: string;
+  lastActualCount?: number;
+  lastActualMatches?: string[];
+}
+
+export interface RegexTestSuiteSummary {
+  totalTests: number;
+  passedCount: number;
+  failedCount: number;
+  pendingCount: number;
+  lastRunTimestamp?: string;
+  passRatePercentage: number;
+}
+
+export interface RuleRegressionResult {
+  testCaseId: string;
+  testCaseName: string;
+  category?: FindingCategory;
+  severity?: SeverityLevel;
+  pattern: string;
+  expectedMatches: string[];
+  expectedCount: number;
+  status: 'PASSED' | 'FAILED';
+  matchedRuleId?: string;
+  matchedRuleName?: string;
+  actualMatches: string[];
+  message: string;
+  durationMs: number;
+}
+
+export interface RuleRegressionReport {
+  timestamp: string;
+  totalTests: number;
+  passedCount: number;
+  failedCount: number;
+  passRate: number;
+  activeRulesCount: number;
+  results: RuleRegressionResult[];
+}
+
 export interface OfficialDocLink {
   provider: 'OWASP' | 'SNYK' | 'CWE' | 'NIST';
   title: string;
@@ -240,7 +300,7 @@ export interface ScanReport {
 export interface AuditLogEvent {
   id: string;
   timestamp: string;
-  type: 'SCAN_START' | 'FILE_PARSED' | 'SECRET_DETECTED' | 'DEP_IGNORED' | 'SCAN_COMPLETE' | 'ALERT_TRIGGERED' | 'RULE_APPLIED';
+  type: 'SCAN_START' | 'FILE_PARSED' | 'SECRET_DETECTED' | 'DEP_IGNORED' | 'SCAN_COMPLETE' | 'ALERT_TRIGGERED' | 'RULE_APPLIED' | 'FIX_APPLIED';
   message: string;
   severity?: SeverityLevel;
   durationMs?: number;
@@ -575,6 +635,32 @@ export interface CiCdPipelineHealthSummary {
   webhookStatus: 'ACTIVE' | 'PENDING' | 'ERROR';
   branchProtectionActive: boolean;
   sarifCodeScanningActive: boolean;
+}
+
+export interface SuggestedFixEnvConfig {
+  variableName: string;
+  exampleLine: string;
+  instructions: string;
+}
+
+export interface SuggestedFixResult {
+  source: 'gemini' | 'rule_engine';
+  model: string;
+  timestamp: string;
+  findingId: string;
+  ruleName: string;
+  vulnerabilityType: string;
+  cweOwaspReference: string;
+  securePattern: string;
+  replacementSnippet: string;
+  beforeSnippet: string;
+  explanation: string;
+  envConfig?: SuggestedFixEnvConfig;
+  securityChecklist: string[];
+  diff?: {
+    removed: string[];
+    added: string[];
+  };
 }
 
 

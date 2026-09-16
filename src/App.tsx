@@ -399,6 +399,69 @@ export default function App() {
     executeScan(files, rules, updated);
   };
 
+  const handleApplyFix = (finding: ScanFinding, newSnippet: string) => {
+    const targetFilePath = finding.file;
+    const targetFile = files.find(f => f.path === targetFilePath || f.name === targetFilePath);
+
+    if (!targetFile) {
+      console.warn('Arquivo não encontrado para aplicação de correção:', targetFilePath);
+      return;
+    }
+
+    let updatedContent = targetFile.content;
+    const originalSnippet = finding.snippet || finding.matchedSecret || '';
+
+    if (originalSnippet && updatedContent.includes(originalSnippet)) {
+      updatedContent = updatedContent.replace(originalSnippet, newSnippet);
+    } else {
+      const lines = updatedContent.split('\n');
+      const lineIdx = Math.max(0, finding.line - 1);
+      if (lineIdx < lines.length) {
+        lines[lineIdx] = newSnippet;
+        updatedContent = lines.join('\n');
+      }
+    }
+
+    const updatedFiles = files.map(f => {
+      if (f.path === targetFile.path) {
+        return {
+          ...f,
+          content: updatedContent,
+          size: new Blob([updatedContent]).size,
+          lastModified: Date.now()
+        };
+      }
+      return f;
+    });
+
+    setFiles(updatedFiles);
+    if (selectedFile?.path === targetFile.path) {
+      setSelectedFile({
+        ...selectedFile,
+        content: updatedContent,
+        size: new Blob([updatedContent]).size,
+        lastModified: Date.now()
+      });
+    }
+
+    const newLog: AuditLogEvent = {
+      id: `audit-fix-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      type: 'FIX_APPLIED',
+      message: `Patch seguro aplicado com sucesso ao arquivo ${targetFile.name} (linha ${finding.line}) para ${finding.ruleName}.`,
+      severity: finding.severity,
+      details: {
+        file: targetFile.path,
+        line: finding.line,
+        ruleName: finding.ruleName
+      }
+    };
+    setAuditLogs(prev => [newLog, ...prev]);
+
+    // Re-run scan with updated code to evaluate risk reduction
+    executeScan(updatedFiles, rules, ignorePatterns);
+  };
+
   const handleBatchQuickIgnore = (filePaths: string[]) => {
     if (filePaths.length === 0) return;
     const newPatterns: IgnorePatternItem[] = [];
@@ -1559,6 +1622,7 @@ export default function App() {
             onOpenIgnoreModal={() => setShowIgnoreModal(true)}
             onQuickIgnore={handleQuickIgnore}
             onOpenGlossary={handleOpenGlossary}
+            onApplyFix={handleApplyFix}
           />
         )}
 
