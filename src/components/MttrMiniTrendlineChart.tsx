@@ -21,7 +21,11 @@ import {
   ChevronDown,
   Calendar,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Search,
+  X,
+  Download,
+  Check
 } from 'lucide-react';
 import { SecScanGlobalConfig } from '../types';
 import { ValidationSeverityDistribution } from './ValidationSeverityDonutChart';
@@ -33,6 +37,8 @@ export interface MttrScanHistoryPoint {
   timeLabel: string;
   timestamp: string;
   fullDateLabel?: string;
+  isoDate?: string;
+  timestampMs?: number;
   criticalCount: number;
   highCount: number;
   warningCount: number;
@@ -91,6 +97,198 @@ export function parseRemediationHours(remediationStr?: string, fallbackHours: nu
   if (values.length === 0) return fallbackHours;
   const sum = values.reduce((acc, curr) => acc + curr, 0);
   return Number((sum / values.length).toFixed(2));
+}
+
+/**
+ * Safely extracts timestamp in milliseconds from a scan point
+ */
+export function getScanTimestampMs(pt: MttrScanHistoryPoint): number {
+  if (pt.timestampMs && !isNaN(pt.timestampMs)) return pt.timestampMs;
+  if (pt.isoDate) {
+    const t = new Date(pt.isoDate).getTime();
+    if (!isNaN(t)) return t;
+  }
+  if (pt.fullDateLabel) {
+    const match = pt.fullDateLabel.match(/(\d{1,2})\/(\d{1,2})/);
+    if (match) {
+      const d = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10) - 1;
+      const y = new Date().getFullYear();
+      const dt = new Date(y, m, d);
+      if (!isNaN(dt.getTime())) return dt.getTime();
+    }
+  }
+  return 0;
+}
+
+/**
+ * Helper to parse various user date or time inputs:
+ * - DD/MM/YYYY or DD/MM
+ * - YYYY-MM-DD
+ * - HH:mm
+ */
+function parseDateOrTimeBoundary(input: string, isEndOfRange: boolean = false): { timeMs?: number; timeMinutes?: number } | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  // HH:mm (e.g., 11:30 or 09:45)
+  const timeMatch = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (timeMatch) {
+    const hh = parseInt(timeMatch[1], 10);
+    const mm = parseInt(timeMatch[2], 10);
+    if (hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59) {
+      return { timeMinutes: hh * 60 + mm };
+    }
+  }
+
+  // YYYY-MM-DD
+  const isoMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (isoMatch) {
+    const y = parseInt(isoMatch[1], 10);
+    const m = parseInt(isoMatch[2], 10) - 1;
+    const d = parseInt(isoMatch[3], 10);
+    const dt = isEndOfRange
+      ? new Date(y, m, d, 23, 59, 59, 999)
+      : new Date(y, m, d, 0, 0, 0, 0);
+    if (!isNaN(dt.getTime())) return { timeMs: dt.getTime() };
+  }
+
+  // DD/MM/YYYY
+  const dmyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (dmyMatch) {
+    const d = parseInt(dmyMatch[1], 10);
+    const m = parseInt(dmyMatch[2], 10) - 1;
+    const y = parseInt(dmyMatch[3], 10);
+    const dt = isEndOfRange
+      ? new Date(y, m, d, 23, 59, 59, 999)
+      : new Date(y, m, d, 0, 0, 0, 0);
+    if (!isNaN(dt.getTime())) return { timeMs: dt.getTime() };
+  }
+
+  // DD/MM (assume current reference year)
+  const dmMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})$/);
+  if (dmMatch) {
+    const d = parseInt(dmMatch[1], 10);
+    const m = parseInt(dmMatch[2], 10) - 1;
+    const y = new Date().getFullYear();
+    const dt = isEndOfRange
+      ? new Date(y, m, d, 23, 59, 59, 999)
+      : new Date(y, m, d, 0, 0, 0, 0);
+    if (!isNaN(dt.getTime())) return { timeMs: dt.getTime() };
+  }
+
+  return null;
+}
+
+/**
+ * Filter timeline points based on query string:
+ * - Date/time ranges: "15/09 - 16/09", "15/09 a 16/09", "10:00 - 14:00"
+ * - Specific single date: "16/09"
+ * - Substring searches: "11:42", "Há 4h", "#3", "Hoje", "Ontem"
+ */
+export function filterScansByDateQuery(scans: MttrScanHistoryPoint[], query: string): MttrScanHistoryPoint[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return scans;
+
+  // Check for range splitters
+  const rangeSplitters = [' - ', ' a ', ' até ', ' to ', '..'];
+  let isRangeQuery = false;
+  let partA = '';
+  let partB = '';
+
+  for (const sep of rangeSplitters) {
+    if (q.includes(sep)) {
+      const parts = q.split(sep);
+      if (parts.length === 2 && parts[0].trim() && parts[1].trim()) {
+        isRangeQuery = true;
+        partA = parts[0].trim();
+        partB = parts[1].trim();
+        break;
+      }
+    }
+  }
+
+  if (isRangeQuery) {
+    const boundA = parseDateOrTimeBoundary(partA, false);
+    const boundB = parseDateOrTimeBoundary(partB, true);
+
+    // Range in dates (timestamp milliseconds)
+    if (boundA?.timeMs !== undefined && boundB?.timeMs !== undefined) {
+      let minMs = boundA.timeMs;
+      let maxMs = boundB.timeMs;
+      if (minMs > maxMs) {
+        const tmp = minMs;
+        minMs = maxMs;
+        maxMs = tmp;
+      }
+      return scans.filter(pt => {
+        const ptMs = getScanTimestampMs(pt);
+        return ptMs >= minMs && ptMs <= maxMs;
+      });
+    }
+
+    // Range in clock times (minutes from midnight)
+    if (boundA?.timeMinutes !== undefined && boundB?.timeMinutes !== undefined) {
+      let minMin = boundA.timeMinutes;
+      let maxMin = boundB.timeMinutes;
+      if (minMin > maxMin) {
+        const tmp = minMin;
+        minMin = maxMin;
+        maxMin = tmp;
+      }
+      return scans.filter(pt => {
+        const match = pt.timestamp.match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) return false;
+        const ptMin = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+        return ptMin >= minMin && ptMin <= maxMin;
+      });
+    }
+  }
+
+  // Single date boundary match (whole day)
+  const singleBound = parseDateOrTimeBoundary(q, false);
+  if (singleBound?.timeMs !== undefined) {
+    const startMs = singleBound.timeMs;
+    const endMs = startMs + 24 * 60 * 60 * 1000 - 1;
+    const dateMatches = scans.filter(pt => {
+      const ptMs = getScanTimestampMs(pt);
+      return ptMs >= startMs && ptMs <= endMs;
+    });
+    if (dateMatches.length > 0) return dateMatches;
+  }
+
+  // Aliases for "hoje" (today) or "ontem" (yesterday)
+  if (q === 'hoje' || q === 'today') {
+    const now = new Date();
+    const todayStr = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    return scans.filter(pt => (pt.fullDateLabel || '').includes(todayStr) || pt.isCurrent);
+  }
+
+  if (q === 'ontem' || q === 'yesterday') {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const yStr = yesterday.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    return scans.filter(pt => (pt.fullDateLabel || '').includes(yStr));
+  }
+
+  // Textual fuzzy substring match
+  return scans.filter(pt => {
+    const fullDate = (pt.fullDateLabel || '').toLowerCase();
+    const ts = (pt.timestamp || '').toLowerCase();
+    const timeLbl = (pt.timeLabel || '').toLowerCase();
+    const scanLbl = (pt.scanLabel || '').toLowerCase();
+    const iso = (pt.isoDate || '').toLowerCase();
+    const idxStr = `#${pt.scanIndex}`;
+
+    return (
+      fullDate.includes(q) ||
+      ts.includes(q) ||
+      timeLbl.includes(q) ||
+      scanLbl.includes(q) ||
+      iso.includes(q) ||
+      idxStr === q ||
+      String(pt.scanIndex) === q
+    );
+  });
 }
 
 /**
@@ -155,6 +353,8 @@ function generateBaselineMttrRuns(
     const scanDate = new Date(Date.now() - (selectedOffsets.length - 1 - idx) * 18 * 60 * 1000);
     const dateStr = scanDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
     const timeStr = scanDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const isoDateStr = scanDate.toISOString().slice(0, 10);
+    const timeMs = scanDate.getTime();
 
     return {
       scanIndex: scanNum,
@@ -162,6 +362,8 @@ function generateBaselineMttrRuns(
       timeLabel: selectedTimes[idx] || 'Passado',
       timestamp: timeStr,
       fullDateLabel: `${dateStr} às ${timeStr}`,
+      isoDate: isoDateStr,
+      timestampMs: timeMs,
       criticalCount: critCount,
       highCount: highCount,
       warningCount: warnCount,
@@ -189,6 +391,8 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
   const [viewMode, setViewMode] = useState<MttrTrendViewMode>('AVERAGE');
   const [compareBySeverity, setCompareBySeverity] = useState<boolean>(false);
   const [hoveredSeverity, setHoveredSeverity] = useState<MttrSeverityKey | null>(null);
+  const [dateSearchQuery, setDateSearchQuery] = useState<string>('');
+  const [exportSuccess, setExportSuccess] = useState<boolean>(false);
   const [timeRange, setTimeRange] = useState<MttrTimeRange>(() => {
     const saved = safeGetItem(MTTR_TIMERANGE_STORAGE_KEY);
     return saved === '5' || saved === '10' || saved === 'all' ? saved : '5';
@@ -248,6 +452,8 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
       const now = new Date();
       const dateStr = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const isoDateStr = now.toISOString().slice(0, 10);
+      const timeMs = now.getTime();
 
       const currentPoint: MttrScanHistoryPoint = {
         scanIndex: currentScanNum,
@@ -255,6 +461,8 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
         timeLabel: 'Agora',
         timestamp: timeStr,
         fullDateLabel: `${dateStr} às ${timeStr}`,
+        isoDate: isoDateStr,
+        timestampMs: timeMs,
         criticalCount: distribution.critical,
         highCount: distribution.high,
         warningCount: distribution.warning,
@@ -280,8 +488,11 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
     return history;
   }, [distribution, config, unitCritHours, unitHighHours, unitWarnHours, fileSetKey]);
 
-  // Filter timeline according to selected timeRange dropdown (Last 5, Last 10, All time)
+  // Filter timeline according to search query or selected timeRange dropdown (Last 5, Last 10, All time)
   const displayData: MttrScanHistoryPoint[] = useMemo(() => {
+    if (dateSearchQuery.trim()) {
+      return filterScansByDateQuery(fullTimelineData, dateSearchQuery);
+    }
     if (timeRange === '5') {
       return fullTimelineData.slice(-5);
     }
@@ -289,7 +500,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
       return fullTimelineData.slice(-10);
     }
     return fullTimelineData;
-  }, [fullTimelineData, timeRange]);
+  }, [fullTimelineData, timeRange, dateSearchQuery]);
 
   // Formatted chart points adapting to single view or 3-severity comparison
   const chartData = useMemo(() => {
@@ -303,20 +514,18 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
   }, [displayData, viewMode]);
 
   // Historical trend comparison across the active time window
-  const initialPoint = displayData[0] || fullTimelineData[0];
-  const currentPoint = displayData[displayData.length - 1] || fullTimelineData[fullTimelineData.length - 1];
+  const initialPoint = displayData.length > 0 ? displayData[0] : null;
+  const currentPoint = displayData.length > 0 ? displayData[displayData.length - 1] : null;
 
-  const initialMetric =
-    viewMode === 'AVERAGE'
-      ? initialPoint?.averageMttrHours ?? 0
-      : initialPoint?.totalBacklogHours ?? 0;
+  const initialMetric = initialPoint
+    ? (viewMode === 'AVERAGE' ? initialPoint.averageMttrHours : initialPoint.totalBacklogHours)
+    : 0;
 
-  const currentMetric =
-    viewMode === 'AVERAGE'
-      ? currentPoint?.averageMttrHours ?? 0
-      : currentPoint?.totalBacklogHours ?? 0;
+  const currentMetric = currentPoint
+    ? (viewMode === 'AVERAGE' ? currentPoint.averageMttrHours : currentPoint.totalBacklogHours)
+    : 0;
 
-  const delta = currentMetric - initialMetric;
+  const delta = currentPoint && initialPoint ? currentMetric - initialMetric : 0;
   const percentDelta =
     initialMetric > 0
       ? Math.round(((currentMetric - initialMetric) / initialMetric) * 100)
@@ -340,13 +549,14 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
   // SLA Target line
   const slaTargetLimit = viewMode === 'AVERAGE' ? 4.0 : 15.0;
 
-  // Dynamic subtitle based on active timeRange
-  const timeRangeSubtitle =
-    timeRange === '5'
-      ? '(Últimas 5 Varreduras)'
-      : timeRange === '10'
-      ? '(Últimas 10 Varreduras)'
-      : `(Histórico Completo • ${displayData.length} Varreduras)`;
+  // Dynamic subtitle based on active timeRange or search query
+  const timeRangeSubtitle = dateSearchQuery.trim()
+    ? `(Filtro: "${dateSearchQuery.trim()}" • ${displayData.length} de ${fullTimelineData.length} Varreduras)`
+    : timeRange === '5'
+    ? '(Últimas 5 Varreduras)'
+    : timeRange === '10'
+    ? '(Últimas 10 Varreduras)'
+    : `(Histórico Completo • ${displayData.length} Varreduras)`;
 
   /**
    * Custom interactive SVG dot for each individual line with expanded hit target
@@ -395,6 +605,83 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
         </g>
       );
     };
+  };
+
+  /**
+   * Exports the currently displayed historical MTTR chart data to a structured CSV file
+   */
+  const handleExportCsv = () => {
+    if (!displayData || displayData.length === 0) return;
+
+    const headers = [
+      'ID_Varredura',
+      'Rotulo',
+      'Data_Hora',
+      'Horario',
+      'Data_ISO',
+      'Tempo_Relativo',
+      'Criticos_P0',
+      'Altos_P1',
+      'Aviso_P2',
+      'Total_Achados',
+      'MTTR_Medio_Horas',
+      'Backlog_Total_Horas',
+      'MTTR_Critico_Horas_Total',
+      'MTTR_Alto_Horas_Total',
+      'MTTR_Aviso_Horas_Total',
+      'Tempo_Unitario_Critico_Horas',
+      'Tempo_Unitario_Alto_Horas',
+      'Tempo_Unitario_Aviso_Horas',
+      'Varredura_Atual'
+    ];
+
+    const escapeCsv = (val: any) => {
+      const str = String(val ?? '');
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const rows = displayData.map(pt => [
+      pt.scanIndex,
+      escapeCsv(pt.scanLabel),
+      escapeCsv(pt.fullDateLabel || `${pt.isoDate || ''} ${pt.timestamp || ''}`),
+      escapeCsv(pt.timestamp),
+      escapeCsv(pt.isoDate || ''),
+      escapeCsv(pt.timeLabel),
+      pt.criticalCount,
+      pt.highCount,
+      pt.warningCount,
+      pt.totalFindings,
+      pt.averageMttrHours,
+      pt.totalBacklogHours,
+      pt.criticalMttrHours,
+      pt.highMttrHours,
+      pt.warningMttrHours,
+      pt.criticalUnitHours,
+      pt.highUnitHours,
+      pt.warningUnitHours,
+      pt.isCurrent ? 'Sim' : 'Nao'
+    ].join(','));
+
+    // Prepend UTF-8 BOM (\uFEFF) for universal spreadsheet software compatibility (Excel, LibreOffice, etc.)
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    link.download = `secscan-mttr-historico-${dateStamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setExportSuccess(true);
+    setTimeout(() => {
+      setExportSuccess(false);
+    }, 2500);
   };
 
   return (
@@ -553,7 +840,109 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
               <Sliders className="w-3 h-3" />
             </button>
           )}
+
+          {/* Export Chart Data Button (CSV) */}
+          <button
+            id="btn-export-mttr-csv"
+            type="button"
+            onClick={handleExportCsv}
+            disabled={displayData.length === 0}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded border transition-all cursor-pointer font-bold text-[9px] ${
+              exportSuccess
+                ? 'bg-emerald-500/25 text-emerald-300 border-emerald-500/50 shadow-xs'
+                : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-emerald-200 border-emerald-500/30 hover:border-emerald-500/50'
+            } disabled:opacity-40 disabled:cursor-not-allowed`}
+            title="Exportar dados históricos de MTTR exibidos atualmente no gráfico em formato CSV"
+          >
+            {exportSuccess ? (
+              <>
+                <Check className="w-3 h-3 text-emerald-300" />
+                <span>Dados Exportados!</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-3 h-3 text-emerald-400" />
+                <span>Exportar Dados do Gráfico</span>
+              </>
+            )}
+          </button>
         </div>
+      </div>
+
+      {/* Date Search & Range Filter Bar */}
+      <div 
+        id="mttr-date-search-bar"
+        className="flex flex-wrap items-center gap-1.5 p-1 rounded bg-black/40 border border-white/5"
+      >
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="w-3 h-3 text-sky-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            id="input-mttr-date-search"
+            type="text"
+            value={dateSearchQuery}
+            onChange={(e) => setDateSearchQuery(e.target.value)}
+            placeholder="Buscar por data (ex: 16/09, 11:30) ou intervalo (ex: 15/09 - 16/09, #3)..."
+            className="w-full pl-6.5 pr-6 py-1 rounded bg-black/60 hover:bg-black/80 focus:bg-black/90 border border-white/10 focus:border-sky-400/60 text-zinc-200 placeholder-zinc-500 text-[9px] font-mono transition-all outline-none focus:ring-1 focus:ring-sky-400/40"
+            aria-label="Filtrar histórico por data ou intervalo específico"
+          />
+          {dateSearchQuery && (
+            <button
+              id="btn-clear-mttr-date-search"
+              type="button"
+              onClick={() => setDateSearchQuery('')}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-zinc-400 hover:text-white rounded hover:bg-white/10 cursor-pointer transition-colors"
+              title="Limpar busca de data"
+            >
+              <X className="w-2.5 h-2.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Search status badge / Quick suggestions */}
+        {dateSearchQuery.trim() ? (
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/15 border border-sky-500/30 text-sky-300 text-[8.5px]">
+            <Calendar className="w-2.5 h-2.5 shrink-0" />
+            <span className="font-semibold">
+              {displayData.length} de {fullTimelineData.length} {displayData.length === 1 ? 'varredura' : 'varreduras'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setDateSearchQuery('')}
+              className="ml-1 text-zinc-400 hover:text-white underline cursor-pointer"
+            >
+              Limpar
+            </button>
+          </div>
+        ) : (
+          <div className="hidden sm:flex items-center gap-1 text-[8px] text-zinc-500">
+            <span className="text-zinc-600">Sugestões:</span>
+            <button
+              type="button"
+              onClick={() => {
+                const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                setDateSearchQuery(today);
+              }}
+              className="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors"
+              title="Filtrar varreduras da data de hoje"
+            >
+              Hoje
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                const yStr = yesterday.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                const tStr = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                setDateSearchQuery(`${yStr} - ${tStr}`);
+              }}
+              className="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors"
+              title="Filtrar intervalo entre ontem e hoje"
+            >
+              Intervalo 24h
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Multi-Severity Interactive Overlay Legend */}
@@ -638,35 +1027,53 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
         onMouseLeave={() => setHoveredSeverity(null)}
         className={`w-full ${compareBySeverity ? 'h-18 sm:h-20' : 'h-14'} bg-black/40 rounded border border-white/5 relative overflow-hidden pt-1 transition-all duration-200`}
       >
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
-            data={chartData}
-            margin={{ top: 4, right: 8, left: 8, bottom: 0 }}
-            onClick={(state: any) => {
-              if (state && state.activePayload && state.activePayload.length > 0) {
-                const pt = state.activePayload[0].payload as MttrScanHistoryPoint;
-                if (onSelectScan) onSelectScan(pt);
-              }
-            }}
-          >
-            <defs>
-              <linearGradient id="mttrGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={primaryColor} stopOpacity={0.38} />
-                <stop offset="95%" stopColor={primaryColor} stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
+        {displayData.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center p-2 space-y-1 text-zinc-400">
+            <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-[9px]">
+              <AlertTriangle className="w-3 h-3 shrink-0" />
+              <span>Nenhuma varredura encontrada para "{dateSearchQuery}"</span>
+            </div>
+            <div className="flex items-center gap-2 text-[8px] text-zinc-500">
+              <span>Tente buscar por data (ex: 16/09), horário (ex: 11:30) ou intervalo (ex: 15/09 - 16/09)</span>
+              <button
+                type="button"
+                onClick={() => setDateSearchQuery('')}
+                className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-zinc-200 hover:text-white border border-white/10 text-[8px] cursor-pointer transition-colors"
+              >
+                Limpar filtro
+              </button>
+            </div>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart
+              data={chartData}
+              margin={{ top: 4, right: 8, left: 8, bottom: 0 }}
+              onClick={(state: any) => {
+                if (state && state.activePayload && state.activePayload.length > 0) {
+                  const pt = state.activePayload[0].payload as MttrScanHistoryPoint;
+                  if (onSelectScan) onSelectScan(pt);
+                }
+              }}
+            >
+              <defs>
+                <linearGradient id="mttrGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={primaryColor} stopOpacity={0.38} />
+                  <stop offset="95%" stopColor={primaryColor} stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
 
-            <YAxis hide domain={[0, 'dataMax + 1.5']} />
-            <XAxis dataKey="scanIndex" hide />
+              <YAxis hide domain={[0, 'dataMax + 1.5']} />
+              <XAxis dataKey="scanIndex" hide />
 
-            {/* SLA Target Reference Line */}
-            <ReferenceLine
-              y={slaTargetLimit}
-              stroke="#F59E0B"
-              strokeDasharray="2 2"
-              strokeWidth={1}
-              strokeOpacity={0.45}
-            />
+              {/* SLA Target Reference Line */}
+              <ReferenceLine
+                y={slaTargetLimit}
+                stroke="#F59E0B"
+                strokeDasharray="2 2"
+                strokeWidth={1}
+                strokeOpacity={0.45}
+              />
 
             <RechartsTooltip
               content={({ active, payload }) => {
@@ -986,46 +1393,49 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
             )}
           </AreaChart>
         </ResponsiveContainer>
+        )}
       </div>
 
       {/* Historical Scan Point Ticks Legend */}
-      <div 
-        id="mttr-trendline-scans-legend"
-        className={`grid ${
-          displayData.length <= 5
-            ? 'grid-cols-5'
-            : displayData.length <= 10
-            ? 'grid-cols-5 sm:grid-cols-10'
-            : 'grid-cols-4 sm:grid-cols-6 md:grid-cols-12'
-        } gap-1 pt-0.5 border-t border-white/5 text-center text-[8.5px]`}
-      >
-        {displayData.map((pt, idx) => {
-          const val =
-            compareBySeverity
-              ? `${pt.criticalCount}C • ${pt.highCount}A • ${pt.warningCount}W`
-              : viewMode === 'AVERAGE'
-              ? `${pt.averageMttrHours}h`
-              : `${pt.totalBacklogHours}h`;
+      {displayData.length > 0 && (
+        <div 
+          id="mttr-trendline-scans-legend"
+          className={`grid ${
+            displayData.length <= 5
+              ? 'grid-cols-5'
+              : displayData.length <= 10
+              ? 'grid-cols-5 sm:grid-cols-10'
+              : 'grid-cols-4 sm:grid-cols-6 md:grid-cols-12'
+          } gap-1 pt-0.5 border-t border-white/5 text-center text-[8.5px]`}
+        >
+          {displayData.map((pt, idx) => {
+            const val =
+              compareBySeverity
+                ? `${pt.criticalCount}C • ${pt.highCount}A • ${pt.warningCount}W`
+                : viewMode === 'AVERAGE'
+                ? `${pt.averageMttrHours}h`
+                : `${pt.totalBacklogHours}h`;
 
-          return (
-            <div
-              key={`scan-node-${pt.scanIndex}-${idx}`}
-              className={`p-1 rounded transition-colors cursor-pointer ${
-                pt.isCurrent
-                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-bold'
-                  : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
-              }`}
-              onClick={() => onSelectScan && onSelectScan(pt)}
-              title={`${pt.scanLabel} (${pt.fullDateLabel || pt.timeLabel}) — ${pt.totalFindings} achados, MTTR: ${pt.averageMttrHours}h`}
-            >
-              <div className="text-[7.5px] uppercase opacity-75 truncate">
-                {pt.isCurrent ? 'Atual' : `#${idx + 1}`}
+            return (
+              <div
+                key={`scan-node-${pt.scanIndex}-${idx}`}
+                className={`p-1 rounded transition-colors cursor-pointer ${
+                  pt.isCurrent
+                    ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-bold'
+                    : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
+                }`}
+                onClick={() => onSelectScan && onSelectScan(pt)}
+                title={`${pt.scanLabel} (${pt.fullDateLabel || pt.timeLabel}) — ${pt.totalFindings} achados, MTTR: ${pt.averageMttrHours}h`}
+              >
+                <div className="text-[7.5px] uppercase opacity-75 truncate">
+                  {pt.isCurrent ? 'Atual' : `#${idx + 1}`}
+                </div>
+                <div className="font-mono text-[9px] font-semibold">{val}</div>
               </div>
-              <div className="font-mono text-[9px] font-semibold">{val}</div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
