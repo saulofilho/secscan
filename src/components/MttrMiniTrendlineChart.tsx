@@ -17,7 +17,8 @@ import {
   Sliders,
   GitCompare,
   Layers,
-  Sparkles
+  History,
+  ChevronDown
 } from 'lucide-react';
 import { SecScanGlobalConfig } from '../types';
 import { ValidationSeverityDistribution } from './ValidationSeverityDonutChart';
@@ -44,6 +45,7 @@ export interface MttrScanHistoryPoint {
 }
 
 export type MttrTrendViewMode = 'AVERAGE' | 'TOTAL';
+export type MttrTimeRange = '5' | '10' | 'all';
 
 interface MttrMiniTrendlineChartProps {
   distribution: ValidationSeverityDistribution;
@@ -54,6 +56,7 @@ interface MttrMiniTrendlineChartProps {
 }
 
 const MTTR_HISTORY_STORAGE_KEY = 'secscan_mttr_history_v1';
+const MTTR_TIMERANGE_STORAGE_KEY = 'secscan_mttr_timerange_v1';
 
 /**
  * Extracts average hours from a remediation string (e.g. "1.5h – 2h" -> 1.75, "30m – 1h" -> 0.75, "12h – 24h" -> 18)
@@ -79,11 +82,12 @@ export function parseRemediationHours(remediationStr?: string, fallbackHours: nu
 }
 
 /**
- * Generates 5 realistic sequential scan runs ending at current scan
+ * Generates sequential baseline scan runs showing realistic resolution over time
  */
 function generateBaselineMttrRuns(
   distribution: ValidationSeverityDistribution,
-  config: SecScanGlobalConfig
+  config: SecScanGlobalConfig,
+  totalCount: number = 12
 ): MttrScanHistoryPoint[] {
   const critHours = parseRemediationHours(
     config.severityConfig?.CRITICAL?.remediationTime || config.remediationTime?.CRITICAL,
@@ -98,37 +102,55 @@ function generateBaselineMttrRuns(
     18.0
   );
 
-  const timesAgo = ['Há 50m', 'Há 35m', 'Há 20m', 'Há 6m', 'Agora'];
-
-  // Progressive remediation curve showing resolution over 5 scans
-  const findingMultipliers = [
-    { crit: distribution.critical + 2, high: distribution.high + 3, warn: distribution.warning + 4 },
-    { crit: distribution.critical + 2, high: distribution.high + 2, warn: distribution.warning + 2 },
-    { crit: distribution.critical + 1, high: distribution.high + 1, warn: distribution.warning + 1 },
-    { crit: distribution.critical, high: distribution.high + 1, warn: distribution.warning },
-    { crit: distribution.critical, high: distribution.high, warn: distribution.warning },
+  const timesAgo = [
+    'Há 4h', 'Há 3h15m', 'Há 2h30m', 'Há 1h50m', 'Há 1h20m',
+    'Há 55m', 'Há 40m', 'Há 25m', 'Há 15m', 'Há 8m', 'Há 3m', 'Agora'
   ];
 
-  return findingMultipliers.map((counts, idx) => {
-    const isCurrent = idx === 4;
-    const total = counts.crit + counts.high + counts.warn;
-    const critTotal = counts.crit * critHours;
-    const highTotal = counts.high * highHours;
-    const warnTotal = counts.warn * warnHours;
+  // Progressive finding offsets from earliest to latest
+  const offsets = [
+    { crit: 5, high: 6, warn: 8 },
+    { crit: 4, high: 6, warn: 7 },
+    { crit: 4, high: 5, warn: 6 },
+    { crit: 3, high: 5, warn: 5 },
+    { crit: 3, high: 4, warn: 5 },
+    { crit: 2, high: 4, warn: 4 },
+    { crit: 2, high: 3, warn: 4 },
+    { crit: 2, high: 2, warn: 3 },
+    { crit: 1, high: 2, warn: 2 },
+    { crit: 1, high: 1, warn: 1 },
+    { crit: 0, high: 1, warn: 1 },
+    { crit: 0, high: 0, warn: 0 },
+  ];
+
+  const startIndex = Math.max(0, offsets.length - totalCount);
+  const selectedOffsets = offsets.slice(startIndex);
+  const selectedTimes = timesAgo.slice(startIndex);
+
+  return selectedOffsets.map((counts, idx) => {
+    const isCurrent = idx === selectedOffsets.length - 1;
+    const critCount = distribution.critical + counts.crit;
+    const highCount = distribution.high + counts.high;
+    const warnCount = distribution.warning + counts.warn;
+    const total = critCount + highCount + warnCount;
+    const critTotal = critCount * critHours;
+    const highTotal = highCount * highHours;
+    const warnTotal = warnCount * warnHours;
     const totalHours = critTotal + highTotal + warnTotal;
     const avgHours = total > 0 ? totalHours / total : 0;
+    const scanNum = idx + 1;
 
     return {
-      scanIndex: idx + 1,
-      scanLabel: isCurrent ? 'Varredura #5 (Atual)' : `Varredura #${idx + 1}`,
-      timeLabel: timesAgo[idx],
-      timestamp: new Date(Date.now() - (4 - idx) * 12 * 60 * 1000).toLocaleTimeString([], {
+      scanIndex: scanNum,
+      scanLabel: isCurrent ? `Varredura #${scanNum} (Atual)` : `Varredura #${scanNum}`,
+      timeLabel: selectedTimes[idx] || 'Passado',
+      timestamp: new Date(Date.now() - (selectedOffsets.length - 1 - idx) * 18 * 60 * 1000).toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit'
       }),
-      criticalCount: counts.crit,
-      highCount: counts.high,
-      warningCount: counts.warn,
+      criticalCount: critCount,
+      highCount: highCount,
+      warningCount: warnCount,
       totalFindings: total,
       averageMttrHours: Number(avgHours.toFixed(1)),
       totalBacklogHours: Number(totalHours.toFixed(1)),
@@ -152,6 +174,10 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<MttrTrendViewMode>('AVERAGE');
   const [compareBySeverity, setCompareBySeverity] = useState<boolean>(false);
+  const [timeRange, setTimeRange] = useState<MttrTimeRange>(() => {
+    const saved = safeGetItem(MTTR_TIMERANGE_STORAGE_KEY);
+    return saved === '5' || saved === '10' || saved === 'all' ? saved : '5';
+  });
 
   // Parse unit remediation parameters from SecScan global config
   const unitCritHours = useMemo(() => {
@@ -175,8 +201,8 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
     );
   }, [config]);
 
-  // Compute or synchronize historical timeline of 5 scans
-  const timelineData: MttrScanHistoryPoint[] = useMemo(() => {
+  // Compute or synchronize historical timeline of scans (up to 25 scans)
+  const fullTimelineData: MttrScanHistoryPoint[] = useMemo(() => {
     const raw = safeGetItem(MTTR_HISTORY_STORAGE_KEY);
     let history: MttrScanHistoryPoint[] = [];
 
@@ -191,21 +217,22 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
       }
     }
 
-    if (history.length < 5) {
-      history = generateBaselineMttrRuns(distribution, config);
+    if (history.length < 10) {
+      history = generateBaselineMttrRuns(distribution, config, 12);
     } else {
-      // Keep last 4 and update the 5th scan with current workspace values
-      const past = history.slice(-4);
+      // Keep previous runs (up to 24) and update/append the current scan
+      const past = history.slice(-24);
       const curCritTotal = distribution.critical * unitCritHours;
       const curHighTotal = distribution.high * unitHighHours;
       const curWarnTotal = distribution.warning * unitWarnHours;
       const curTotalHours = curCritTotal + curHighTotal + curWarnTotal;
       const curTotalFindings = distribution.total;
       const curAvg = curTotalFindings > 0 ? curTotalHours / curTotalFindings : 0;
+      const currentScanNum = past.length + 1;
 
       const currentPoint: MttrScanHistoryPoint = {
-        scanIndex: 5,
-        scanLabel: 'Varredura #5 (Atual)',
+        scanIndex: currentScanNum,
+        scanLabel: `Varredura #${currentScanNum} (Atual)`,
         timeLabel: 'Agora',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         criticalCount: distribution.critical,
@@ -223,38 +250,51 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
         isCurrent: true
       };
 
-      history = [...past, currentPoint];
+      // Unmark any previous current flags in history
+      const cleanPast = past.map(pt => ({ ...pt, isCurrent: false }));
+      history = [...cleanPast, currentPoint];
     }
 
-    // Persist normalized 5-point timeline
-    safeSetItem(MTTR_HISTORY_STORAGE_KEY, JSON.stringify(history.slice(-5)));
-    return history.slice(-5);
+    // Persist up to 25 scans
+    safeSetItem(MTTR_HISTORY_STORAGE_KEY, JSON.stringify(history.slice(-25)));
+    return history;
   }, [distribution, config, unitCritHours, unitHighHours, unitWarnHours, fileSetKey]);
+
+  // Filter timeline according to selected timeRange dropdown (Last 5, Last 10, All time)
+  const displayData: MttrScanHistoryPoint[] = useMemo(() => {
+    if (timeRange === '5') {
+      return fullTimelineData.slice(-5);
+    }
+    if (timeRange === '10') {
+      return fullTimelineData.slice(-10);
+    }
+    return fullTimelineData;
+  }, [fullTimelineData, timeRange]);
 
   // Formatted chart points adapting to single view or 3-severity comparison
   const chartData = useMemo(() => {
-    return timelineData.map(pt => ({
+    return displayData.map(pt => ({
       ...pt,
       primaryValue: viewMode === 'AVERAGE' ? pt.averageMttrHours : pt.totalBacklogHours,
       criticalValue: viewMode === 'AVERAGE' ? pt.criticalUnitHours : pt.criticalMttrHours,
       highValue: viewMode === 'AVERAGE' ? pt.highUnitHours : pt.highMttrHours,
       warningValue: viewMode === 'AVERAGE' ? pt.warningUnitHours : pt.warningMttrHours,
     }));
-  }, [timelineData, viewMode]);
+  }, [displayData, viewMode]);
 
-  // Historical trend comparison between Scan #1 and Scan #5 (Current)
-  const initialPoint = timelineData[0];
-  const currentPoint = timelineData[timelineData.length - 1];
+  // Historical trend comparison across the active time window
+  const initialPoint = displayData[0] || fullTimelineData[0];
+  const currentPoint = displayData[displayData.length - 1] || fullTimelineData[fullTimelineData.length - 1];
 
   const initialMetric =
     viewMode === 'AVERAGE'
-      ? initialPoint.averageMttrHours
-      : initialPoint.totalBacklogHours;
+      ? initialPoint?.averageMttrHours ?? 0
+      : initialPoint?.totalBacklogHours ?? 0;
 
   const currentMetric =
     viewMode === 'AVERAGE'
-      ? currentPoint.averageMttrHours
-      : currentPoint.totalBacklogHours;
+      ? currentPoint?.averageMttrHours ?? 0
+      : currentPoint?.totalBacklogHours ?? 0;
 
   const delta = currentMetric - initialMetric;
   const percentDelta =
@@ -280,12 +320,20 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
   // SLA Target line
   const slaTargetLimit = viewMode === 'AVERAGE' ? 4.0 : 15.0;
 
+  // Dynamic subtitle based on active timeRange
+  const timeRangeSubtitle =
+    timeRange === '5'
+      ? '(Últimas 5 Varreduras)'
+      : timeRange === '10'
+      ? '(Últimas 10 Varreduras)'
+      : `(Histórico Completo • ${displayData.length} Varreduras)`;
+
   return (
     <div
       id="workspace-mttr-mini-trendline"
       className="mt-2 p-2.5 rounded-lg bg-black/50 border border-white/10 font-mono text-[10px] space-y-2 select-none"
     >
-      {/* Top Header: Title, Telemetry, Toggle & View Mode */}
+      {/* Top Header: Title, Telemetry, Dropdown Toggle & View Mode */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <Clock className="w-3.5 h-3.5 text-sky-400 shrink-0" />
@@ -293,7 +341,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
             Evolução Histórica do MTTR
           </span>
           <span className="text-zinc-500 text-[8.5px] hidden sm:inline">
-            (Últimas 5 Varreduras)
+            {timeRangeSubtitle}
           </span>
         </div>
 
@@ -308,8 +356,8 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
             <span className="text-zinc-400">Atual:</span>
             <span className="text-emerald-400 font-mono">
               {viewMode === 'AVERAGE'
-                ? `${currentPoint.averageMttrHours}h`
-                : `${currentPoint.totalBacklogHours}h tot`}
+                ? `${currentPoint?.averageMttrHours ?? 0}h`
+                : `${currentPoint?.totalBacklogHours ?? 0}h tot`}
             </span>
           </div>
 
@@ -323,7 +371,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
                 ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                 : 'bg-zinc-800 text-zinc-300 border-zinc-700'
             }`}
-            title={`Variação do MTTR ao longo das últimas 5 varreduras: ${
+            title={`Variação do MTTR no período selecionado: ${
               isImproved ? 'Tempo de resolução otimizado' : isRegressed ? 'Aumento no tempo estimado' : 'Tempo estável'
             }`}
           >
@@ -337,6 +385,36 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
                 ? `+${percentDelta}% MTTR`
                 : 'Estável'}
             </span>
+          </div>
+
+          {/* Small Time-Range Dropdown (Historical Scan Depth Selector) */}
+          <div
+            className="relative inline-flex items-center text-[9px] font-mono"
+            title="Selecionar profundidade temporal das varreduras: Últimas 5, Últimas 10 ou Histórico completo"
+          >
+            <History className="w-2.5 h-2.5 text-sky-400 absolute left-1.5 pointer-events-none z-10" />
+            <select
+              id="select-mttr-time-range"
+              value={timeRange}
+              onChange={(e) => {
+                const val = e.target.value as MttrTimeRange;
+                setTimeRange(val);
+                safeSetItem(MTTR_TIMERANGE_STORAGE_KEY, val);
+              }}
+              className="pl-5 pr-4 py-0.5 rounded bg-black/70 hover:bg-black/90 border border-white/10 hover:border-sky-400/40 text-zinc-300 hover:text-white text-[9px] font-mono font-semibold transition-all appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-400/50 shadow-xs"
+              aria-label="Selecionar profundidade temporal do histórico de MTTR"
+            >
+              <option value="5" className="bg-[#111116] text-zinc-200">
+                Last 5 scans (5 varreduras)
+              </option>
+              <option value="10" className="bg-[#111116] text-zinc-200">
+                Last 10 scans (10 varreduras)
+              </option>
+              <option value="all" className="bg-[#111116] text-zinc-200">
+                All time (Histórico completo)
+              </option>
+            </select>
+            <ChevronDown className="w-2.5 h-2.5 text-zinc-400 absolute right-1 pointer-events-none" />
           </div>
 
           {/* Toggle "Comparar por severidade" button */}
@@ -353,7 +431,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
             aria-pressed={compareBySeverity}
           >
             <GitCompare className={`w-3 h-3 ${compareBySeverity ? 'text-sky-300' : 'text-zinc-400'}`} />
-            <span>Comparar por severidade</span>
+            <span>Comparar</span>
             <span
               className={`w-1.5 h-1.5 rounded-full transition-all ${
                 compareBySeverity ? 'bg-sky-400 ring-2 ring-sky-400/30 animate-pulse' : 'bg-zinc-600'
@@ -423,7 +501,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-sm" />
               <span className="font-bold">Crítico</span>
               <span className="text-zinc-500 text-[8px]">
-                ({viewMode === 'AVERAGE' ? `${currentPoint.criticalUnitHours}h/achado` : `${currentPoint.criticalMttrHours}h tot`})
+                ({viewMode === 'AVERAGE' ? `${currentPoint?.criticalUnitHours ?? 0}h/achado` : `${currentPoint?.criticalMttrHours ?? 0}h tot`})
               </span>
             </div>
 
@@ -433,7 +511,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-sm" />
               <span className="font-bold">Alto</span>
               <span className="text-zinc-500 text-[8px]">
-                ({viewMode === 'AVERAGE' ? `${currentPoint.highUnitHours}h/achado` : `${currentPoint.highMttrHours}h tot`})
+                ({viewMode === 'AVERAGE' ? `${currentPoint?.highUnitHours ?? 0}h/achado` : `${currentPoint?.highMttrHours ?? 0}h tot`})
               </span>
             </div>
 
@@ -443,7 +521,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-sm" />
               <span className="font-bold">Aviso</span>
               <span className="text-zinc-500 text-[8px]">
-                ({viewMode === 'AVERAGE' ? `${currentPoint.warningUnitHours}h/achado` : `${currentPoint.warningMttrHours}h tot`})
+                ({viewMode === 'AVERAGE' ? `${currentPoint?.warningUnitHours ?? 0}h/achado` : `${currentPoint?.warningMttrHours ?? 0}h tot`})
               </span>
             </div>
           </div>
@@ -470,18 +548,6 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
               <linearGradient id="mttrGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={primaryColor} stopOpacity={0.38} />
                 <stop offset="95%" stopColor={primaryColor} stopOpacity={0.02} />
-              </linearGradient>
-              <linearGradient id="mttrCritGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="#F43F5E" stopOpacity={0.0} />
-              </linearGradient>
-              <linearGradient id="mttrHighGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#F59E0B" stopOpacity={0.0} />
-              </linearGradient>
-              <linearGradient id="mttrWarnGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#EAB308" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#EAB308" stopOpacity={0.0} />
               </linearGradient>
             </defs>
 
@@ -591,7 +657,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
                   name="Crítico"
                   stroke="#F43F5E"
                   strokeWidth={2.2}
-                  dot={{ r: 2.5, fill: '#141419', stroke: '#F43F5E', strokeWidth: 1.5 }}
+                  dot={{ r: 2.2, fill: '#141419', stroke: '#F43F5E', strokeWidth: 1.5 }}
                   activeDot={{ r: 4.5, fill: '#F43F5E', stroke: '#FFFFFF', strokeWidth: 2 }}
                 />
 
@@ -602,7 +668,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
                   name="Alto"
                   stroke="#F59E0B"
                   strokeWidth={2.2}
-                  dot={{ r: 2.5, fill: '#141419', stroke: '#F59E0B', strokeWidth: 1.5 }}
+                  dot={{ r: 2.2, fill: '#141419', stroke: '#F59E0B', strokeWidth: 1.5 }}
                   activeDot={{ r: 4.5, fill: '#F59E0B', stroke: '#FFFFFF', strokeWidth: 2 }}
                 />
 
@@ -613,7 +679,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
                   name="Aviso"
                   stroke="#EAB308"
                   strokeWidth={2.2}
-                  dot={{ r: 2.5, fill: '#141419', stroke: '#EAB308', strokeWidth: 1.5 }}
+                  dot={{ r: 2.2, fill: '#141419', stroke: '#EAB308', strokeWidth: 1.5 }}
                   activeDot={{ r: 4.5, fill: '#EAB308', stroke: '#FFFFFF', strokeWidth: 2 }}
                 />
               </>
@@ -625,7 +691,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
                 stroke={primaryColor}
                 strokeWidth={2}
                 fill="url(#mttrGradient)"
-                dot={{ r: 2.5, fill: '#0e0e11', stroke: primaryColor, strokeWidth: 1.5 }}
+                dot={{ r: 2.2, fill: '#0e0e11', stroke: primaryColor, strokeWidth: 1.5 }}
                 activeDot={{ r: 4.5, fill: primaryColor, stroke: '#FFFFFF', strokeWidth: 2 }}
               />
             )}
@@ -633,12 +699,18 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
         </ResponsiveContainer>
       </div>
 
-      {/* 5-Scan Point Ticks Legend */}
+      {/* Historical Scan Point Ticks Legend */}
       <div 
         id="mttr-trendline-scans-legend"
-        className="grid grid-cols-5 gap-1 pt-0.5 border-t border-white/5 text-center text-[8.5px]"
+        className={`grid ${
+          displayData.length <= 5
+            ? 'grid-cols-5'
+            : displayData.length <= 10
+            ? 'grid-cols-5 sm:grid-cols-10'
+            : 'grid-cols-4 sm:grid-cols-6 md:grid-cols-12'
+        } gap-1 pt-0.5 border-t border-white/5 text-center text-[8.5px]`}
       >
-        {timelineData.map((pt, idx) => {
+        {displayData.map((pt, idx) => {
           const val =
             compareBySeverity
               ? `${pt.criticalCount}C • ${pt.highCount}A • ${pt.warningCount}W`
@@ -648,7 +720,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
 
           return (
             <div
-              key={`scan-node-${pt.scanIndex}`}
+              key={`scan-node-${pt.scanIndex}-${idx}`}
               className={`p-1 rounded transition-colors cursor-pointer ${
                 pt.isCurrent
                   ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-bold'
