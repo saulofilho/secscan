@@ -18,7 +18,10 @@ import {
   GitCompare,
   Layers,
   History,
-  ChevronDown
+  ChevronDown,
+  Calendar,
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
 import { SecScanGlobalConfig } from '../types';
 import { ValidationSeverityDistribution } from './ValidationSeverityDonutChart';
@@ -29,6 +32,7 @@ export interface MttrScanHistoryPoint {
   scanLabel: string;
   timeLabel: string;
   timestamp: string;
+  fullDateLabel?: string;
   criticalCount: number;
   highCount: number;
   warningCount: number;
@@ -46,6 +50,14 @@ export interface MttrScanHistoryPoint {
 
 export type MttrTrendViewMode = 'AVERAGE' | 'TOTAL';
 export type MttrTimeRange = '5' | '10' | 'all';
+export type MttrSeverityKey = 'critical' | 'high' | 'warning';
+
+export interface MttrChartDataPoint extends MttrScanHistoryPoint {
+  primaryValue: number;
+  criticalValue: number;
+  highValue: number;
+  warningValue: number;
+}
 
 interface MttrMiniTrendlineChartProps {
   distribution: ValidationSeverityDistribution;
@@ -140,14 +152,16 @@ function generateBaselineMttrRuns(
     const avgHours = total > 0 ? totalHours / total : 0;
     const scanNum = idx + 1;
 
+    const scanDate = new Date(Date.now() - (selectedOffsets.length - 1 - idx) * 18 * 60 * 1000);
+    const dateStr = scanDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const timeStr = scanDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
     return {
       scanIndex: scanNum,
       scanLabel: isCurrent ? `Varredura #${scanNum} (Atual)` : `Varredura #${scanNum}`,
       timeLabel: selectedTimes[idx] || 'Passado',
-      timestamp: new Date(Date.now() - (selectedOffsets.length - 1 - idx) * 18 * 60 * 1000).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
+      timestamp: timeStr,
+      fullDateLabel: `${dateStr} às ${timeStr}`,
       criticalCount: critCount,
       highCount: highCount,
       warningCount: warnCount,
@@ -174,6 +188,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<MttrTrendViewMode>('AVERAGE');
   const [compareBySeverity, setCompareBySeverity] = useState<boolean>(false);
+  const [hoveredSeverity, setHoveredSeverity] = useState<MttrSeverityKey | null>(null);
   const [timeRange, setTimeRange] = useState<MttrTimeRange>(() => {
     const saved = safeGetItem(MTTR_TIMERANGE_STORAGE_KEY);
     return saved === '5' || saved === '10' || saved === 'all' ? saved : '5';
@@ -230,11 +245,16 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
       const curAvg = curTotalFindings > 0 ? curTotalHours / curTotalFindings : 0;
       const currentScanNum = past.length + 1;
 
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
       const currentPoint: MttrScanHistoryPoint = {
         scanIndex: currentScanNum,
         scanLabel: `Varredura #${currentScanNum} (Atual)`,
         timeLabel: 'Agora',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: timeStr,
+        fullDateLabel: `${dateStr} às ${timeStr}`,
         criticalCount: distribution.critical,
         highCount: distribution.high,
         warningCount: distribution.warning,
@@ -327,6 +347,55 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
       : timeRange === '10'
       ? '(Últimas 10 Varreduras)'
       : `(Histórico Completo • ${displayData.length} Varreduras)`;
+
+  /**
+   * Custom interactive SVG dot for each individual line with expanded hit target
+   */
+  const renderSeverityDot = (severityKey: MttrSeverityKey, color: string) => {
+    return (props: any) => {
+      const { cx, cy, payload } = props;
+      if (cx == null || cy == null) return null;
+      const isHovered = hoveredSeverity === severityKey;
+      return (
+        <g
+          key={`dot-${severityKey}-${payload?.scanIndex}`}
+          className="cursor-pointer"
+          onMouseEnter={(e) => {
+            e.stopPropagation();
+            setHoveredSeverity(severityKey);
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setHoveredSeverity(prev => (prev === severityKey ? null : severityKey));
+          }}
+        >
+          {/* Expanded transparent hit target (20px diameter) for easy aiming */}
+          <circle cx={cx} cy={cy} r={10} fill="transparent" />
+          {/* Main visual dot */}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={isHovered ? 4.5 : 2.5}
+            fill={isHovered ? color : '#141419'}
+            stroke={color}
+            strokeWidth={isHovered ? 2.5 : 1.5}
+          />
+          {isHovered && (
+            <circle
+              cx={cx}
+              cy={cy}
+              r={7}
+              fill="none"
+              stroke={color}
+              strokeWidth={1.2}
+              strokeDasharray="2 2"
+              opacity={0.85}
+            />
+          )}
+        </g>
+      );
+    };
+  };
 
   return (
     <div
@@ -421,7 +490,10 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
           <button
             id="btn-toggle-compare-severity"
             type="button"
-            onClick={() => setCompareBySeverity(prev => !prev)}
+            onClick={() => {
+              setCompareBySeverity(prev => !prev);
+              setHoveredSeverity(null);
+            }}
             className={`px-2 py-0.5 rounded text-[9px] font-mono font-semibold tracking-wide transition-all border cursor-pointer inline-flex items-center gap-1.5 ${
               compareBySeverity
                 ? 'bg-sky-500/25 text-sky-200 border-sky-400/50 shadow-xs'
@@ -484,7 +556,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
         </div>
       </div>
 
-      {/* Multi-Severity Overlay Legend when Comparison is Active */}
+      {/* Multi-Severity Interactive Overlay Legend */}
       {compareBySeverity && (
         <div 
           id="mttr-compare-severity-legend"
@@ -492,38 +564,70 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
         >
           <div className="flex items-center gap-1 text-zinc-400">
             <Layers className="w-3 h-3 text-sky-400" />
-            <span className="font-semibold uppercase tracking-wider text-[8px]">Camadas Sobrepostas:</span>
+            <span className="font-semibold uppercase tracking-wider text-[8px]">
+              {hoveredSeverity ? 'Severidade em Destaque:' : 'Camadas Sobrepostas:'}
+            </span>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Critical Line Legend */}
-            <div className="flex items-center gap-1.5 text-rose-300">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Critical Line Legend Button */}
+            <button
+              type="button"
+              onClick={() => setHoveredSeverity(prev => (prev === 'critical' ? null : 'critical'))}
+              onMouseEnter={() => setHoveredSeverity('critical')}
+              className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded transition-all cursor-pointer border ${
+                hoveredSeverity === 'critical'
+                  ? 'bg-rose-500/25 text-rose-200 border-rose-500/50 shadow-xs'
+                  : 'bg-transparent text-rose-300 border-transparent hover:bg-rose-500/15'
+              }`}
+              title="Clique ou passe o mouse para focar na linha Crítica (P0)"
+            >
               <span className="w-2 h-0.5 bg-rose-500 rounded-full" />
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-sm" />
               <span className="font-bold">Crítico</span>
               <span className="text-zinc-500 text-[8px]">
                 ({viewMode === 'AVERAGE' ? `${currentPoint?.criticalUnitHours ?? 0}h/achado` : `${currentPoint?.criticalMttrHours ?? 0}h tot`})
               </span>
-            </div>
+            </button>
 
-            {/* High Line Legend */}
-            <div className="flex items-center gap-1.5 text-amber-300">
+            {/* High Line Legend Button */}
+            <button
+              type="button"
+              onClick={() => setHoveredSeverity(prev => (prev === 'high' ? null : 'high'))}
+              onMouseEnter={() => setHoveredSeverity('high')}
+              className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded transition-all cursor-pointer border ${
+                hoveredSeverity === 'high'
+                  ? 'bg-amber-500/25 text-amber-200 border-amber-500/50 shadow-xs'
+                  : 'bg-transparent text-amber-300 border-transparent hover:bg-amber-500/15'
+              }`}
+              title="Clique ou passe o mouse para focar na linha Alta (P1)"
+            >
               <span className="w-2 h-0.5 bg-amber-500 rounded-full" />
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-sm" />
               <span className="font-bold">Alto</span>
               <span className="text-zinc-500 text-[8px]">
                 ({viewMode === 'AVERAGE' ? `${currentPoint?.highUnitHours ?? 0}h/achado` : `${currentPoint?.highMttrHours ?? 0}h tot`})
               </span>
-            </div>
+            </button>
 
-            {/* Warning Line Legend */}
-            <div className="flex items-center gap-1.5 text-yellow-300">
+            {/* Warning Line Legend Button */}
+            <button
+              type="button"
+              onClick={() => setHoveredSeverity(prev => (prev === 'warning' ? null : 'warning'))}
+              onMouseEnter={() => setHoveredSeverity('warning')}
+              className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded transition-all cursor-pointer border ${
+                hoveredSeverity === 'warning'
+                  ? 'bg-yellow-400/25 text-yellow-200 border-yellow-400/50 shadow-xs'
+                  : 'bg-transparent text-yellow-300 border-transparent hover:bg-yellow-400/15'
+              }`}
+              title="Clique ou passe o mouse para focar na linha de Aviso (P2)"
+            >
               <span className="w-2 h-0.5 bg-yellow-400 rounded-full" />
               <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-sm" />
               <span className="font-bold">Aviso</span>
               <span className="text-zinc-500 text-[8px]">
                 ({viewMode === 'AVERAGE' ? `${currentPoint?.warningUnitHours ?? 0}h/achado` : `${currentPoint?.warningMttrHours ?? 0}h tot`})
               </span>
-            </div>
+            </button>
           </div>
         </div>
       )}
@@ -531,6 +635,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
       {/* Mini Trendline Sparkline Chart Container */}
       <div 
         id="mttr-trendline-chart-stage"
+        onMouseLeave={() => setHoveredSeverity(null)}
         className={`w-full ${compareBySeverity ? 'h-18 sm:h-20' : 'h-14'} bg-black/40 rounded border border-white/5 relative overflow-hidden pt-1 transition-all duration-200`}
       >
         <ResponsiveContainer width="100%" height="100%">
@@ -565,122 +670,306 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
 
             <RechartsTooltip
               content={({ active, payload }) => {
-                if (active && payload && payload.length > 0) {
-                  const pt = payload[0].payload as any;
+                if (!active || !payload || payload.length === 0) return null;
+                const pt = payload[0].payload as MttrChartDataPoint;
+
+                if (compareBySeverity) {
+                  if (hoveredSeverity) {
+                    /* Individual Line / Severity Custom Focused Tooltip */
+                    const isCrit = hoveredSeverity === 'critical';
+                    const isHigh = hoveredSeverity === 'high';
+                    const isWarn = hoveredSeverity === 'warning';
+
+                    const title = isCrit ? 'Severidade: Crítico (P0)' : isHigh ? 'Severidade: Alto (P1)' : 'Severidade: Aviso (P2)';
+                    const badgeColor = isCrit ? 'text-rose-300' : isHigh ? 'text-amber-300' : 'text-yellow-300';
+                    const bgColor = isCrit ? 'bg-rose-500/15 border-rose-500/30' : isHigh ? 'bg-amber-500/15 border-amber-500/30' : 'bg-yellow-400/15 border-yellow-400/30';
+                    const dotBg = isCrit ? 'bg-rose-500' : isHigh ? 'bg-amber-500' : 'bg-yellow-400';
+                    const mttrVal = isCrit
+                      ? (viewMode === 'AVERAGE' ? pt.criticalUnitHours : pt.criticalMttrHours)
+                      : isHigh
+                      ? (viewMode === 'AVERAGE' ? pt.highUnitHours : pt.highMttrHours)
+                      : (viewMode === 'AVERAGE' ? pt.warningUnitHours : pt.warningMttrHours);
+                    const count = isCrit ? pt.criticalCount : isHigh ? pt.highCount : pt.warningCount;
+                    const slaLimit = isCrit ? 2.0 : isHigh ? 6.0 : 24.0;
+                    const unitVal = isCrit ? pt.criticalUnitHours : isHigh ? pt.highUnitHours : pt.warningUnitHours;
+                    const withinSla = unitVal <= slaLimit;
+
+                    return (
+                      <div
+                        id="tooltip-individual-severity"
+                        className="bg-[#0f0f13] border border-white/20 px-3 py-2 rounded shadow-2xl font-mono text-[9px] text-zinc-200 z-50 min-w-[210px] space-y-1.5 backdrop-blur-md"
+                      >
+                        {/* Header: Severity Identification and Scan Label */}
+                        <div className="flex items-center justify-between border-b border-white/10 pb-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${dotBg} shadow-sm animate-pulse`} />
+                            <span className={`font-bold ${badgeColor} text-[10px] uppercase tracking-wide`}>
+                              {title}
+                            </span>
+                          </div>
+                          <span className="text-zinc-400 text-[8px] font-semibold">
+                            {pt.scanLabel}
+                          </span>
+                        </div>
+
+                        {/* Exact Date & Time */}
+                        <div className="flex items-center justify-between text-zinc-300 text-[8.5px]">
+                          <span className="text-zinc-400 flex items-center gap-1">
+                            <Calendar className="w-2.5 h-2.5 text-sky-400" />
+                            Data específica:
+                          </span>
+                          <span className="font-semibold text-white">
+                            {pt.fullDateLabel || `${pt.timestamp} (${pt.timeLabel})`}
+                          </span>
+                        </div>
+
+                        {/* MTTR on this specific date highlight box */}
+                        <div className={`p-2 rounded ${bgColor} border flex items-center justify-between`}>
+                          <div>
+                            <div className={`text-[8px] uppercase tracking-wider font-bold ${badgeColor}`}>
+                              {viewMode === 'AVERAGE' ? 'MTTR nesta data:' : 'Backlog nesta data:'}
+                            </div>
+                            <div className={`text-[14px] font-extrabold font-mono ${badgeColor}`}>
+                              {mttrVal}h
+                              <span className="text-[8.5px] font-normal text-zinc-400 ml-1">
+                                {viewMode === 'AVERAGE' ? '/ achado' : 'totais'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[7.5px] text-zinc-400 uppercase">Achados nesta data</div>
+                            <div className={`text-[12px] font-bold font-mono ${badgeColor}`}>
+                              {count} {count === 1 ? 'item' : 'itens'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* SLA Compliance Status */}
+                        <div className="flex items-center justify-between text-[8px] pt-0.5 text-zinc-400 border-t border-white/5">
+                          <span>Meta SLA: &le; {slaLimit}h</span>
+                          <span className={`font-semibold flex items-center gap-1 ${withinSla ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {withinSla ? (
+                              <>
+                                <CheckCircle2 className="w-2.5 h-2.5" />
+                                Dentro do SLA
+                              </>
+                            ) : (
+                              <>
+                                <AlertTriangle className="w-2.5 h-2.5" />
+                                Acima do SLA
+                              </>
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Interactive Severity Switcher */}
+                        <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[7.5px]">
+                          <span className="text-zinc-500">Alternar severidade:</span>
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onMouseEnter={() => setHoveredSeverity('critical')}
+                              className={`px-1 py-0.2 rounded transition-colors cursor-pointer ${
+                                isCrit ? 'bg-rose-500/30 text-rose-200 font-bold border border-rose-500/40' : 'text-zinc-400 hover:text-white'
+                              }`}
+                            >
+                              Crítico
+                            </button>
+                            <button
+                              type="button"
+                              onMouseEnter={() => setHoveredSeverity('high')}
+                              className={`px-1 py-0.2 rounded transition-colors cursor-pointer ${
+                                isHigh ? 'bg-amber-500/30 text-amber-200 font-bold border border-amber-500/40' : 'text-zinc-400 hover:text-white'
+                              }`}
+                            >
+                              Alto
+                            </button>
+                            <button
+                              type="button"
+                              onMouseEnter={() => setHoveredSeverity('warning')}
+                              className={`px-1 py-0.2 rounded transition-colors cursor-pointer ${
+                                isWarn ? 'bg-yellow-400/30 text-yellow-200 font-bold border border-yellow-400/40' : 'text-zinc-400 hover:text-white'
+                              }`}
+                            >
+                              Aviso
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  /* Multi-Severity Overview in Tooltip */
                   return (
-                    <div className="bg-[#0f0f13] border border-white/20 px-2.5 py-1.5 rounded shadow-2xl font-mono text-[9px] text-zinc-200 z-50 min-w-[185px] space-y-1.5">
+                    <div
+                      id="tooltip-all-severities"
+                      className="bg-[#0f0f13] border border-white/20 px-2.5 py-1.5 rounded shadow-2xl font-mono text-[9px] text-zinc-200 z-50 min-w-[210px] space-y-1.5 backdrop-blur-md"
+                    >
                       <div className="flex items-center justify-between border-b border-white/10 pb-1 font-bold text-white">
                         <span className="flex items-center gap-1">
                           {pt.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
                           {pt.scanLabel}
                         </span>
-                        <span className="text-zinc-400 font-normal">{pt.timeLabel}</span>
+                        <span className="text-zinc-400 font-normal text-[8px]">
+                          {pt.fullDateLabel || `${pt.timestamp} (${pt.timeLabel})`}
+                        </span>
                       </div>
 
-                      {compareBySeverity ? (
-                        /* Multi-Severity Breakdown in Tooltip */
-                        <div className="space-y-1 py-0.5">
-                          <div className="flex items-center justify-between text-rose-300">
-                            <span className="flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                              <span>Crítico:</span>
+                      <div className="space-y-1 py-0.5">
+                        {/* Critical Row */}
+                        <div
+                          className="flex items-center justify-between p-1 rounded hover:bg-rose-500/10 cursor-pointer transition-colors text-rose-300"
+                          onMouseEnter={() => setHoveredSeverity('critical')}
+                        >
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                            <span className="font-semibold">Crítico (P0):</span>
+                          </span>
+                          <span className="font-bold font-mono">
+                            {pt.criticalValue}h
+                            <span className="text-zinc-500 text-[8px] font-normal ml-1">
+                              ({pt.criticalCount} {pt.criticalCount === 1 ? 'achado' : 'achados'})
                             </span>
-                            <span className="font-bold font-mono">
-                              {pt.criticalValue}h
-                              <span className="text-zinc-500 text-[8px] font-normal ml-1">
-                                ({pt.criticalCount} achados)
-                              </span>
-                            </span>
-                          </div>
-
-                          <div className="flex items-center justify-between text-amber-300">
-                            <span className="flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                              <span>Alto:</span>
-                            </span>
-                            <span className="font-bold font-mono">
-                              {pt.highValue}h
-                              <span className="text-zinc-500 text-[8px] font-normal ml-1">
-                                ({pt.highCount} achados)
-                              </span>
-                            </span>
-                          </div>
-
-                          <div className="flex items-center justify-between text-yellow-300">
-                            <span className="flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
-                              <span>Aviso:</span>
-                            </span>
-                            <span className="font-bold font-mono">
-                              {pt.warningValue}h
-                              <span className="text-zinc-500 text-[8px] font-normal ml-1">
-                                ({pt.warningCount} achados)
-                              </span>
-                            </span>
-                          </div>
+                          </span>
                         </div>
-                      ) : (
-                        /* Single Metric View in Tooltip */
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between pt-0.5">
-                            <span className="text-zinc-400">MTTR Médio:</span>
-                            <span className="font-bold text-white text-[10.5px]">
-                              {pt.averageMttrHours}h / achado
+
+                        {/* High Row */}
+                        <div
+                          className="flex items-center justify-between p-1 rounded hover:bg-amber-500/10 cursor-pointer transition-colors text-amber-300"
+                          onMouseEnter={() => setHoveredSeverity('high')}
+                        >
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                            <span className="font-semibold">Alto (P1):</span>
+                          </span>
+                          <span className="font-bold font-mono">
+                            {pt.highValue}h
+                            <span className="text-zinc-500 text-[8px] font-normal ml-1">
+                              ({pt.highCount} {pt.highCount === 1 ? 'achado' : 'achados'})
                             </span>
-                          </div>
-
-                          <div className="flex items-center justify-between text-zinc-400">
-                            <span>Horas Totais de Backlog:</span>
-                            <span className="font-semibold text-zinc-200">{pt.totalBacklogHours}h</span>
-                          </div>
+                          </span>
                         </div>
-                      )}
 
-                      <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[8px] text-zinc-400">
-                        <span>Total: {pt.totalFindings} achados</span>
-                        <span>MTTR Geral: {pt.averageMttrHours}h</span>
+                        {/* Warning Row */}
+                        <div
+                          className="flex items-center justify-between p-1 rounded hover:bg-yellow-400/10 cursor-pointer transition-colors text-yellow-300"
+                          onMouseEnter={() => setHoveredSeverity('warning')}
+                        >
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                            <span className="font-semibold">Aviso (P2):</span>
+                          </span>
+                          <span className="font-bold font-mono">
+                            {pt.warningValue}h
+                            <span className="text-zinc-500 text-[8px] font-normal ml-1">
+                              ({pt.warningCount} {pt.warningCount === 1 ? 'achado' : 'achados'})
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[7.5px] text-zinc-400">
+                        <span>💡 Passe o mouse sobre uma linha para isolar</span>
+                        <span className="text-zinc-300 font-semibold">{pt.totalFindings} achados tot</span>
                       </div>
                     </div>
                   );
                 }
-                return null;
+
+                /* Single Trendline Mode Tooltip */
+                return (
+                  <div className="bg-[#0f0f13] border border-white/20 px-2.5 py-1.5 rounded shadow-2xl font-mono text-[9px] text-zinc-200 z-50 min-w-[185px] space-y-1.5">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-1 font-bold text-white">
+                      <span className="flex items-center gap-1">
+                        {pt.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                        {pt.scanLabel}
+                      </span>
+                      <span className="text-zinc-400 font-normal text-[8px]">
+                        {pt.fullDateLabel || `${pt.timestamp} (${pt.timeLabel})`}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between pt-0.5">
+                        <span className="text-zinc-400">MTTR Médio:</span>
+                        <span className="font-bold text-white text-[10.5px]">
+                          {pt.averageMttrHours}h / achado
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-zinc-400">
+                        <span>Horas Totais de Backlog:</span>
+                        <span className="font-semibold text-zinc-200">{pt.totalBacklogHours}h</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[8px] text-zinc-400">
+                      <span>Total: {pt.totalFindings} achados</span>
+                      <span>MTTR Geral: {pt.averageMttrHours}h</span>
+                    </div>
+                  </div>
+                );
               }}
             />
 
             {compareBySeverity ? (
-              /* 3 Superimposed Colored Lines for Critical, High, and Warning */
+              /* 3 Superimposed Colored Lines with Individual Hover and Dot Handlers */
               <>
                 {/* 1. Critical Line (Red / Rose) */}
                 <Line
                   type="monotone"
                   dataKey="criticalValue"
-                  name="Crítico"
+                  name="Crítico (P0)"
                   stroke="#F43F5E"
-                  strokeWidth={2.2}
-                  dot={{ r: 2.2, fill: '#141419', stroke: '#F43F5E', strokeWidth: 1.5 }}
-                  activeDot={{ r: 4.5, fill: '#F43F5E', stroke: '#FFFFFF', strokeWidth: 2 }}
+                  strokeWidth={hoveredSeverity === 'critical' ? 3.5 : hoveredSeverity ? 1.4 : 2.2}
+                  strokeOpacity={hoveredSeverity && hoveredSeverity !== 'critical' ? 0.3 : 1}
+                  onMouseEnter={() => setHoveredSeverity('critical')}
+                  dot={renderSeverityDot('critical', '#F43F5E')}
+                  activeDot={{
+                    r: 6,
+                    fill: '#F43F5E',
+                    stroke: '#FFFFFF',
+                    strokeWidth: 2,
+                    onMouseEnter: () => setHoveredSeverity('critical'),
+                  }}
                 />
 
                 {/* 2. High Line (Orange / Amber) */}
                 <Line
                   type="monotone"
                   dataKey="highValue"
-                  name="Alto"
+                  name="Alto (P1)"
                   stroke="#F59E0B"
-                  strokeWidth={2.2}
-                  dot={{ r: 2.2, fill: '#141419', stroke: '#F59E0B', strokeWidth: 1.5 }}
-                  activeDot={{ r: 4.5, fill: '#F59E0B', stroke: '#FFFFFF', strokeWidth: 2 }}
+                  strokeWidth={hoveredSeverity === 'high' ? 3.5 : hoveredSeverity ? 1.4 : 2.2}
+                  strokeOpacity={hoveredSeverity && hoveredSeverity !== 'high' ? 0.3 : 1}
+                  onMouseEnter={() => setHoveredSeverity('high')}
+                  dot={renderSeverityDot('high', '#F59E0B')}
+                  activeDot={{
+                    r: 6,
+                    fill: '#F59E0B',
+                    stroke: '#FFFFFF',
+                    strokeWidth: 2,
+                    onMouseEnter: () => setHoveredSeverity('high'),
+                  }}
                 />
 
                 {/* 3. Warning Line (Yellow) */}
                 <Line
                   type="monotone"
                   dataKey="warningValue"
-                  name="Aviso"
+                  name="Aviso (P2)"
                   stroke="#EAB308"
-                  strokeWidth={2.2}
-                  dot={{ r: 2.2, fill: '#141419', stroke: '#EAB308', strokeWidth: 1.5 }}
-                  activeDot={{ r: 4.5, fill: '#EAB308', stroke: '#FFFFFF', strokeWidth: 2 }}
+                  strokeWidth={hoveredSeverity === 'warning' ? 3.5 : hoveredSeverity ? 1.4 : 2.2}
+                  strokeOpacity={hoveredSeverity && hoveredSeverity !== 'warning' ? 0.3 : 1}
+                  onMouseEnter={() => setHoveredSeverity('warning')}
+                  dot={renderSeverityDot('warning', '#EAB308')}
+                  activeDot={{
+                    r: 6,
+                    fill: '#EAB308',
+                    stroke: '#FFFFFF',
+                    strokeWidth: 2,
+                    onMouseEnter: () => setHoveredSeverity('warning'),
+                  }}
                 />
               </>
             ) : (
@@ -727,7 +1016,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
                   : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
               }`}
               onClick={() => onSelectScan && onSelectScan(pt)}
-              title={`${pt.scanLabel} (${pt.timeLabel}) — ${pt.totalFindings} achados, MTTR: ${pt.averageMttrHours}h`}
+              title={`${pt.scanLabel} (${pt.fullDateLabel || pt.timeLabel}) — ${pt.totalFindings} achados, MTTR: ${pt.averageMttrHours}h`}
             >
               <div className="text-[7.5px] uppercase opacity-75 truncate">
                 {pt.isCurrent ? 'Atual' : `#${idx + 1}`}
