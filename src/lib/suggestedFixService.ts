@@ -153,7 +153,6 @@ export async function requestSuggestedFix(
     });
 
     if (!response.ok) {
-      console.warn(`Servidor retornou status ${response.status} em /api/suggested-fix, usando contingência local.`);
       return generateClientFallbackFix(finding, surroundingCode);
     }
 
@@ -163,8 +162,7 @@ export async function requestSuggestedFix(
     }
 
     return data as SuggestedFixResult;
-  } catch (err) {
-    console.warn('Exceção ao requisitar /api/suggested-fix, usando motor local:', err);
+  } catch {
     return generateClientFallbackFix(finding, surroundingCode);
   }
 }

@@ -35,6 +35,7 @@ import { ValidationSeverityDonutChart } from './components/ValidationSeverityDon
 import { GlobalScanProgressBar } from './components/GlobalScanProgressBar';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
+import { SeverityTooltip } from './components/Tooltip';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -1287,59 +1288,83 @@ export default function App() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-1.5">
-                        {/* Critical toggle */}
-                        <button
-                          id="btn-filter-severity-critical"
-                          type="button"
-                          onClick={() => toggleNoticeSeverityFilter('CRITICAL')}
-                          className={`px-2 py-0.5 rounded inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-all border cursor-pointer ${
-                            noticeSeverityFilters.CRITICAL
-                              ? 'bg-rose-500/25 text-rose-200 border-rose-500/50 shadow-sm'
-                              : 'bg-black/30 text-zinc-500 border-white/10 hover:text-rose-300 hover:border-rose-500/30 opacity-60'
-                          }`}
-                          title="Alternar exibição de achados Críticos"
-                          aria-pressed={noticeSeverityFilters.CRITICAL}
+                        {/* Critical toggle with Explanatory Tooltip */}
+                        <SeverityTooltip
+                          severity="CRITICAL"
+                          count={noticeSeverityDistribution.critical}
+                          isActive={noticeSeverityFilters.CRITICAL}
+                          align="left"
+                          position="bottom"
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full ${noticeSeverityFilters.CRITICAL ? 'bg-rose-500' : 'bg-zinc-600'}`} />
-                          <span>Crítico</span>
-                          <span className="text-[9px] opacity-75">({noticeSeverityDistribution.critical})</span>
-                        </button>
+                          <button
+                            id="btn-filter-severity-critical"
+                            type="button"
+                            onClick={() => toggleNoticeSeverityFilter('CRITICAL')}
+                            className={`px-2 py-0.5 rounded inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-all border cursor-pointer ${
+                              noticeSeverityFilters.CRITICAL
+                                ? 'bg-rose-500/25 text-rose-200 border-rose-500/50 shadow-sm'
+                                : 'bg-black/30 text-zinc-500 border-white/10 hover:text-rose-300 hover:border-rose-500/30 opacity-60'
+                            }`}
+                            title="Alternar exibição de achados Críticos (passe o mouse para ver detalhes de MTTR)"
+                            aria-pressed={noticeSeverityFilters.CRITICAL}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${noticeSeverityFilters.CRITICAL ? 'bg-rose-500' : 'bg-zinc-600'}`} />
+                            <span>Crítico</span>
+                            <span className="text-[9px] opacity-75">({noticeSeverityDistribution.critical})</span>
+                          </button>
+                        </SeverityTooltip>
 
-                        {/* High toggle */}
-                        <button
-                          id="btn-filter-severity-high"
-                          type="button"
-                          onClick={() => toggleNoticeSeverityFilter('HIGH')}
-                          className={`px-2 py-0.5 rounded inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-all border cursor-pointer ${
-                            noticeSeverityFilters.HIGH
-                              ? 'bg-amber-500/25 text-amber-200 border-amber-500/50 shadow-sm'
-                              : 'bg-black/30 text-zinc-500 border-white/10 hover:text-amber-300 hover:border-amber-500/30 opacity-60'
-                          }`}
-                          title="Alternar exibição de achados Altos"
-                          aria-pressed={noticeSeverityFilters.HIGH}
+                        {/* High toggle with Explanatory Tooltip */}
+                        <SeverityTooltip
+                          severity="HIGH"
+                          count={noticeSeverityDistribution.high}
+                          isActive={noticeSeverityFilters.HIGH}
+                          align="center"
+                          position="bottom"
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full ${noticeSeverityFilters.HIGH ? 'bg-amber-500' : 'bg-zinc-600'}`} />
-                          <span>Alto</span>
-                          <span className="text-[9px] opacity-75">({noticeSeverityDistribution.high})</span>
-                        </button>
+                          <button
+                            id="btn-filter-severity-high"
+                            type="button"
+                            onClick={() => toggleNoticeSeverityFilter('HIGH')}
+                            className={`px-2 py-0.5 rounded inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-all border cursor-pointer ${
+                              noticeSeverityFilters.HIGH
+                                ? 'bg-amber-500/25 text-amber-200 border-amber-500/50 shadow-sm'
+                                : 'bg-black/30 text-zinc-500 border-white/10 hover:text-amber-300 hover:border-amber-500/30 opacity-60'
+                            }`}
+                            title="Alternar exibição de achados Altos (passe o mouse para ver detalhes de MTTR)"
+                            aria-pressed={noticeSeverityFilters.HIGH}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${noticeSeverityFilters.HIGH ? 'bg-amber-500' : 'bg-zinc-600'}`} />
+                            <span>Alto</span>
+                            <span className="text-[9px] opacity-75">({noticeSeverityDistribution.high})</span>
+                          </button>
+                        </SeverityTooltip>
 
-                        {/* Warning toggle */}
-                        <button
-                          id="btn-filter-severity-warning"
-                          type="button"
-                          onClick={() => toggleNoticeSeverityFilter('WARNING')}
-                          className={`px-2 py-0.5 rounded inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-all border cursor-pointer ${
-                            noticeSeverityFilters.WARNING
-                              ? 'bg-yellow-500/25 text-yellow-200 border-yellow-500/50 shadow-sm'
-                              : 'bg-black/30 text-zinc-500 border-white/10 hover:text-yellow-300 hover:border-yellow-500/30 opacity-60'
-                          }`}
-                          title="Alternar exibição de achados de Aviso"
-                          aria-pressed={noticeSeverityFilters.WARNING}
+                        {/* Warning toggle with Explanatory Tooltip */}
+                        <SeverityTooltip
+                          severity="WARNING"
+                          count={noticeSeverityDistribution.warning}
+                          isActive={noticeSeverityFilters.WARNING}
+                          align="right"
+                          position="bottom"
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full ${noticeSeverityFilters.WARNING ? 'bg-yellow-400' : 'bg-zinc-600'}`} />
-                          <span>Aviso</span>
-                          <span className="text-[9px] opacity-75">({noticeSeverityDistribution.warning})</span>
-                        </button>
+                          <button
+                            id="btn-filter-severity-warning"
+                            type="button"
+                            onClick={() => toggleNoticeSeverityFilter('WARNING')}
+                            className={`px-2 py-0.5 rounded inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-all border cursor-pointer ${
+                              noticeSeverityFilters.WARNING
+                                ? 'bg-yellow-500/25 text-yellow-200 border-yellow-500/50 shadow-sm'
+                                : 'bg-black/30 text-zinc-500 border-white/10 hover:text-yellow-300 hover:border-yellow-500/30 opacity-60'
+                            }`}
+                            title="Alternar exibição de achados de Aviso (passe o mouse para ver detalhes de MTTR)"
+                            aria-pressed={noticeSeverityFilters.WARNING}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${noticeSeverityFilters.WARNING ? 'bg-yellow-400' : 'bg-zinc-600'}`} />
+                            <span>Aviso</span>
+                            <span className="text-[9px] opacity-75">({noticeSeverityDistribution.warning})</span>
+                          </button>
+                        </SeverityTooltip>
 
                         {/* Quick reset/show all if any is toggled off */}
                         {(!noticeSeverityFilters.CRITICAL || !noticeSeverityFilters.HIGH || !noticeSeverityFilters.WARNING) && (

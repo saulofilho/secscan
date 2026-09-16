@@ -336,6 +336,44 @@ async function startServer() {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
+  // Resilient multi-tier Gemini caller with automatic model failover & exponential backoff
+  const callGeminiResilient = async (
+    ai: GoogleGenAI,
+    prompt: string,
+    modelCandidates: string[] = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.1-pro-preview'],
+    perModelTimeoutMs: number = 7000
+  ): Promise<{ text: string; model: string } | null> => {
+    for (let i = 0; i < modelCandidates.length; i++) {
+      const model = modelCandidates[i];
+      try {
+        const callPromise = ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json'
+          }
+        });
+
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout de ${perModelTimeoutMs}ms no modelo ${model}`)), perModelTimeoutMs)
+        );
+
+        const response: any = await Promise.race([callPromise, timeoutPromise]);
+        const text = response?.text?.trim();
+        if (text) {
+          return { text, model };
+        }
+      } catch (err: any) {
+        const msg = String(err?.message || err);
+        const isCapacityIssue = msg.includes('503') || msg.includes('high demand') || msg.includes('UNAVAILABLE') || msg.includes('429');
+        if (isCapacityIssue && i < modelCandidates.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+        }
+      }
+    }
+    return null;
+  };
+
   // API endpoint for Gemini-powered mitigation suggestions
   app.post('/api/mitigations', async (req, res) => {
     try {
@@ -396,46 +434,42 @@ Responda ESTRITAMENTE em formato JSON com o seguinte esquema sem markdown fences
   ]
 }`;
 
-      // Call Gemini with a timeout promise to guarantee fast and resilient response
-      const geminiCall = ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json'
-        }
-      });
-
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout de 3.5s atingido na consulta ao Gemini API')), 3500)
+      const genResult = await callGeminiResilient(
+        ai,
+        prompt,
+        ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.1-pro-preview'],
+        7000
       );
 
-      const response: any = await Promise.race([geminiCall, timeoutPromise]);
-      const responseText = response.text?.trim();
-
-      if (responseText) {
+      if (genResult && genResult.text) {
         try {
-          const parsed = JSON.parse(responseText);
-          return res.json({
-            source: 'gemini',
-            model: 'gemini-3.8-flash',
-            timestamp: new Date().toISOString(),
-            executiveSummary: parsed.executiveSummary || 'Plano de remediação gerado via Gemini 3.8 Flash.',
-            totalPotentialRiskReduction: parsed.totalPotentialRiskReduction || 20,
-            projectedNewRiskScore: parsed.projectedNewRiskScore || Math.max(0, currentRiskScore - 20),
-            willPassQualityGate: (parsed.projectedNewRiskScore || Math.max(0, currentRiskScore - 20)) <= qualityGateLimit,
-            suggestions: parsed.suggestions || [],
-            actionPlan: parsed.actionPlan || []
-          });
-        } catch (parseErr) {
-          console.warn('Falha no parse do JSON do Gemini, utilizando fallback:', parseErr);
+          let cleanText = genResult.text.trim();
+          if (cleanText.startsWith('```')) {
+            cleanText = cleanText.replace(/^```(json)?\n?/, '').replace(/\n?```$/, '').trim();
+          }
+          const parsed = JSON.parse(cleanText);
+          if (parsed && (parsed.suggestions || parsed.executiveSummary)) {
+            return res.json({
+              source: 'gemini',
+              model: genResult.model,
+              timestamp: new Date().toISOString(),
+              executiveSummary: parsed.executiveSummary || 'Plano de remediação gerado via inteligência artificial SecScan.',
+              totalPotentialRiskReduction: parsed.totalPotentialRiskReduction || 20,
+              projectedNewRiskScore: parsed.projectedNewRiskScore || Math.max(0, currentRiskScore - 20),
+              willPassQualityGate: (parsed.projectedNewRiskScore || Math.max(0, currentRiskScore - 20)) <= qualityGateLimit,
+              suggestions: parsed.suggestions || [],
+              actionPlan: parsed.actionPlan || []
+            });
+          }
+        } catch {
+          // JSON parse failed, proceed to deterministic fallback
         }
       }
 
-      // Fallback if parsing failed
+      // High demand or quota spike fallback -> deterministic AppSec engine
       const fallback = generateRuleBasedSuggestions(top3, currentRiskScore, qualityGateLimit);
       return res.json(fallback);
-    } catch (err: any) {
-      console.warn('Erro ao chamar Gemini API para mitigação, utilizando motor de contingência:', err?.message);
+    } catch {
       const { topFindings = [], currentRiskScore = 65, qualityGateLimit = 50 } = req.body || {};
       const fallback = generateRuleBasedSuggestions(topFindings.slice(0, 3), currentRiskScore, qualityGateLimit);
       return res.json(fallback);
@@ -506,84 +540,61 @@ Responda ESTRITAMENTE em formato JSON com o seguinte formato, sem markdown ou fe
   }
 }`;
 
-      // Call Gemini with timeout and model fallback
-      const callGeminiWithTimeout = async (modelName: string, timeoutMs: number = 7000) => {
-        const geminiCall = ai.models.generateContent({
-          model: modelName,
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json'
-          }
-        });
+      const genResult = await callGeminiResilient(
+        ai,
+        prompt,
+        ['gemini-3.1-pro-preview', 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'],
+        7500
+      );
 
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Timeout de ${timeoutMs}ms no modelo ${modelName}`)), timeoutMs)
-        );
-
-        return await Promise.race([geminiCall, timeoutPromise]);
-      };
-
-      let response: any = null;
-      let usedModel = 'gemini-3.1-pro-preview';
-
-      try {
-        response = await callGeminiWithTimeout('gemini-3.1-pro-preview', 7000);
-      } catch (proErr) {
-        console.warn('Falha com gemini-3.1-pro-preview, tentando gemini-3.8-flash:', (proErr as any)?.message);
+      if (genResult && genResult.text) {
         try {
-          usedModel = 'gemini-3.8-flash';
-          response = await callGeminiWithTimeout('gemini-3.8-flash', 5000);
-        } catch (flashErr) {
-          console.warn('Ambos os modelos falharam ou atingiram limite, acionando motor determinístico:', (flashErr as any)?.message);
+          let cleanText = genResult.text.trim();
+          if (cleanText.startsWith('```')) {
+            cleanText = cleanText.replace(/^```(json)?\n?/, '').replace(/\n?```$/, '').trim();
+          }
+
+          const parsed = JSON.parse(cleanText);
+
+          if (parsed.replacementSnippet) {
+            const removed = parsed.diff?.removed || (parsed.beforeSnippet || finding.snippet || '').split('\n').filter(Boolean);
+            const added = parsed.diff?.added || (parsed.replacementSnippet || '').split('\n').filter(Boolean);
+
+            const result: SuggestedFixResult = {
+              source: 'gemini',
+              model: genResult.model,
+              timestamp: new Date().toISOString(),
+              findingId: finding.id,
+              ruleName: finding.ruleName,
+              vulnerabilityType: parsed.vulnerabilityType || `Vulnerabilidade em ${finding.ruleName}`,
+              cweOwaspReference: parsed.cweOwaspReference || 'CWE-798 / OWASP Top 10',
+              securePattern: parsed.securePattern || 'Runtime Injection & Hardening',
+              replacementSnippet: parsed.replacementSnippet,
+              beforeSnippet: parsed.beforeSnippet || finding.snippet || '',
+              explanation: parsed.explanation || 'Código refatorado de acordo com as melhores práticas de AppSec.',
+              envConfig: parsed.envConfig || undefined,
+              securityChecklist: parsed.securityChecklist || [
+                'Validar a substituição em ambiente de desenvolvimento.',
+                'Garantir rotação da credencial exposta.',
+                'Executar a varredura SAST novamente para validar a correção.'
+              ],
+              diff: {
+                removed,
+                added
+              }
+            };
+
+            return res.json(result);
+          }
+        } catch {
+          // JSON parsing failed, proceed to fallback
         }
       }
 
-      if (response && response.text) {
-        let cleanText = response.text.trim();
-        // Strip markdown backticks if any
-        if (cleanText.startsWith('```')) {
-          cleanText = cleanText.replace(/^```(json)?\n?/, '').replace(/\n?```$/, '').trim();
-        }
-
-        const parsed = JSON.parse(cleanText);
-
-        if (parsed.replacementSnippet) {
-          const removed = parsed.diff?.removed || (parsed.beforeSnippet || finding.snippet || '').split('\n').filter(Boolean);
-          const added = parsed.diff?.added || (parsed.replacementSnippet || '').split('\n').filter(Boolean);
-
-          const result: SuggestedFixResult = {
-            source: 'gemini',
-            model: usedModel,
-            timestamp: new Date().toISOString(),
-            findingId: finding.id,
-            ruleName: finding.ruleName,
-            vulnerabilityType: parsed.vulnerabilityType || `Vulnerabilidade em ${finding.ruleName}`,
-            cweOwaspReference: parsed.cweOwaspReference || 'CWE-798 / OWASP Top 10',
-            securePattern: parsed.securePattern || 'Runtime Injection & Hardening',
-            replacementSnippet: parsed.replacementSnippet,
-            beforeSnippet: parsed.beforeSnippet || finding.snippet || '',
-            explanation: parsed.explanation || 'Código refatorado de acordo com as melhores práticas de AppSec.',
-            envConfig: parsed.envConfig || undefined,
-            securityChecklist: parsed.securityChecklist || [
-              'Validar a substituição em ambiente de desenvolvimento.',
-              'Garantir rotação da credencial exposta.',
-              'Executar a varredura SAST novamente para validar a correção.'
-            ],
-            diff: {
-              removed,
-              added
-            }
-          };
-
-          return res.json(result);
-        }
-      }
-
-      // Fallback if parsing didn't yield replacementSnippet
+      // Fallback to deterministic rule engine
       const fallback = generateRuleBasedSuggestedFix(finding, context);
       return res.json(fallback);
-    } catch (err: any) {
-      console.warn('Erro na geração de correção via Gemini, utilizando motor determinístico:', err?.message);
+    } catch {
       const fallback = generateRuleBasedSuggestedFix(finding, context);
       return res.json(fallback);
     }

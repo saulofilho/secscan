@@ -140,8 +140,7 @@ export const MitigationSuggestionsPanel: React.FC<MitigationSuggestionsPanelProp
       const result: GeminiMitigationReport = await response.json();
       setData(result);
       safeSetItem(STORAGE_CACHE_KEY, JSON.stringify(result));
-    } catch (err: any) {
-      console.warn('Erro ao consultar /api/mitigations:', err?.message);
+    } catch {
       // Construct fallback locally if network/API failed
       const fallbackReport: GeminiMitigationReport = {
         source: 'rule_engine',
