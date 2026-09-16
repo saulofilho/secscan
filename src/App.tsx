@@ -38,6 +38,7 @@ import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { SeverityTooltip } from './components/Tooltip';
 import { SecScanMttrConfigModal } from './components/SecScanMttrConfigModal';
+import { MttrMiniTrendlineChart } from './components/MttrMiniTrendlineChart';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -1428,6 +1429,14 @@ export default function App() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Mini Trendline Chart displaying Historical Evolution of Average Remediation Time across last 5 scans */}
+                    <MttrMiniTrendlineChart
+                      distribution={noticeSeverityDistribution}
+                      config={secScanConfig}
+                      fileSetKey={files.map(f => f.name).sort().join('_') || 'empty_workspace'}
+                      onOpenMttrConfig={() => setShowMttrConfigModal(true)}
+                    />
 
                     {!noticeSeverityFilters.CRITICAL && !noticeSeverityFilters.HIGH && !noticeSeverityFilters.WARNING ? (
                       <div className="p-3 rounded bg-black/50 border border-white/10 text-center space-y-1 font-mono text-xs text-white/70">
