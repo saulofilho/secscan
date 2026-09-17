@@ -119,16 +119,21 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
         },
         {
           keys: [`${modKey}8`, '8'],
-          description: 'Ir para Editor de Regras Regex & Entropia',
+          description: 'Ir para CrowdStrike Falcon (EDR, IOA & Threat Graph)',
           tag: 'Módulo'
         },
         {
           keys: [`${modKey}9`, '9'],
-          description: 'Ir para Terminal CLI Interativo',
+          description: 'Ir para Editor de Regras Regex & Entropia',
           tag: 'Módulo'
         },
         {
           keys: [`${modKey}0`, '0'],
+          description: 'Ir para Terminal CLI Interativo',
+          tag: 'Módulo'
+        },
+        {
+          keys: [`${modKey}-`, '-'],
           description: 'Ir para CI/CD & Integração Cloud',
           tag: 'Módulo'
         }

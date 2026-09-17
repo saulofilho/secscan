@@ -41,6 +41,7 @@ import { SecScanMttrConfigModal } from './components/SecScanMttrConfigModal';
 import { MttrMiniTrendlineChart, parseRemediationHours } from './components/MttrMiniTrendlineChart';
 import { SecurityFrameworksHub } from './components/SecurityFrameworksHub';
 import { SecurityOnionSocView } from './components/SecurityOnionSocView';
+import { CrowdStrikeSuiteView } from './components/CrowdStrikeSuiteView';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -1092,7 +1093,7 @@ export default function App() {
         }
       }
 
-      // Navigation: 1 through 0
+      // Navigation: 1 through 0, plus -
       const tabMap: Record<string, string> = {
         '1': 'dashboard',
         '2': 'scanner',
@@ -1101,9 +1102,10 @@ export default function App() {
         '5': 'dataflow',
         '6': 'frameworks',
         '7': 'securityonion',
-        '8': 'rules',
-        '9': 'cli',
-        '0': 'cicd'
+        '8': 'crowdstrike',
+        '9': 'rules',
+        '0': 'cli',
+        '-': 'cicd'
       };
 
       if (!isInputElement && !isCmdOrCtrl && !e.altKey && tabMap[e.key]) {
@@ -1799,6 +1801,15 @@ export default function App() {
             onSelectFinding={handleSelectFinding}
             onNavigateToScanner={() => setActiveTab('scanner')}
             onNavigateToEndpoints={() => setActiveTab('endpoints')}
+            onNavigateToDataFlow={() => setActiveTab('dataflow')}
+          />
+        )}
+
+        {activeTab === 'crowdstrike' && (
+          <CrowdStrikeSuiteView
+            report={report}
+            onSelectFinding={handleSelectFinding}
+            onNavigateToScanner={() => setActiveTab('scanner')}
             onNavigateToDataFlow={() => setActiveTab('dataflow')}
           />
         )}

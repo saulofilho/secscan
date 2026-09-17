@@ -30,7 +30,8 @@ import {
   Activity,
   ShieldCheck,
   Crosshair,
-  Radio
+  Radio,
+  Zap
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
 
@@ -353,6 +354,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           setActiveTab('securityonion');
         },
         keywords: ['security onion', 'soc', 'hunt', 'threat hunting', 'cases', 'triagem', 'sigma', 'suricata', 'zeek', 'modsecurity', 'pcap', 'playbooks', 'blue team']
+      },
+      {
+        id: 'nav-crowdstrike',
+        title: 'Módulo: CrowdStrike Falcon (EDR & Threat Graph)',
+        subtitle: 'Visibilidade de endpoints, Indicadores de Ataque (IOA), contenção de rede e inteligência de adversários',
+        category: 'Navegação',
+        icon: Zap,
+        badge: 'EDR / IOA',
+        badgeColor: 'bg-red-500/15 text-red-400 border-red-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('crowdstrike');
+        },
+        keywords: ['crowdstrike', 'falcon', 'edr', 'xdr', 'ioa', 'indicadores de ataque', 'process tree', 'containment', 'isolamento', 'rtr', 'threat intel', 'adversarios', 'overwatch']
       },
       {
         id: 'nav-rules',
