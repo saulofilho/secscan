@@ -690,8 +690,76 @@ export interface SecScanGlobalConfig {
     [key: string]: SeverityRemediationConfig;
   };
   dynamicMttrCalculation?: boolean;
+  maxAllowedMttrHours?: number; // Configured maximum MTTR limit threshold in hours
   [key: string]: unknown;
 }
+
+export type MitreTacticId =
+  | 'TA0001' // Initial Access
+  | 'TA0002' // Execution
+  | 'TA0003' // Persistence
+  | 'TA0004' // Privilege Escalation
+  | 'TA0006' // Credential Access
+  | 'TA0007' // Discovery
+  | 'TA0008' // Lateral Movement
+  | 'TA0009' // Collection
+  | 'TA0010'; // Exfiltration
+
+export interface MitreD3fendCountermeasure {
+  id: string; // e.g. D3-SCRA
+  name: string;
+  category: 'Model' | 'Harden' | 'Detect' | 'Isolate' | 'Deceive' | 'Evict';
+  description: string;
+  implementationGuide: string;
+  verificationMethod: string;
+  docUrl: string;
+}
+
+export interface MitreAttackTechnique {
+  id: string; // e.g. T1552.001
+  tacticId: MitreTacticId;
+  tacticName: string;
+  name: string;
+  description: string;
+  adversaryObjective: string;
+  matchedKeywords: string[]; // for correlating findings
+  d3fendCountermeasures: MitreD3fendCountermeasure[];
+  docUrl: string;
+}
+
+export type NistCsfFunctionId = 'GV' | 'ID' | 'PR' | 'DE' | 'RS' | 'RC';
+
+export type NistAuditStatus = 'COMPLIANT' | 'PARTIAL' | 'NON_COMPLIANT' | 'UNDER_REVIEW';
+
+export interface NistCsfSubcategory {
+  id: string; // e.g. PR.AA-01
+  functionId: NistCsfFunctionId;
+  functionName: string;
+  categoryName: string;
+  title: string;
+  requirement: string;
+  devSecOpsAction: string;
+  verificationEvidence: string;
+  docUrl: string;
+  autoCheckKeywords?: string[];
+}
+
+export type WstgTestStatus = 'PASSED' | 'FAILED' | 'IN_PROGRESS' | 'NOT_TESTED';
+
+export interface OwaspWstgTestCase {
+  id: string; // e.g. WSTG-CONF-04
+  categoryCode: 'INFO' | 'CONF' | 'IDNT' | 'ATHN' | 'ATHZ' | 'SESS' | 'INPV' | 'CRYP' | 'BUSL';
+  categoryTitle: string;
+  title: string;
+  objective: string;
+  methodology: string;
+  cliVerification: string;
+  remediationAdvice: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+  docUrl: string;
+  correlatedRules?: string[];
+}
+
 
 
 

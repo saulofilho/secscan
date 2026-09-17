@@ -1297,6 +1297,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         }}
         onNavigateToScanner={() => onNavigateToTab('scanner')}
         onNavigateToFile={onNavigateToFile}
+        onNavigateToTab={onNavigateToTab}
       />
 
       {/* Risk Trend: Historical Risk Score Line Chart Component over the Last 10 Scans */}

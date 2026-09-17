@@ -25,6 +25,9 @@ export const SecScanMttrConfigModal: React.FC<SecScanMttrConfigModalProps> = ({
   const [warningTime, setWarningTime] = useState<string>(
     config.severityConfig.WARNING.remediationTime || config.remediationTime.WARNING || '12h – 24h'
   );
+  const [maxMttrHours, setMaxMttrHours] = useState<number | string>(
+    config.maxAllowedMttrHours ?? 4.0
+  );
   const [dynamicCalculation, setDynamicCalculation] = useState<boolean>(
     config.dynamicMttrCalculation !== false
   );
@@ -41,6 +44,7 @@ export const SecScanMttrConfigModal: React.FC<SecScanMttrConfigModalProps> = ({
       setWarningTime(
         config.severityConfig.WARNING.remediationTime || config.remediationTime.WARNING || '12h – 24h'
       );
+      setMaxMttrHours(config.maxAllowedMttrHours ?? 4.0);
       setDynamicCalculation(config.dynamicMttrCalculation !== false);
       setSavedSuccess(false);
     }
@@ -49,7 +53,11 @@ export const SecScanMttrConfigModal: React.FC<SecScanMttrConfigModalProps> = ({
   if (!isOpen) return null;
 
   const handleSave = () => {
+    const parsedMaxLimit = parseFloat(String(maxMttrHours));
+    const finalMaxLimit = !isNaN(parsedMaxLimit) && parsedMaxLimit > 0 ? parsedMaxLimit : 4.0;
+
     const updated = saveSecScanConfig({
+      maxAllowedMttrHours: finalMaxLimit,
       remediationTime: {
         CRITICAL: criticalTime.trim() || '1.5h – 2h',
         HIGH: highTime.trim() || '4h – 6h',
@@ -84,6 +92,7 @@ export const SecScanMttrConfigModal: React.FC<SecScanMttrConfigModalProps> = ({
     setCriticalTime(DEFAULT_SECSCAN_CONFIG.remediationTime.CRITICAL);
     setHighTime(DEFAULT_SECSCAN_CONFIG.remediationTime.HIGH);
     setWarningTime(DEFAULT_SECSCAN_CONFIG.remediationTime.WARNING);
+    setMaxMttrHours(DEFAULT_SECSCAN_CONFIG.maxAllowedMttrHours ?? 4.0);
     setDynamicCalculation(true);
     onUpdateConfig(reset);
   };
@@ -93,14 +102,17 @@ export const SecScanMttrConfigModal: React.FC<SecScanMttrConfigModalProps> = ({
       setCriticalTime('30m – 1h');
       setHighTime('2h – 4h');
       setWarningTime('6h – 12h');
+      setMaxMttrHours(2.0);
     } else if (preset === 'standard') {
       setCriticalTime('1.5h – 2h');
       setHighTime('4h – 6h');
       setWarningTime('12h – 24h');
+      setMaxMttrHours(4.0);
     } else {
       setCriticalTime('2h – 4h');
       setHighTime('8h – 16h');
       setWarningTime('24h – 48h');
+      setMaxMttrHours(8.0);
     }
   };
 
@@ -252,6 +264,44 @@ export const SecScanMttrConfigModal: React.FC<SecScanMttrConfigModalProps> = ({
                 placeholder="ex: 12h – 24h"
                 className="flex-1 px-2.5 py-1 rounded bg-black/60 border border-yellow-500/40 text-yellow-200 font-mono text-xs focus:outline-none focus:border-yellow-400"
               />
+            </div>
+          </div>
+
+          {/* Limite Máximo Tolerado de MTTR (SLA Threshold & Alert Trigger) */}
+          <div className="p-3 rounded-lg border border-sky-500/30 bg-sky-950/20 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                <span className="font-bold text-sky-200 uppercase tracking-wider text-[11px]">
+                  Limite Máximo de MTTR (SLA Target)
+                </span>
+              </div>
+              <span className="text-[10px] text-zinc-400">Gatilho de Alerta no Gráfico</span>
+            </div>
+            <p className="text-[10.5px] text-zinc-400 font-sans leading-relaxed">
+              Define o tempo médio de remediação máximo aceitável. Qualquer varredura no gráfico de tendência histórica cujo MTTR exceder este teto exibirá <strong className="text-rose-400">ícones de alerta destacados</strong> e marcação visual no ponto e legenda.
+            </p>
+            <div className="flex items-center gap-2.5 pt-1">
+              <label htmlFor="input-max-allowed-mttr" className="text-[11px] text-zinc-300 font-semibold whitespace-nowrap">
+                Limite Máximo:
+              </label>
+              <div className="relative inline-flex items-center">
+                <input
+                  id="input-max-allowed-mttr"
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  max="100"
+                  value={maxMttrHours}
+                  onChange={(e) => setMaxMttrHours(e.target.value)}
+                  placeholder="ex: 4.0"
+                  className="w-28 pl-2.5 pr-7 py-1 rounded bg-black/70 border border-sky-500/40 text-sky-200 font-mono text-xs font-bold focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/40"
+                />
+                <span className="absolute right-2 text-zinc-500 text-[10px] pointer-events-none">h</span>
+              </div>
+              <span className="text-[10px] text-zinc-400">
+                (horas por achado • padrão: 4.0h)
+              </span>
             </div>
           </div>
         </div>

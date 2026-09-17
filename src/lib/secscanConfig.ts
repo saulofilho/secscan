@@ -47,7 +47,31 @@ export const DEFAULT_SECSCAN_CONFIG: SecScanGlobalConfig = {
     },
   },
   dynamicMttrCalculation: true,
+  maxAllowedMttrHours: 4.0,
 };
+
+/**
+ * Extracts the maximum (upper bound) hours from a remediation string.
+ * E.g. "1.5h – 2h" -> 2.0, "30m – 1h" -> 1.0, "12h – 24h" -> 24.0, "4h" -> 4.0
+ */
+export function parseMaxRemediationHours(remediationStr?: string, fallbackHours: number = 4.0): number {
+  if (!remediationStr) return fallbackHours;
+  const matches = Array.from(remediationStr.matchAll(/([\d.]+)\s*(h|m|d)?/gi));
+  if (matches.length === 0) return fallbackHours;
+
+  const values: number[] = [];
+  for (const match of matches) {
+    const num = parseFloat(match[1]);
+    const unit = (match[2] || 'h').toLowerCase();
+    if (isNaN(num)) continue;
+    if (unit === 'm') values.push(num / 60);
+    else if (unit === 'd') values.push(num * 24);
+    else values.push(num);
+  }
+
+  if (values.length === 0) return fallbackHours;
+  return Number(Math.max(...values).toFixed(2));
+}
 
 /**
  * Retrieves the global SecScan configuration, merging saved overrides from storage
@@ -62,6 +86,10 @@ export function getSecScanConfig(): SecScanGlobalConfig {
         const merged: SecScanGlobalConfig = {
           ...DEFAULT_SECSCAN_CONFIG,
           ...parsed,
+          maxAllowedMttrHours:
+            typeof parsed.maxAllowedMttrHours === 'number' && !isNaN(parsed.maxAllowedMttrHours)
+              ? parsed.maxAllowedMttrHours
+              : DEFAULT_SECSCAN_CONFIG.maxAllowedMttrHours,
           remediationTime: {
             ...DEFAULT_SECSCAN_CONFIG.remediationTime,
             ...(parsed.remediationTime || {}),

@@ -20,7 +20,8 @@ import {
   AlertCircle,
   FileCode,
   Zap,
-  Info
+  Info,
+  Crosshair
 } from 'lucide-react';
 import { ScanReport, ScanFinding, ComplianceFrameworkId, ComplianceControlStatus } from '../types';
 import {
@@ -34,6 +35,7 @@ interface ComplianceReadinessPanelProps {
   onSelectFinding?: (finding: ScanFinding) => void;
   onNavigateToScanner?: () => void;
   onNavigateToFile?: (filePath: string) => void;
+  onNavigateToTab?: (tab: string) => void;
 }
 
 export const ComplianceReadinessPanel: React.FC<ComplianceReadinessPanelProps> = ({
@@ -41,6 +43,7 @@ export const ComplianceReadinessPanel: React.FC<ComplianceReadinessPanelProps> =
   onSelectFinding,
   onNavigateToScanner,
   onNavigateToFile,
+  onNavigateToTab,
 }) => {
   const [selectedFramework, setSelectedFramework] = useState<ComplianceFrameworkId | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | ComplianceControlStatus>('ALL');
@@ -211,6 +214,18 @@ export const ComplianceReadinessPanel: React.FC<ComplianceReadinessPanelProps> =
             <Download className="w-3.5 h-3.5" />
             <span>Baixar (.md)</span>
           </button>
+
+          {onNavigateToTab && (
+            <button
+              type="button"
+              onClick={() => onNavigateToTab('frameworks')}
+              className="px-3.5 py-2 bg-[#FF3E00]/15 hover:bg-[#FF3E00]/25 text-[#FF3E00] border border-[#FF3E00]/40 text-xs font-mono uppercase tracking-wider font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Abrir o Centro de Frameworks de Cibersegurança (MITRE ATT&CK/D3FEND, NIST CSF 2.0 e OWASP WSTG)"
+            >
+              <Crosshair className="w-3.5 h-3.5" />
+              <span>Ver MITRE / NIST / WSTG</span>
+            </button>
+          )}
         </div>
       </div>
 

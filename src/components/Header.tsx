@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { 
   ShieldAlert, 
+  ShieldCheck,
   Play, 
   Download, 
   FileCode2, 
@@ -68,6 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'endpoints', label: 'LinkFinder (APIs)', icon: Route, badge: report.apiEndpoints.length },
     { id: 'jsminer', label: 'JS Miner', icon: Boxes, badge: report.jsMiner?.totalAssetsCount },
     { id: 'dataflow', label: 'Fluxo & Sinks (D3)', icon: Network, badge: report.dataFlowGraph?.metrics.totalTaintFlows },
+    { id: 'frameworks', label: 'Frameworks (MITRE/NIST/OWASP)', icon: ShieldCheck },
     { id: 'rules', label: 'Regras Regex', icon: SlidersHorizontal },
     { id: 'cli', label: 'Terminal CLI', icon: Terminal },
     { id: 'cicd', label: 'CI/CD & Cloud', icon: CloudCog },

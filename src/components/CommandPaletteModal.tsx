@@ -27,7 +27,9 @@ import {
   Sparkles,
   History,
   ListOrdered,
-  Activity
+  Activity,
+  ShieldCheck,
+  Crosshair
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
 
@@ -322,6 +324,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           setActiveTab('dataflow');
         },
         keywords: ['fluxo', 'taint', 'dataflow', 'grafo', 'd3', 'sinks', 'sources']
+      },
+      {
+        id: 'nav-frameworks',
+        title: 'Módulo: Frameworks de Cibersegurança (MITRE / NIST / OWASP)',
+        subtitle: 'Mapeamento tático MITRE ATT&CK/D3FEND, auditoria NIST CSF 2.0 e checklist defensivo OWASP WSTG',
+        category: 'Navegação',
+        icon: ShieldCheck,
+        badge: 'Novo',
+        badgeColor: 'bg-[#FF3E00]/15 text-[#FF3E00] border-[#FF3E00]/30',
+        action: () => {
+          onClose();
+          setActiveTab('frameworks');
+        },
+        keywords: ['frameworks', 'mitre', 'attack', 'd3fend', 'nist', 'csf', 'owasp', 'wstg', 'red team', 'purple team', 'auditoria', 'contramedidas']
       },
       {
         id: 'nav-rules',

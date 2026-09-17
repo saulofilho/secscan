@@ -39,6 +39,7 @@ import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { SeverityTooltip } from './components/Tooltip';
 import { SecScanMttrConfigModal } from './components/SecScanMttrConfigModal';
 import { MttrMiniTrendlineChart } from './components/MttrMiniTrendlineChart';
+import { SecurityFrameworksHub } from './components/SecurityFrameworksHub';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -1732,6 +1733,14 @@ export default function App() {
                 setActiveTab('scanner');
               }
             }}
+          />
+        )}
+
+        {activeTab === 'frameworks' && (
+          <SecurityFrameworksHub
+            report={report}
+            onSelectFinding={handleSelectFinding}
+            onNavigateToScanner={() => setActiveTab('scanner')}
           />
         )}
 

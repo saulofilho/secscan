@@ -30,6 +30,7 @@ import {
 import { SecScanGlobalConfig } from '../types';
 import { ValidationSeverityDistribution } from './ValidationSeverityDonutChart';
 import { safeGetItem, safeSetItem } from '../lib/storage';
+import { parseMaxRemediationHours } from '../lib/secscanConfig';
 
 export interface MttrScanHistoryPoint {
   scanIndex: number;
@@ -546,8 +547,53 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
       ? '#F59E0B' // amber-500
       : '#38BDF8'; // sky-400
 
-  // SLA Target line
-  const slaTargetLimit = viewMode === 'AVERAGE' ? 4.0 : 15.0;
+  // Effective Maximum MTTR Limit configured in SecScanMttrConfigModal (default 4.0h)
+  const configuredMaxMttr =
+    typeof config.maxAllowedMttrHours === 'number' && !isNaN(config.maxAllowedMttrHours) && config.maxAllowedMttrHours > 0
+      ? config.maxAllowedMttrHours
+      : 4.0;
+
+  const effectiveMaxLimit =
+    viewMode === 'AVERAGE' ? configuredMaxMttr : Number((configuredMaxMttr * 4).toFixed(1));
+
+  // Severity maximum limits from configured remediation times
+  const critMaxLimit = useMemo(() => {
+    return parseMaxRemediationHours(
+      config.severityConfig?.CRITICAL?.remediationTime || config.remediationTime?.CRITICAL,
+      2.0
+    );
+  }, [config]);
+
+  const highMaxLimit = useMemo(() => {
+    return parseMaxRemediationHours(
+      config.severityConfig?.HIGH?.remediationTime || config.remediationTime?.HIGH,
+      6.0
+    );
+  }, [config]);
+
+  const warnMaxLimit = useMemo(() => {
+    return parseMaxRemediationHours(
+      config.severityConfig?.WARNING?.remediationTime || config.remediationTime?.WARNING,
+      24.0
+    );
+  }, [config]);
+
+  // SLA Target line (configured maximum limit)
+  const slaTargetLimit = effectiveMaxLimit;
+
+  // Number of historical scans in displayData that exceed the maximum limit
+  const exceededScansCount = useMemo(() => {
+    return displayData.filter(pt => {
+      const val = viewMode === 'AVERAGE' ? pt.averageMttrHours : pt.totalBacklogHours;
+      return val > effectiveMaxLimit;
+    }).length;
+  }, [displayData, viewMode, effectiveMaxLimit]);
+
+  const isCurrentScanExceeded = useMemo(() => {
+    if (!currentPoint) return false;
+    const val = viewMode === 'AVERAGE' ? currentPoint.averageMttrHours : currentPoint.totalBacklogHours;
+    return val > effectiveMaxLimit;
+  }, [currentPoint, viewMode, effectiveMaxLimit]);
 
   // Dynamic subtitle based on active timeRange or search query
   const timeRangeSubtitle = dateSearchQuery.trim()
@@ -559,6 +605,68 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
     : `(Histórico Completo • ${displayData.length} Varreduras)`;
 
   /**
+   * Custom interactive SVG dot for single-trendline mode:
+   * Displays an alert icon / pulsing warning marker whenever the MTTR exceeds the configured maximum limit.
+   */
+  const renderSingleModeDot = (props: any) => {
+    const { cx, cy, payload } = props;
+    if (cx == null || cy == null) return null;
+    const isExceeded = payload && payload.primaryValue > effectiveMaxLimit;
+
+    if (isExceeded) {
+      return (
+        <g key={`dot-alert-${payload?.scanIndex}`} className="cursor-pointer">
+          {/* Expanded transparent hit target */}
+          <circle cx={cx} cy={cy} r={12} fill="transparent" />
+          {/* Pulsing warning halo ring */}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={7.5}
+            fill="rgba(244, 63, 94, 0.25)"
+            stroke="#F43F5E"
+            strokeWidth={1.2}
+            strokeDasharray="2 2"
+          />
+          {/* Solid prominent alert marker */}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={3.8}
+            fill="#F43F5E"
+            stroke="#FFFFFF"
+            strokeWidth={1.8}
+          />
+          {/* Alert Triangle Icon positioned directly above the exceeded point */}
+          <g transform={`translate(${cx - 5.5}, ${cy - 16})`} className="pointer-events-none">
+            <path
+              d="M5.5 0.5 L10.5 9 L0.5 9 Z"
+              fill="#EF4444"
+              stroke="#FFFFFF"
+              strokeWidth="0.8"
+              strokeLinejoin="round"
+            />
+            <line x1="5.5" y1="3.2" x2="5.5" y2="6.2" stroke="#FFFFFF" strokeWidth="1.1" strokeLinecap="round" />
+            <circle cx="5.5" cy="7.7" r="0.55" fill="#FFFFFF" />
+          </g>
+        </g>
+      );
+    }
+
+    return (
+      <circle
+        key={`dot-norm-${payload?.scanIndex}`}
+        cx={cx}
+        cy={cy}
+        r={2.2}
+        fill="#0e0e11"
+        stroke={primaryColor}
+        strokeWidth={1.5}
+      />
+    );
+  };
+
+  /**
    * Custom interactive SVG dot for each individual line with expanded hit target
    */
   const renderSeverityDot = (severityKey: MttrSeverityKey, color: string) => {
@@ -566,6 +674,23 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
       const { cx, cy, payload } = props;
       if (cx == null || cy == null) return null;
       const isHovered = hoveredSeverity === severityKey;
+
+      const sevLimit =
+        severityKey === 'critical'
+          ? (viewMode === 'AVERAGE' ? critMaxLimit : critMaxLimit * Math.max(1, payload?.criticalCount || 1))
+          : severityKey === 'high'
+          ? (viewMode === 'AVERAGE' ? highMaxLimit : highMaxLimit * Math.max(1, payload?.highCount || 1))
+          : (viewMode === 'AVERAGE' ? warnMaxLimit : warnMaxLimit * Math.max(1, payload?.warningCount || 1));
+
+      const sevVal =
+        severityKey === 'critical'
+          ? payload?.criticalValue
+          : severityKey === 'high'
+          ? payload?.highValue
+          : payload?.warningValue;
+
+      const isSevExceeded = typeof sevVal === 'number' && sevVal > sevLimit;
+
       return (
         <g
           key={`dot-${severityKey}-${payload?.scanIndex}`}
@@ -581,16 +706,43 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
         >
           {/* Expanded transparent hit target (20px diameter) for easy aiming */}
           <circle cx={cx} cy={cy} r={10} fill="transparent" />
+
+          {/* Exceeded visual indicator halo & alert icon */}
+          {isSevExceeded && (
+            <>
+              <circle
+                cx={cx}
+                cy={cy}
+                r={7.5}
+                fill="rgba(239, 68, 68, 0.25)"
+                stroke="#EF4444"
+                strokeWidth={1.2}
+                strokeDasharray="2 2"
+              />
+              <g transform={`translate(${cx - 5.5}, ${cy - 16})`} className="pointer-events-none">
+                <path
+                  d="M5.5 0.5 L10.5 9 L0.5 9 Z"
+                  fill="#EF4444"
+                  stroke="#FFFFFF"
+                  strokeWidth="0.8"
+                  strokeLinejoin="round"
+                />
+                <line x1="5.5" y1="3.2" x2="5.5" y2="6.2" stroke="#FFFFFF" strokeWidth="1.1" strokeLinecap="round" />
+                <circle cx="5.5" cy="7.7" r="0.55" fill="#FFFFFF" />
+              </g>
+            </>
+          )}
+
           {/* Main visual dot */}
           <circle
             cx={cx}
             cy={cy}
-            r={isHovered ? 4.5 : 2.5}
-            fill={isHovered ? color : '#141419'}
-            stroke={color}
-            strokeWidth={isHovered ? 2.5 : 1.5}
+            r={isHovered ? 4.5 : isSevExceeded ? 3.5 : 2.5}
+            fill={isHovered ? color : isSevExceeded ? '#EF4444' : '#141419'}
+            stroke={isSevExceeded ? '#FFFFFF' : color}
+            strokeWidth={isHovered ? 2.5 : isSevExceeded ? 1.8 : 1.5}
           />
-          {isHovered && (
+          {isHovered && !isSevExceeded && (
             <circle
               cx={cx}
               cy={cy}
@@ -742,6 +894,30 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
                 : 'Estável'}
             </span>
           </div>
+
+          {/* MTTR Limit Exceeded Visual Badge */}
+          {exceededScansCount > 0 && (
+            <button
+              id="badge-mttr-exceeded-alert"
+              type="button"
+              onClick={onOpenMttrConfig}
+              className={`px-1.5 py-0.5 rounded text-[9px] font-bold border inline-flex items-center gap-1 cursor-pointer transition-all hover:scale-105 active:scale-95 ${
+                isCurrentScanExceeded
+                  ? 'bg-rose-500/25 text-rose-300 border-rose-500/50 shadow-xs'
+                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+              }`}
+              title={`Alerta de MTTR: ${exceededScansCount} ${
+                exceededScansCount === 1 ? 'varredura ultrapassa' : 'varreduras ultrapassam'
+              } o limite máximo configurado de ${effectiveMaxLimit}h. Clique para ajustar o SLA.`}
+            >
+              <AlertTriangle className="w-2.5 h-2.5 text-rose-400 shrink-0 animate-pulse" />
+              <span>
+                {isCurrentScanExceeded
+                  ? `MTTR > Limite (${currentPoint?.averageMttrHours ?? 0}h > ${effectiveMaxLimit}h)`
+                  : `${exceededScansCount} > ${effectiveMaxLimit}h`}
+              </span>
+            </button>
+          )}
 
           {/* Small Time-Range Dropdown (Historical Scan Depth Selector) */}
           <div
@@ -1063,16 +1239,26 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
                 </linearGradient>
               </defs>
 
-              <YAxis hide domain={[0, 'dataMax + 1.5']} />
+              <YAxis
+                hide
+                domain={[0, (dataMax: number) => Math.max(Number(dataMax) || 0, effectiveMaxLimit) + 1.5]}
+              />
               <XAxis dataKey="scanIndex" hide />
 
-              {/* SLA Target Reference Line */}
+              {/* SLA Target / Maximum Allowed MTTR Reference Line */}
               <ReferenceLine
-                y={slaTargetLimit}
-                stroke="#F59E0B"
-                strokeDasharray="2 2"
-                strokeWidth={1}
-                strokeOpacity={0.45}
+                y={effectiveMaxLimit}
+                stroke="#EF4444"
+                strokeDasharray="3 3"
+                strokeWidth={1.2}
+                strokeOpacity={0.7}
+                label={{
+                  value: `⚠️ Limite Máx: ${effectiveMaxLimit}h`,
+                  position: 'insideTopRight',
+                  fill: '#F87171',
+                  fontSize: 8.5,
+                  fontWeight: 'bold',
+                }}
               />
 
             <RechartsTooltip
@@ -1284,22 +1470,31 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
                 }
 
                 /* Single Trendline Mode Tooltip */
+                const isPtExceeded = pt.primaryValue > effectiveMaxLimit;
                 return (
-                  <div className="bg-[#0f0f13] border border-white/20 px-2.5 py-1.5 rounded shadow-2xl font-mono text-[9px] text-zinc-200 z-50 min-w-[185px] space-y-1.5">
+                  <div className={`bg-[#0f0f13] border ${isPtExceeded ? 'border-rose-500/60 shadow-rose-950/40' : 'border-white/20'} px-2.5 py-1.5 rounded shadow-2xl font-mono text-[9px] text-zinc-200 z-50 min-w-[195px] space-y-1.5`}>
                     <div className="flex items-center justify-between border-b border-white/10 pb-1 font-bold text-white">
                       <span className="flex items-center gap-1">
                         {pt.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
                         {pt.scanLabel}
+                        {isPtExceeded && <span className="text-rose-400 text-[10px]" title="Excede o limite máximo configurado">⚠️</span>}
                       </span>
                       <span className="text-zinc-400 font-normal text-[8px]">
                         {pt.fullDateLabel || `${pt.timestamp} (${pt.timeLabel})`}
                       </span>
                     </div>
 
+                    {isPtExceeded && (
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-rose-950/50 border border-rose-500/40 text-rose-300 text-[8.5px] font-bold">
+                        <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" />
+                        <span>MTTR Acima do Limite ({pt.primaryValue}h &gt; {effectiveMaxLimit}h)</span>
+                      </div>
+                    )}
+
                     <div className="space-y-1">
                       <div className="flex items-center justify-between pt-0.5">
                         <span className="text-zinc-400">MTTR Médio:</span>
-                        <span className="font-bold text-white text-[10.5px]">
+                        <span className={`font-bold text-[10.5px] ${isPtExceeded ? 'text-rose-300' : 'text-white'}`}>
                           {pt.averageMttrHours}h / achado
                         </span>
                       </div>
@@ -1312,7 +1507,9 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
 
                     <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[8px] text-zinc-400">
                       <span>Total: {pt.totalFindings} achados</span>
-                      <span>MTTR Geral: {pt.averageMttrHours}h</span>
+                      <span className={isPtExceeded ? 'text-rose-400 font-semibold' : ''}>
+                        Limite: {effectiveMaxLimit}h {isPtExceeded ? '(Violado)' : '(OK)'}
+                      </span>
                     </div>
                   </div>
                 );
@@ -1387,8 +1584,8 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
                 stroke={primaryColor}
                 strokeWidth={2}
                 fill="url(#mttrGradient)"
-                dot={{ r: 2.2, fill: '#0e0e11', stroke: primaryColor, strokeWidth: 1.5 }}
-                activeDot={{ r: 4.5, fill: primaryColor, stroke: '#FFFFFF', strokeWidth: 2 }}
+                dot={renderSingleModeDot}
+                activeDot={{ r: 5, fill: primaryColor, stroke: '#FFFFFF', strokeWidth: 2 }}
               />
             )}
           </AreaChart>
@@ -1409,6 +1606,17 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
           } gap-1 pt-0.5 border-t border-white/5 text-center text-[8.5px]`}
         >
           {displayData.map((pt, idx) => {
+            const critVal = viewMode === 'AVERAGE' ? pt.criticalUnitHours : pt.criticalMttrHours;
+            const highVal = viewMode === 'AVERAGE' ? pt.highUnitHours : pt.highMttrHours;
+            const warnVal = viewMode === 'AVERAGE' ? pt.warningUnitHours : pt.warningMttrHours;
+
+            const isPtExceeded =
+              compareBySeverity
+                ? (critVal > (viewMode === 'AVERAGE' ? critMaxLimit : critMaxLimit * Math.max(1, pt.criticalCount)) ||
+                   highVal > (viewMode === 'AVERAGE' ? highMaxLimit : highMaxLimit * Math.max(1, pt.highCount)) ||
+                   warnVal > (viewMode === 'AVERAGE' ? warnMaxLimit : warnMaxLimit * Math.max(1, pt.warningCount)))
+                : (viewMode === 'AVERAGE' ? pt.averageMttrHours : pt.totalBacklogHours) > effectiveMaxLimit;
+
             const val =
               compareBySeverity
                 ? `${pt.criticalCount}C • ${pt.highCount}A • ${pt.warningCount}W`
@@ -1421,16 +1629,25 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
                 key={`scan-node-${pt.scanIndex}-${idx}`}
                 className={`p-1 rounded transition-colors cursor-pointer ${
                   pt.isCurrent
-                    ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-bold'
+                    ? isPtExceeded
+                      ? 'bg-rose-500/20 border border-rose-500/50 text-rose-300 font-bold'
+                      : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-bold'
+                    : isPtExceeded
+                    ? 'bg-rose-950/30 border border-rose-500/30 text-rose-300 hover:bg-rose-900/40'
                     : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
                 }`}
                 onClick={() => onSelectScan && onSelectScan(pt)}
-                title={`${pt.scanLabel} (${pt.fullDateLabel || pt.timeLabel}) — ${pt.totalFindings} achados, MTTR: ${pt.averageMttrHours}h`}
+                title={`${pt.scanLabel} (${pt.fullDateLabel || pt.timeLabel}) — ${pt.totalFindings} achados, MTTR: ${pt.averageMttrHours}h ${
+                  isPtExceeded ? `⚠️ (Excede o limite máximo de ${effectiveMaxLimit}h)` : ''
+                }`}
               >
-                <div className="text-[7.5px] uppercase opacity-75 truncate">
-                  {pt.isCurrent ? 'Atual' : `#${idx + 1}`}
+                <div className="text-[7.5px] uppercase opacity-75 truncate flex items-center justify-center gap-0.5">
+                  <span>{pt.isCurrent ? 'Atual' : `#${idx + 1}`}</span>
+                  {isPtExceeded && <span className="text-rose-400 font-bold text-[8px]">⚠️</span>}
                 </div>
-                <div className="font-mono text-[9px] font-semibold">{val}</div>
+                <div className="font-mono text-[9px] font-semibold flex items-center justify-center gap-0.5">
+                  <span>{val}</span>
+                </div>
               </div>
             );
           })}
