@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, X, Check, RotateCcw, AlertTriangle, ShieldAlert, Timer, Sliders, Info, Sparkles } from 'lucide-react';
+import { Clock, X, Check, RotateCcw, AlertTriangle, ShieldAlert, Timer, Sliders, Info, Sparkles, Target } from 'lucide-react';
 import { SecScanGlobalConfig } from '../types';
 import { DEFAULT_SECSCAN_CONFIG, saveSecScanConfig } from '../lib/secscanConfig';
 
@@ -28,6 +28,9 @@ export const SecScanMttrConfigModal: React.FC<SecScanMttrConfigModalProps> = ({
   const [maxMttrHours, setMaxMttrHours] = useState<number | string>(
     config.maxAllowedMttrHours ?? 4.0
   );
+  const [idealBenchmarkHours, setIdealBenchmarkHours] = useState<number | string>(
+    config.idealBenchmarkMttrHours ?? 2.0
+  );
   const [dynamicCalculation, setDynamicCalculation] = useState<boolean>(
     config.dynamicMttrCalculation !== false
   );
@@ -45,6 +48,7 @@ export const SecScanMttrConfigModal: React.FC<SecScanMttrConfigModalProps> = ({
         config.severityConfig.WARNING.remediationTime || config.remediationTime.WARNING || '12h – 24h'
       );
       setMaxMttrHours(config.maxAllowedMttrHours ?? 4.0);
+      setIdealBenchmarkHours(config.idealBenchmarkMttrHours ?? 2.0);
       setDynamicCalculation(config.dynamicMttrCalculation !== false);
       setSavedSuccess(false);
     }
@@ -55,9 +59,12 @@ export const SecScanMttrConfigModal: React.FC<SecScanMttrConfigModalProps> = ({
   const handleSave = () => {
     const parsedMaxLimit = parseFloat(String(maxMttrHours));
     const finalMaxLimit = !isNaN(parsedMaxLimit) && parsedMaxLimit > 0 ? parsedMaxLimit : 4.0;
+    const parsedBenchmark = parseFloat(String(idealBenchmarkHours));
+    const finalBenchmark = !isNaN(parsedBenchmark) && parsedBenchmark > 0 ? parsedBenchmark : 2.0;
 
     const updated = saveSecScanConfig({
       maxAllowedMttrHours: finalMaxLimit,
+      idealBenchmarkMttrHours: finalBenchmark,
       remediationTime: {
         CRITICAL: criticalTime.trim() || '1.5h – 2h',
         HIGH: highTime.trim() || '4h – 6h',
@@ -93,6 +100,7 @@ export const SecScanMttrConfigModal: React.FC<SecScanMttrConfigModalProps> = ({
     setHighTime(DEFAULT_SECSCAN_CONFIG.remediationTime.HIGH);
     setWarningTime(DEFAULT_SECSCAN_CONFIG.remediationTime.WARNING);
     setMaxMttrHours(DEFAULT_SECSCAN_CONFIG.maxAllowedMttrHours ?? 4.0);
+    setIdealBenchmarkHours(DEFAULT_SECSCAN_CONFIG.idealBenchmarkMttrHours ?? 2.0);
     setDynamicCalculation(true);
     onUpdateConfig(reset);
   };
@@ -103,16 +111,19 @@ export const SecScanMttrConfigModal: React.FC<SecScanMttrConfigModalProps> = ({
       setHighTime('2h – 4h');
       setWarningTime('6h – 12h');
       setMaxMttrHours(2.0);
+      setIdealBenchmarkHours(1.0);
     } else if (preset === 'standard') {
       setCriticalTime('1.5h – 2h');
       setHighTime('4h – 6h');
       setWarningTime('12h – 24h');
       setMaxMttrHours(4.0);
+      setIdealBenchmarkHours(2.0);
     } else {
       setCriticalTime('2h – 4h');
       setHighTime('8h – 16h');
       setWarningTime('24h – 48h');
       setMaxMttrHours(8.0);
+      setIdealBenchmarkHours(3.0);
     }
   };
 
@@ -267,6 +278,44 @@ export const SecScanMttrConfigModal: React.FC<SecScanMttrConfigModalProps> = ({
             </div>
           </div>
 
+          {/* Meta Ideal de MTTR (Benchmark de Segurança) */}
+          <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-950/20 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Target className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="font-bold text-emerald-200 uppercase tracking-wider text-[11px]">
+                  Meta Ideal de MTTR (Benchmark de Segurança)
+                </span>
+              </div>
+              <span className="text-[10px] text-emerald-400/80 font-mono">Linha de Referência (Verde)</span>
+            </div>
+            <p className="text-[10.5px] text-zinc-400 font-sans leading-relaxed">
+              Define o objetivo de segurança ideal ou benchmark de excelência para resolução. Uma linha de referência verde (<strong className="text-emerald-400">🎯 Meta Ideal</strong>) é renderizada no gráfico <code className="text-zinc-300">MttrMiniTrendlineChart</code> para comparação visual contínua da performance real contra o alvo.
+            </p>
+            <div className="flex items-center gap-2.5 pt-1">
+              <label htmlFor="input-ideal-benchmark-mttr" className="text-[11px] text-zinc-300 font-semibold whitespace-nowrap">
+                Meta Ideal:
+              </label>
+              <div className="relative inline-flex items-center">
+                <input
+                  id="input-ideal-benchmark-mttr"
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  max="50"
+                  value={idealBenchmarkHours}
+                  onChange={(e) => setIdealBenchmarkHours(e.target.value)}
+                  placeholder="ex: 2.0"
+                  className="w-28 pl-2.5 pr-7 py-1 rounded bg-black/70 border border-emerald-500/40 text-emerald-200 font-mono text-xs font-bold focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/40"
+                />
+                <span className="absolute right-2 text-zinc-500 text-[10px] pointer-events-none">h</span>
+              </div>
+              <span className="text-[10px] text-zinc-400">
+                (horas por achado • padrão: 2.0h)
+              </span>
+            </div>
+          </div>
+
           {/* Limite Máximo Tolerado de MTTR (SLA Threshold & Alert Trigger) */}
           <div className="p-3 rounded-lg border border-sky-500/30 bg-sky-950/20 space-y-2">
             <div className="flex items-center justify-between">
@@ -276,7 +325,7 @@ export const SecScanMttrConfigModal: React.FC<SecScanMttrConfigModalProps> = ({
                   Limite Máximo de MTTR (SLA Target)
                 </span>
               </div>
-              <span className="text-[10px] text-zinc-400">Gatilho de Alerta no Gráfico</span>
+              <span className="text-[10px] text-rose-400/80 font-mono">Linha de Alerta (Vermelha)</span>
             </div>
             <p className="text-[10.5px] text-zinc-400 font-sans leading-relaxed">
               Define o tempo médio de remediação máximo aceitável. Qualquer varredura no gráfico de tendência histórica cujo MTTR exceder este teto exibirá <strong className="text-rose-400">ícones de alerta destacados</strong> e marcação visual no ponto e legenda.

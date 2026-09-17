@@ -48,6 +48,7 @@ export const DEFAULT_SECSCAN_CONFIG: SecScanGlobalConfig = {
   },
   dynamicMttrCalculation: true,
   maxAllowedMttrHours: 4.0,
+  idealBenchmarkMttrHours: 2.0,
 };
 
 /**
@@ -90,6 +91,10 @@ export function getSecScanConfig(): SecScanGlobalConfig {
             typeof parsed.maxAllowedMttrHours === 'number' && !isNaN(parsed.maxAllowedMttrHours)
               ? parsed.maxAllowedMttrHours
               : DEFAULT_SECSCAN_CONFIG.maxAllowedMttrHours,
+          idealBenchmarkMttrHours:
+            typeof parsed.idealBenchmarkMttrHours === 'number' && !isNaN(parsed.idealBenchmarkMttrHours)
+              ? parsed.idealBenchmarkMttrHours
+              : DEFAULT_SECSCAN_CONFIG.idealBenchmarkMttrHours,
           remediationTime: {
             ...DEFAULT_SECSCAN_CONFIG.remediationTime,
             ...(parsed.remediationTime || {}),

@@ -691,6 +691,7 @@ export interface SecScanGlobalConfig {
   };
   dynamicMttrCalculation?: boolean;
   maxAllowedMttrHours?: number; // Configured maximum MTTR limit threshold in hours
+  idealBenchmarkMttrHours?: number; // Target benchmark ideal MTTR in hours (e.g. 2.0h)
   [key: string]: unknown;
 }
 

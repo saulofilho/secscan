@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   AreaChart,
   Area,
@@ -25,7 +25,10 @@ import {
   Search,
   X,
   Download,
-  Check
+  Check,
+  Target,
+  Info,
+  Lightbulb
 } from 'lucide-react';
 import { SecScanGlobalConfig } from '../types';
 import { ValidationSeverityDistribution } from './ValidationSeverityDonutChart';
@@ -382,6 +385,176 @@ function generateBaselineMttrRuns(
   });
 }
 
+export interface SecuritySuggestion {
+  title: string;
+  advice: string;
+  action: string;
+  level: 'success' | 'warning' | 'critical' | 'info';
+}
+
+interface BenchmarkInfoTooltipProps {
+  id?: string;
+  suggestion: SecuritySuggestion;
+  currentMttr: number;
+  benchmark: number;
+  maxLimit: number;
+  position?: 'top' | 'bottom' | 'right';
+}
+
+export const BenchmarkInfoTooltip: React.FC<BenchmarkInfoTooltipProps> = ({
+  id = 'mttr-benchmark-info-tooltip',
+  suggestion,
+  currentMttr,
+  benchmark,
+  maxLimit,
+  position = 'top',
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen]);
+
+  const themeColors = useMemo(() => {
+    switch (suggestion.level) {
+      case 'critical':
+        return {
+          icon: 'text-rose-400',
+          btnBg: 'bg-rose-500/15 border-rose-500/40 text-rose-300 hover:bg-rose-500/30',
+          popoverBorder: 'border-rose-500/60 shadow-[0_8px_25px_rgba(244,63,94,0.25)]',
+          badge: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+          actionBg: 'bg-rose-950/30 border-rose-500/30 text-rose-200',
+          accent: 'text-rose-400',
+        };
+      case 'warning':
+        return {
+          icon: 'text-amber-400',
+          btnBg: 'bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/30',
+          popoverBorder: 'border-amber-500/60 shadow-[0_8px_25px_rgba(245,158,11,0.2)]',
+          badge: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+          actionBg: 'bg-amber-950/30 border-amber-500/30 text-amber-200',
+          accent: 'text-amber-400',
+        };
+      case 'success':
+      default:
+        return {
+          icon: 'text-emerald-400',
+          btnBg: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30',
+          popoverBorder: 'border-emerald-500/60 shadow-[0_8px_25px_rgba(16,185,129,0.2)]',
+          badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+          actionBg: 'bg-emerald-950/30 border-emerald-500/30 text-emerald-200',
+          accent: 'text-emerald-400',
+        };
+    }
+  }, [suggestion.level]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative inline-flex items-center"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+    >
+      <button
+        id={id}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => setIsOpen(false)}
+        aria-label="Sugestão rápida de segurança sobre a meta de MTTR"
+        className={`p-0.5 rounded-full border transition-all cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-1 focus:ring-emerald-400 ${themeColors.btnBg}`}
+        title="Clique ou passe o mouse para ver uma sugestão rápida de segurança"
+      >
+        <Info className={`w-3 h-3 ${themeColors.icon}`} />
+      </button>
+
+      {isOpen && (
+        <div
+          role="tooltip"
+          id={`${id}-popover`}
+          className={`absolute ${
+            position === 'top'
+              ? 'bottom-full mb-2 -left-3 sm:left-0'
+              : 'top-full mt-2 -right-3 sm:right-0'
+          } z-50 w-72 sm:w-80 p-3 rounded-lg bg-[#0b0c10] border ${themeColors.popoverBorder} shadow-2xl font-sans text-xs text-zinc-200 backdrop-blur-md animate-in fade-in zoom-in-95 duration-150 pointer-events-auto`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between gap-2 border-b border-white/10 pb-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className={`p-1 rounded bg-black/40 border border-white/10 ${themeColors.icon}`}>
+                <Lightbulb className="w-3.5 h-3.5 shrink-0" />
+              </div>
+              <div className="min-w-0">
+                <span className="font-bold text-white text-[11px] block leading-tight truncate">
+                  {suggestion.title}
+                </span>
+                <span className="text-[9px] text-zinc-400 font-mono">
+                  Sugestão de Segurança • Meta de MTTR
+                </span>
+              </div>
+            </div>
+
+            <span
+              className={`px-1.5 py-0.5 rounded font-mono text-[8px] font-bold border shrink-0 ${themeColors.badge}`}
+            >
+              {currentMttr <= benchmark
+                ? 'Meta Atingida ✓'
+                : currentMttr <= maxLimit
+                ? `+${(currentMttr - benchmark).toFixed(1)}h vs Meta`
+                : 'SLA Violado ⚠️'}
+            </span>
+          </div>
+
+          {/* Dynamic security advice based on current history */}
+          <div className="py-2 text-[10.5px] text-zinc-300 font-sans leading-relaxed">
+            {suggestion.advice}
+          </div>
+
+          {/* Action Box */}
+          {suggestion.action && (
+            <div
+              className={`p-2 rounded border text-[9.5px] mb-2 flex items-start gap-1.5 ${themeColors.actionBg}`}
+            >
+              <Lightbulb className={`w-3 h-3 shrink-0 mt-0.5 ${themeColors.icon}`} />
+              <div>
+                <span className="font-bold block text-white text-[10px]">Ação Recomendada:</span>
+                <span className="leading-snug">{suggestion.action}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Quick Metrics Reference Bar */}
+          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[9px] font-mono text-zinc-400">
+            <div className="flex items-center gap-1">
+              <span>Atual:</span>
+              <strong className="text-white">{currentMttr}h</strong>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-emerald-400">Meta:</span>
+              <strong className="text-emerald-300">≤ {benchmark}h</strong>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-rose-400">SLA:</span>
+              <strong className="text-rose-300">≤ {maxLimit}h</strong>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
   distribution,
   config,
@@ -537,6 +710,13 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
   const isImproved = delta < 0;
   const isRegressed = delta > 0;
 
+  // Storage key for toggling the ideal benchmark line
+  const MTTR_SHOW_BENCHMARK_STORAGE_KEY = 'secscan_mttr_show_benchmark_line_v1';
+  const [showBenchmarkLine, setShowBenchmarkLine] = useState<boolean>(() => {
+    const saved = safeGetItem(MTTR_SHOW_BENCHMARK_STORAGE_KEY);
+    return saved !== 'false';
+  });
+
   // Effective Maximum MTTR Limit configured in SecScanMttrConfigModal (default 4.0h)
   const configuredMaxMttr =
     typeof config.maxAllowedMttrHours === 'number' && !isNaN(config.maxAllowedMttrHours) && config.maxAllowedMttrHours > 0
@@ -545,6 +725,31 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
 
   const effectiveMaxLimit =
     viewMode === 'AVERAGE' ? configuredMaxMttr : Number((configuredMaxMttr * 4).toFixed(1));
+
+  // Ideal MTTR Benchmark configured in SecScanMttrConfigModal (default 2.0h)
+  const configuredBenchmarkMttr =
+    typeof config.idealBenchmarkMttrHours === 'number' &&
+    !isNaN(config.idealBenchmarkMttrHours) &&
+    config.idealBenchmarkMttrHours > 0
+      ? config.idealBenchmarkMttrHours
+      : 2.0;
+
+  const effectiveBenchmark =
+    viewMode === 'AVERAGE' ? configuredBenchmarkMttr : Number((configuredBenchmarkMttr * 4).toFixed(1));
+
+  const currentMttrValue =
+    viewMode === 'AVERAGE'
+      ? (currentPoint?.averageMttrHours ?? 0)
+      : (currentPoint?.totalBacklogHours ?? 0);
+
+  const isCurrentScanMeetingBenchmark = currentMttrValue <= effectiveBenchmark;
+  const benchmarkDeltaHours = Number((currentMttrValue - effectiveBenchmark).toFixed(1));
+
+  const benchmarkTitleText = `Meta Ideal de MTTR (Benchmark de Segurança): ${effectiveBenchmark}h. ${
+    isCurrentScanMeetingBenchmark
+      ? `Performance atual dentro da meta ideal (${currentMttrValue}h ≤ ${effectiveBenchmark}h)`
+      : `Performance atual está +${benchmarkDeltaHours}h acima da meta ideal`
+  }. Clique para alternar a linha verde de referência no gráfico.`;
 
   const isCurrentScanExceeded = useMemo(() => {
     if (!currentPoint) return false;
@@ -605,6 +810,93 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
     : timeRange === '10'
     ? '(Últimas 10 Varreduras)'
     : `(Histórico Completo • ${displayData.length} Varreduras)`;
+
+  // Dynamic security suggestion based on historical MTTR trends and finding distribution
+  const dynamicSecuritySuggestion = useMemo<SecuritySuggestion>(() => {
+    const curVal = currentMttrValue;
+    const critCount = currentPoint?.criticalCount ?? distribution.critical ?? 0;
+    const hiCount = currentPoint?.highCount ?? distribution.high ?? 0;
+    const warnCount = currentPoint?.warningCount ?? distribution.warning ?? 0;
+    const totCount = currentPoint?.totalFindings ?? distribution.total ?? 0;
+
+    // SLA breach condition
+    if (curVal > effectiveMaxLimit) {
+      if (warnCount > (critCount + hiCount) && warnCount > 4) {
+        return {
+          title: 'Tempo Médio Alto por Volume de Avisos',
+          advice: 'O tempo médio está alto, considere revisar as regras de exclusão de arquivos (.secscanignore) para evitar sobrecarga de alertas em scripts de teste e dependências legadas.',
+          action: 'Refinar filtros de exclusão e sanitizar arquivos de mock/teste no repositório.',
+          level: 'critical',
+        };
+      }
+      if (critCount > 0) {
+        return {
+          title: 'SLA Violado com Falhas Críticas Pendentes',
+          advice: `O tempo médio está alto (${curVal}h > teto de ${effectiveMaxLimit}h) com ${critCount} achado(s) crítico(s). Priorize a remediação imediata de chaves e segredos expostos no código.`,
+          action: 'Inativar e rotacionar credenciais no Vault e purgar commits com segredos.',
+          level: 'critical',
+        };
+      }
+      return {
+        title: 'Tempo Médio Excede o Limite Máximo de SLA',
+        advice: `O tempo médio está alto (${curVal}h > limite máx de ${effectiveMaxLimit}h). Considere revisar as regras de exclusão de arquivos e automatizar verificações via pre-commit hooks.`,
+        action: 'Revisar escopo do scanner e configurar exclusões para arquivos de build gerados.',
+        level: 'critical',
+      };
+    }
+
+    // Above ideal benchmark, but within SLA tolerance
+    if (curVal > effectiveBenchmark) {
+      const diff = Number((curVal - effectiveBenchmark).toFixed(1));
+      if (hiCount >= 2) {
+        return {
+          title: 'Otimização para Alcance da Meta Ideal',
+          advice: `O tempo médio está +${diff}h acima da meta ideal de ${effectiveBenchmark}h. A maior parte do tempo está concentrada em falhas de nível Alto (P1). Habilitar linters de segurança pré-commit ajudará a mitigar vulnerabilidades antes do commit.`,
+          action: 'Implantar hook pre-commit de SAST e agrupar correções em lote por componente.',
+          level: 'warning',
+        };
+      }
+      if (isRegressed) {
+        return {
+          title: 'Tendência Histórica de MTTR em Aumento',
+          advice: `Identificado aumento recente de +${percentDelta}% no MTTR. Considere revisar as regras de exclusão de arquivos para garantir que novas bibliotecas ou builds não estejam inflando a métrica.`,
+          action: 'Revisar inclusões de novos arquivos na varredura e focar em patches em lote.',
+          level: 'warning',
+        };
+      }
+      return {
+        title: `Meta Ideal de MTTR Não Atingida (+${diff}h)`,
+        advice: `O tempo médio está ligeiramente acima da meta de ${effectiveBenchmark}h (+${diff}h). Considere revisar as regras de exclusão de arquivos e templates para reduzir o tempo gasto em ruído secundário.`,
+        action: 'Refinar filtros no .secscanignore e manter foco em regras de alta confiança.',
+        level: 'warning',
+      };
+    }
+
+    // Within ideal benchmark
+    if (totCount === 0) {
+      return {
+        title: 'Postura de Segurança Ótima (Sem Achados)',
+        advice: 'Nenhuma vulnerabilidade ativa detectada no repositório. Mantenha os gates de CI/CD ativos e configure escaneamentos periódicos agendados contra novas CVEs.',
+        action: 'Manter rotina de varredura contínua nos pull requests e pipelines.',
+        level: 'success',
+      };
+    }
+
+    return {
+      title: 'Performance Alinhada à Meta Ideal de Segurança',
+      advice: `Excelente ritmo de remediação (${curVal}h ≤ meta ideal de ${effectiveBenchmark}h). A equipe está mitigando riscos rapidamente. Documente as práticas para sustentar o ritmo contínuo.`,
+      action: 'Manter políticas defensivas atuais e compartilhar playbooks com o time.',
+      level: 'success',
+    };
+  }, [
+    currentMttrValue,
+    currentPoint,
+    distribution,
+    effectiveBenchmark,
+    effectiveMaxLimit,
+    isRegressed,
+    percentDelta,
+  ]);
 
   /**
    * Custom interactive SVG dot for single-trendline mode:
@@ -915,6 +1207,50 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
                 ? `+${percentDelta}% MTTR`
                 : 'Estável'}
             </span>
+          </div>
+
+          {/* Benchmark Target Comparison Pill & Informative 'i' Tooltip */}
+          <div className="inline-flex items-center gap-1">
+            <button
+              id="badge-mttr-benchmark-target"
+              type="button"
+              onClick={() => {
+                setShowBenchmarkLine(prev => {
+                  const next = !prev;
+                  safeSetItem(MTTR_SHOW_BENCHMARK_STORAGE_KEY, String(next));
+                  return next;
+                });
+              }}
+              className={`px-1.5 py-0.5 rounded text-[9px] font-bold border inline-flex items-center gap-1 cursor-pointer transition-all hover:scale-102 active:scale-98 ${
+                showBenchmarkLine
+                  ? isCurrentScanMeetingBenchmark
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-xs'
+                    : 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30'
+                  : 'bg-white/5 text-zinc-400 border-white/10 opacity-70 hover:opacity-100'
+              }`}
+              title={benchmarkTitleText}
+            >
+              <Target className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+              <span>Meta: {effectiveBenchmark}h</span>
+              <span
+                className={`text-[8px] font-extrabold px-1 py-0.2 rounded ${
+                  isCurrentScanMeetingBenchmark
+                    ? 'bg-emerald-500/30 text-emerald-200'
+                    : 'bg-zinc-800 text-zinc-300'
+                }`}
+              >
+                {isCurrentScanMeetingBenchmark ? '✓ No Alvo' : `+${benchmarkDeltaHours}h`}
+              </span>
+            </button>
+
+            <BenchmarkInfoTooltip
+              id="badge-benchmark-info-header"
+              suggestion={dynamicSecuritySuggestion}
+              currentMttr={currentMttrValue}
+              benchmark={effectiveBenchmark}
+              maxLimit={effectiveMaxLimit}
+              position="bottom"
+            />
           </div>
 
           {/* MTTR Limit Exceeded Visual Badge */}
@@ -1258,6 +1594,82 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
         </div>
       )}
 
+      {/* Benchmark & SLA Reference Legend Bar */}
+      <div
+        id="mttr-benchmark-reference-legend"
+        className="flex flex-wrap items-center justify-between gap-1.5 px-2 py-1 rounded bg-black/35 border border-white/5 text-[8.5px]"
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Ideal Benchmark Target Toggle & Legend */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setShowBenchmarkLine(prev => {
+                  const next = !prev;
+                  safeSetItem(MTTR_SHOW_BENCHMARK_STORAGE_KEY, String(next));
+                  return next;
+                });
+              }}
+              className={`flex items-center gap-1.5 cursor-pointer select-none transition-opacity ${
+                showBenchmarkLine ? 'opacity-100' : 'opacity-40 line-through'
+              }`}
+              title="Meta Ideal de MTTR: clique para alternar a exibição da linha tracejada verde no gráfico"
+            >
+              <span className="w-3.5 h-0 border-b-2 border-dashed border-emerald-400 shrink-0" />
+              <span className="text-emerald-300 font-semibold flex items-center gap-1">
+                <Target className="w-2.5 h-2.5 text-emerald-400" />
+                Meta Ideal (Benchmark): ≤ {effectiveBenchmark}h
+              </span>
+            </button>
+
+            {/* Informative 'i' Tooltip directly beside the benchmark line */}
+            <BenchmarkInfoTooltip
+              id="mttr-benchmark-info-legend"
+              suggestion={dynamicSecuritySuggestion}
+              currentMttr={currentMttrValue}
+              benchmark={effectiveBenchmark}
+              maxLimit={effectiveMaxLimit}
+              position="top"
+            />
+          </div>
+
+          {/* Maximum SLA Limit Legend */}
+          <button
+            type="button"
+            onClick={onOpenMttrConfig}
+            className="flex items-center gap-1.5 cursor-pointer select-none transition-opacity hover:opacity-100 opacity-90"
+            title="Limite Máximo de MTTR (SLA): clique para configurar limites no SecScan"
+          >
+            <span className="w-3.5 h-0 border-b-2 border-dotted border-rose-500 shrink-0" />
+            <span className="text-rose-300 font-semibold flex items-center gap-1">
+              <AlertTriangle className="w-2.5 h-2.5 text-rose-400" />
+              Limite Máx (SLA): ≤ {effectiveMaxLimit}h
+            </span>
+          </button>
+        </div>
+
+        {/* Real-time Benchmark Compliance Status Tag */}
+        <div className="flex items-center gap-1 text-[8px] font-mono">
+          <span className="text-zinc-500">Real vs Meta:</span>
+          {isCurrentScanMeetingBenchmark ? (
+            <span className="text-emerald-300 font-bold bg-emerald-500/15 px-1.5 py-0.2 rounded border border-emerald-500/30 flex items-center gap-1">
+              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
+              Objetivo Atingido ({currentMttrValue}h ≤ {effectiveBenchmark}h)
+            </span>
+          ) : currentMttrValue <= effectiveMaxLimit ? (
+            <span className="text-amber-300 font-semibold bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
+              Aceitável (+{benchmarkDeltaHours}h da meta, dentro do SLA)
+            </span>
+          ) : (
+            <span className="text-rose-300 font-bold bg-rose-500/15 px-1.5 py-0.2 rounded border border-rose-500/40 flex items-center gap-1 animate-pulse">
+              <AlertTriangle className="w-2.5 h-2.5 text-rose-400" />
+              SLA Violado (+{(currentMttrValue - effectiveMaxLimit).toFixed(1)}h acima do limite)
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* Mini Trendline Sparkline Chart Container */}
       <div 
         id="mttr-trendline-chart-stage"
@@ -1269,7 +1681,7 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
         } relative overflow-hidden pt-1 transition-all duration-200`}
       >
         {/* Floating Indicator in Chart Canvas */}
-        {isCurrentScanExceeded && (
+        {isCurrentScanExceeded ? (
           <div
             id="mttr-chart-stage-exceeded-badge"
             className="absolute top-1 left-2 z-10 pointer-events-none flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-950/80 border border-rose-500/60 text-rose-300 font-mono font-bold text-[8px] backdrop-blur-xs shadow-xs"
@@ -1277,7 +1689,15 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
             <AlertTriangle className="w-2.5 h-2.5 text-rose-400 shrink-0 animate-pulse" />
             <span>MTTR &gt; {effectiveMaxLimit}h (Limite Máx Excedido)</span>
           </div>
-        )}
+        ) : isCurrentScanMeetingBenchmark && showBenchmarkLine ? (
+          <div
+            id="mttr-chart-stage-benchmark-badge"
+            className="absolute top-1 left-2 z-10 pointer-events-none flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 font-mono font-bold text-[8px] backdrop-blur-xs shadow-xs"
+          >
+            <Target className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+            <span>Na Meta Ideal (≤ {effectiveBenchmark}h)</span>
+          </div>
+        ) : null}
         {displayData.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-2 space-y-1 text-zinc-400">
             <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-[9px]">
@@ -1316,12 +1736,32 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
 
               <YAxis
                 hide
-                domain={[0, (dataMax: number) => Math.max(Number(dataMax) || 0, effectiveMaxLimit) + 1.5]}
+                domain={[0, (dataMax: number) => Math.max(Number(dataMax) || 0, effectiveMaxLimit, effectiveBenchmark) + 1.5]}
               />
               <XAxis dataKey="scanIndex" hide />
 
+              {/* Static Benchmark Reference Line - Meta Ideal de MTTR (Objetivo de Segurança) */}
+              {showBenchmarkLine && (
+                <ReferenceLine
+                  id="ref-line-mttr-ideal-benchmark"
+                  y={effectiveBenchmark}
+                  stroke="#10B981"
+                  strokeDasharray="4 3"
+                  strokeWidth={1.4}
+                  strokeOpacity={0.85}
+                  label={{
+                    value: `🎯 Meta Ideal: ${effectiveBenchmark}h`,
+                    position: 'insideTopLeft',
+                    fill: '#34D399',
+                    fontSize: 8.5,
+                    fontWeight: 'bold',
+                  }}
+                />
+              )}
+
               {/* SLA Target / Maximum Allowed MTTR Reference Line */}
               <ReferenceLine
+                id="ref-line-mttr-max-limit"
                 y={effectiveMaxLimit}
                 stroke="#EF4444"
                 strokeDasharray="3 3"
@@ -1577,6 +2017,17 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
                       <div className="flex items-center justify-between text-zinc-400">
                         <span>Horas Totais de Backlog:</span>
                         <span className="font-semibold text-zinc-200">{pt.totalBacklogHours}h</span>
+                      </div>
+
+                      {/* Benchmark Comparison in Tooltip */}
+                      <div className="flex items-center justify-between text-zinc-400 pt-1 border-t border-white/5 text-[8.5px]">
+                        <span className="flex items-center gap-1">
+                          <Target className="w-2.5 h-2.5 text-emerald-400" />
+                          <span>Meta Ideal (Benchmark):</span>
+                        </span>
+                        <span className={`font-semibold font-mono ${pt.primaryValue <= effectiveBenchmark ? 'text-emerald-400' : 'text-amber-300'}`}>
+                          ≤ {effectiveBenchmark}h {pt.primaryValue <= effectiveBenchmark ? '(Alcançada ✓)' : `(+${(pt.primaryValue - effectiveBenchmark).toFixed(1)}h)`}
+                        </span>
                       </div>
                     </div>
 
