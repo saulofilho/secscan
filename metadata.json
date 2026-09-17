@@ -1,6 +1,6 @@
 {
   "name": "SecScan AppSec Suite - Advanced SAST, Secret Matrix & DataFlow Platform",
-  "description": "Plataforma avançada de segurança de aplicações (AppSec) e análise estática (SAST). Inclui mapeamento tático MITRE ATT&CK & D3FEND, auditoria NIST CSF 2.0, checklist defensivo OWASP WSTG, matriz de segredos e credenciais, LinkFinder, JS-Miner e grafo interativo de fluxo de dados (Taint Analysis).",
+  "description": "Plataforma avançada de segurança de aplicações (AppSec), análise estática (SAST) e operações defensivas inspiradas no Security Onion. Inclui Threat Hunting (Hunt), triagem de casos de SOC, gerador de regras (Sigma/Suricata/Zeek/ModSecurity/YARA), inspeção PCAP/Hex e playbooks de resposta a incidentes NIST SP 800-61.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

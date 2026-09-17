@@ -29,7 +29,8 @@ import {
   ListOrdered,
   Activity,
   ShieldCheck,
-  Crosshair
+  Crosshair,
+  Radio
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
 
@@ -338,6 +339,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           setActiveTab('frameworks');
         },
         keywords: ['frameworks', 'mitre', 'attack', 'd3fend', 'nist', 'csf', 'owasp', 'wstg', 'red team', 'purple team', 'auditoria', 'contramedidas']
+      },
+      {
+        id: 'nav-securityonion',
+        title: 'Módulo: Security Onion (SOC & Threat Hunting Suite)',
+        subtitle: 'Caça a ameaças (Hunt), triagem de casos, gerador de regras (Sigma/Suricata/Zeek), PCAP e SOPs',
+        category: 'Navegação',
+        icon: Radio,
+        badge: 'SOC / Hunt',
+        badgeColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('securityonion');
+        },
+        keywords: ['security onion', 'soc', 'hunt', 'threat hunting', 'cases', 'triagem', 'sigma', 'suricata', 'zeek', 'modsecurity', 'pcap', 'playbooks', 'blue team']
       },
       {
         id: 'nav-rules',

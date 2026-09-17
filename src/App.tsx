@@ -40,6 +40,7 @@ import { SeverityTooltip } from './components/Tooltip';
 import { SecScanMttrConfigModal } from './components/SecScanMttrConfigModal';
 import { MttrMiniTrendlineChart, parseRemediationHours } from './components/MttrMiniTrendlineChart';
 import { SecurityFrameworksHub } from './components/SecurityFrameworksHub';
+import { SecurityOnionSocView } from './components/SecurityOnionSocView';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -1091,16 +1092,18 @@ export default function App() {
         }
       }
 
-      // Navigation: 1 through 8
+      // Navigation: 1 through 0
       const tabMap: Record<string, string> = {
         '1': 'dashboard',
         '2': 'scanner',
         '3': 'endpoints',
         '4': 'jsminer',
         '5': 'dataflow',
-        '6': 'rules',
-        '7': 'cli',
-        '8': 'cicd'
+        '6': 'frameworks',
+        '7': 'securityonion',
+        '8': 'rules',
+        '9': 'cli',
+        '0': 'cicd'
       };
 
       if (!isInputElement && !isCmdOrCtrl && !e.altKey && tabMap[e.key]) {
@@ -1787,6 +1790,16 @@ export default function App() {
             report={report}
             onSelectFinding={handleSelectFinding}
             onNavigateToScanner={() => setActiveTab('scanner')}
+          />
+        )}
+
+        {activeTab === 'securityonion' && (
+          <SecurityOnionSocView
+            report={report}
+            onSelectFinding={handleSelectFinding}
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onNavigateToEndpoints={() => setActiveTab('endpoints')}
+            onNavigateToDataFlow={() => setActiveTab('dataflow')}
           />
         )}
 
