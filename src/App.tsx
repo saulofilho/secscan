@@ -38,7 +38,7 @@ import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { SeverityTooltip } from './components/Tooltip';
 import { SecScanMttrConfigModal } from './components/SecScanMttrConfigModal';
-import { MttrMiniTrendlineChart } from './components/MttrMiniTrendlineChart';
+import { MttrMiniTrendlineChart, parseRemediationHours } from './components/MttrMiniTrendlineChart';
 import { SecurityFrameworksHub } from './components/SecurityFrameworksHub';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
@@ -240,6 +240,35 @@ export default function App() {
     const total = critical + high + warning;
     return { critical, high, warning, total };
   }, [validationNotice]);
+
+  const workspaceCurrentMttrHours = useMemo(() => {
+    if (noticeSeverityDistribution.total === 0) return 0;
+    const critHours = parseRemediationHours(
+      secScanConfig.severityConfig?.CRITICAL?.remediationTime || secScanConfig.remediationTime?.CRITICAL,
+      1.75
+    );
+    const highHours = parseRemediationHours(
+      secScanConfig.severityConfig?.HIGH?.remediationTime || secScanConfig.remediationTime?.HIGH,
+      5.0
+    );
+    const warnHours = parseRemediationHours(
+      secScanConfig.severityConfig?.WARNING?.remediationTime || secScanConfig.remediationTime?.WARNING,
+      18.0
+    );
+    const totalHours =
+      noticeSeverityDistribution.critical * critHours +
+      noticeSeverityDistribution.high * highHours +
+      noticeSeverityDistribution.warning * warnHours;
+    return Number((totalHours / noticeSeverityDistribution.total).toFixed(1));
+  }, [noticeSeverityDistribution, secScanConfig]);
+
+  const maxAllowedMttrLimit =
+    typeof secScanConfig.maxAllowedMttrHours === 'number' && !isNaN(secScanConfig.maxAllowedMttrHours) && secScanConfig.maxAllowedMttrHours > 0
+      ? secScanConfig.maxAllowedMttrHours
+      : 4.0;
+
+  const isWorkspaceMttrExceeded =
+    noticeSeverityDistribution.total > 0 && workspaceCurrentMttrHours > maxAllowedMttrLimit;
 
   const [noticeSeverityFilters, setNoticeSeverityFilters] = useState<{
     CRITICAL: boolean;
@@ -1417,16 +1446,33 @@ export default function App() {
                           </button>
                         )}
 
-                        {/* Direct MTTR Global Config modal trigger button */}
+                        {/* Direct MTTR Global Config modal trigger button with visual alert marking */}
                         <button
                           id="btn-configure-mttr-remediation"
                           type="button"
                           onClick={() => setShowMttrConfigModal(true)}
-                          className="px-1.5 py-0.5 rounded text-[9.5px] font-mono text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-colors cursor-pointer inline-flex items-center gap-1"
-                          title="Ajustar parâmetros de remediationTime (MTTR) no objeto de configuração global do SecScan"
+                          className={`px-1.5 py-0.5 rounded text-[9.5px] font-mono transition-all cursor-pointer inline-flex items-center gap-1 border ${
+                            isWorkspaceMttrExceeded
+                              ? 'bg-rose-500/25 text-rose-200 border-rose-500/50 hover:bg-rose-500/35 ring-1 ring-rose-500/40 shadow-xs'
+                              : 'text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 border-white/10'
+                          }`}
+                          title={
+                            isWorkspaceMttrExceeded
+                              ? `ALERTA DE SLA: MTTR médio atual (${workspaceCurrentMttrHours}h) excede o limite máximo permitido de ${maxAllowedMttrLimit}h configurado no SecScanMttrConfigModal! Clique para ajustar.`
+                              : "Ajustar parâmetros de remediationTime (MTTR) no objeto de configuração global do SecScan"
+                          }
                         >
-                          <Clock className="w-2.5 h-2.5 text-zinc-400" />
+                          {isWorkspaceMttrExceeded ? (
+                            <AlertTriangle className="w-2.5 h-2.5 text-rose-400 shrink-0 animate-bounce" />
+                          ) : (
+                            <Clock className="w-2.5 h-2.5 text-zinc-400" />
+                          )}
                           <span>MTTR Config</span>
+                          {isWorkspaceMttrExceeded && (
+                            <span className="px-1 py-0.2 rounded bg-rose-600/80 text-[8px] text-white font-extrabold uppercase tracking-tight">
+                              &gt;{maxAllowedMttrLimit}h
+                            </span>
+                          )}
                         </button>
                       </div>
                     </div>

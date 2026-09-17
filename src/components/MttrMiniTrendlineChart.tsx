@@ -537,16 +537,6 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
   const isImproved = delta < 0;
   const isRegressed = delta > 0;
 
-  // Chart theme colors
-  const primaryColor =
-    distribution.total === 0
-      ? '#10B981' // emerald-500
-      : distribution.critical > 0
-      ? '#F43F5E' // rose-500
-      : distribution.high > 0
-      ? '#F59E0B' // amber-500
-      : '#38BDF8'; // sky-400
-
   // Effective Maximum MTTR Limit configured in SecScanMttrConfigModal (default 4.0h)
   const configuredMaxMttr =
     typeof config.maxAllowedMttrHours === 'number' && !isNaN(config.maxAllowedMttrHours) && config.maxAllowedMttrHours > 0
@@ -555,6 +545,24 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
 
   const effectiveMaxLimit =
     viewMode === 'AVERAGE' ? configuredMaxMttr : Number((configuredMaxMttr * 4).toFixed(1));
+
+  const isCurrentScanExceeded = useMemo(() => {
+    if (!currentPoint) return false;
+    const val = viewMode === 'AVERAGE' ? currentPoint.averageMttrHours : currentPoint.totalBacklogHours;
+    return val > effectiveMaxLimit;
+  }, [currentPoint, viewMode, effectiveMaxLimit]);
+
+  // Chart theme colors - dynamic alert red if current scan exceeds configured limit
+  const primaryColor =
+    isCurrentScanExceeded
+      ? '#F43F5E' // rose-500 alert color when MTTR limit is breached!
+      : distribution.total === 0
+      ? '#10B981' // emerald-500
+      : distribution.critical > 0
+      ? '#F43F5E' // rose-500
+      : distribution.high > 0
+      ? '#F59E0B' // amber-500
+      : '#38BDF8'; // sky-400
 
   // Severity maximum limits from configured remediation times
   const critMaxLimit = useMemo(() => {
@@ -588,12 +596,6 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
       return val > effectiveMaxLimit;
     }).length;
   }, [displayData, viewMode, effectiveMaxLimit]);
-
-  const isCurrentScanExceeded = useMemo(() => {
-    if (!currentPoint) return false;
-    const val = viewMode === 'AVERAGE' ? currentPoint.averageMttrHours : currentPoint.totalBacklogHours;
-    return val > effectiveMaxLimit;
-  }, [currentPoint, viewMode, effectiveMaxLimit]);
 
   // Dynamic subtitle based on active timeRange or search query
   const timeRangeSubtitle = dateSearchQuery.trim()
@@ -855,18 +857,38 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
 
         {/* Action Controls & Badges */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {/* Current MTTR Value Badge */}
+          {/* Current MTTR Value Badge with Visual Alert Marking */}
           <div
             id="badge-current-mttr"
-            className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white font-bold text-[9.5px] inline-flex items-center gap-1"
-            title="Tempo Médio de Remediação calculado para a varredura atual"
+            className={`px-2 py-0.5 rounded border font-bold text-[9.5px] inline-flex items-center gap-1.5 transition-all ${
+              isCurrentScanExceeded
+                ? 'bg-rose-500/20 border-rose-500/60 text-rose-200 ring-1 ring-rose-500/40 shadow-xs'
+                : 'bg-white/5 border-white/10 text-white'
+            }`}
+            title={
+              isCurrentScanExceeded
+                ? `ALERTA DE SLA: MTTR atual (${currentPoint?.averageMttrHours ?? 0}h) excede o limite máximo permitido de ${effectiveMaxLimit}h configurado no SecScan!`
+                : "Tempo Médio de Remediação calculado para a varredura atual"
+            }
           >
-            <span className="text-zinc-400">Atual:</span>
-            <span className="text-emerald-400 font-mono">
+            {isCurrentScanExceeded && (
+              <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0 animate-bounce" />
+            )}
+            <span className={isCurrentScanExceeded ? 'text-rose-300' : 'text-zinc-400'}>Atual:</span>
+            <span
+              className={`font-mono font-extrabold ${
+                isCurrentScanExceeded ? 'text-rose-200 underline decoration-rose-500' : 'text-emerald-400'
+              }`}
+            >
               {viewMode === 'AVERAGE'
                 ? `${currentPoint?.averageMttrHours ?? 0}h`
                 : `${currentPoint?.totalBacklogHours ?? 0}h tot`}
             </span>
+            {isCurrentScanExceeded && (
+              <span className="px-1 py-0.2 rounded bg-rose-600/80 text-[8px] text-white uppercase font-extrabold tracking-tight">
+                Excedido
+              </span>
+            )}
           </div>
 
           {/* Trend Delta Pill */}
@@ -1045,6 +1067,45 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
         </div>
       </div>
 
+      {/* Visual Alert Banner displayed whenever current MTTR exceeds the configured maximum limit in SecScanMttrConfigModal */}
+      {isCurrentScanExceeded && (
+        <div
+          id="mttr-threshold-breached-alert-banner"
+          className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-rose-950/70 border border-rose-500/60 text-rose-200 shadow-sm"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-400 shrink-0">
+              <AlertTriangle className="w-3.5 h-3.5 animate-pulse" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-bold text-[9.5px] text-rose-200 tracking-wide uppercase">
+                  Limite Máximo de MTTR Excedido
+                </span>
+                <span className="px-1.5 py-0.2 rounded bg-rose-500/30 text-rose-100 text-[8px] font-mono border border-rose-500/50 font-extrabold">
+                  SLA: {currentPoint?.averageMttrHours ?? 0}h &gt; {effectiveMaxLimit}h (+{((currentPoint?.averageMttrHours ?? 0) - effectiveMaxLimit).toFixed(1)}h)
+                </span>
+              </div>
+              <p className="text-[8.5px] text-rose-300/80 truncate">
+                O tempo de resolução ultrapassa o teto máximo de {effectiveMaxLimit}h definido no SecScanMttrConfigModal.
+              </p>
+            </div>
+          </div>
+          {onOpenMttrConfig && (
+            <button
+              id="btn-alert-adjust-mttr-limit"
+              type="button"
+              onClick={onOpenMttrConfig}
+              className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold text-[8.5px] tracking-wide transition-colors cursor-pointer border border-rose-400 shrink-0 shadow-xs flex items-center gap-1"
+              title="Abrir SecScanMttrConfigModal para reconfigurar o limite máximo permitido de MTTR"
+            >
+              <Sliders className="w-2.5 h-2.5" />
+              <span>Ajustar Limite</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Date Search & Range Filter Bar */}
       <div 
         id="mttr-date-search-bar"
@@ -1201,8 +1262,22 @@ export const MttrMiniTrendlineChart: React.FC<MttrMiniTrendlineChartProps> = ({
       <div 
         id="mttr-trendline-chart-stage"
         onMouseLeave={() => setHoveredSeverity(null)}
-        className={`w-full ${compareBySeverity ? 'h-18 sm:h-20' : 'h-14'} bg-black/40 rounded border border-white/5 relative overflow-hidden pt-1 transition-all duration-200`}
+        className={`w-full ${compareBySeverity ? 'h-18 sm:h-20' : 'h-14'} bg-black/40 rounded border ${
+          isCurrentScanExceeded
+            ? 'border-rose-500/60 ring-1 ring-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.2)]'
+            : 'border-white/5'
+        } relative overflow-hidden pt-1 transition-all duration-200`}
       >
+        {/* Floating Indicator in Chart Canvas */}
+        {isCurrentScanExceeded && (
+          <div
+            id="mttr-chart-stage-exceeded-badge"
+            className="absolute top-1 left-2 z-10 pointer-events-none flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-950/80 border border-rose-500/60 text-rose-300 font-mono font-bold text-[8px] backdrop-blur-xs shadow-xs"
+          >
+            <AlertTriangle className="w-2.5 h-2.5 text-rose-400 shrink-0 animate-pulse" />
+            <span>MTTR &gt; {effectiveMaxLimit}h (Limite Máx Excedido)</span>
+          </div>
+        )}
         {displayData.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-2 space-y-1 text-zinc-400">
             <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-[9px]">
