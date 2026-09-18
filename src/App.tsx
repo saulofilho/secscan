@@ -44,6 +44,7 @@ import { SecurityFrameworksHub } from './components/SecurityFrameworksHub';
 import { SecurityOnionSocView } from './components/SecurityOnionSocView';
 import { CrowdStrikeSuiteView } from './components/CrowdStrikeSuiteView';
 import { NmapNetworkSuiteView } from './components/NmapNetworkSuiteView';
+import { NiktoWebScannerView } from './components/NiktoWebScannerView';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -1834,6 +1835,14 @@ export default function App() {
 
         {activeTab === 'nmap' && (
           <NmapNetworkSuiteView
+            report={report}
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onNavigateToEndpoints={() => setActiveTab('endpoints')}
+          />
+        )}
+
+        {activeTab === 'nikto' && (
+          <NiktoWebScannerView
             report={report}
             onNavigateToScanner={() => setActiveTab('scanner')}
             onNavigateToEndpoints={() => setActiveTab('endpoints')}

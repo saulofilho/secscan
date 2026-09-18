@@ -33,7 +33,8 @@ import {
   Crosshair,
   Radio,
   Zap,
-  Globe
+  Globe,
+  FileSearch
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
 
@@ -430,6 +431,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           setActiveTab('nmap');
         },
         keywords: ['nmap', 'portas', 'scan', 'network', 'rede', 'recon', 'banner', 'nse', 'fingerprint', 'os', 'topologia', 'port scanner']
+      },
+      {
+        id: 'nav-nikto',
+        title: 'Módulo: Nikto (Web Server Misconfiguration & Header Scanner)',
+        subtitle: 'Auditoria de servidores web, arquivos perigosos, métodos HTTP de risco e cabeçalhos de segurança',
+        category: 'Navegação',
+        icon: FileSearch,
+        badge: 'Web Audit',
+        badgeColor: 'bg-[#FF7A00]/15 text-[#FF7A00] border-[#FF7A00]/30',
+        action: () => {
+          onClose();
+          setActiveTab('nikto');
+        },
+        keywords: ['nikto', 'web', 'servidor', 'headers', 'misconfiguration', 'hsts', 'csp', 'x-frame-options', 'methods', 'trace', 'arquivos', 'tuning']
       },
       {
         id: 'nav-rules',
