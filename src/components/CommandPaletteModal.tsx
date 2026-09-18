@@ -34,7 +34,8 @@ import {
   Radio,
   Zap,
   Globe,
-  FileSearch
+  FileSearch,
+  Flame
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
 
@@ -445,6 +446,34 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           setActiveTab('nikto');
         },
         keywords: ['nikto', 'web', 'servidor', 'headers', 'misconfiguration', 'hsts', 'csp', 'x-frame-options', 'methods', 'trace', 'arquivos', 'tuning']
+      },
+      {
+        id: 'nav-ngfw',
+        title: 'Módulo: NGFW (Next-Gen Firewall Suite & Zero Trust)',
+        subtitle: 'Políticas L7, inspeção App-ID, prevenção de intrusão inline (IPS), zonas de segurança e decriptação SSL',
+        category: 'Navegação',
+        icon: Flame,
+        badge: 'L7 / IPS',
+        badgeColor: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('ngfw');
+        },
+        keywords: ['ngfw', 'firewall', 'app-id', 'ips', 'zero-trust', 'ssl', 'decriptacao', 'regras', 'zonas', 'dmz', 'untrust', 'palo alto', 'fortinet', 'checkpoint']
+      },
+      {
+        id: 'nav-edr',
+        title: 'Módulo: EDR (Endpoint Detection and Response)',
+        subtitle: 'Árvore de processos parent-child, regras comportamentais IOA/MITRE, console de Threat Hunting e forense de memória com YARA',
+        category: 'Navegação',
+        icon: Crosshair,
+        badge: 'eBPF / EDR',
+        badgeColor: 'bg-red-500/15 text-red-400 border-red-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('edr');
+        },
+        keywords: ['edr', 'endpoint', 'processo', 'tree', 'threat hunting', 'hunting', 'yara', 'dump', 'memoria', 'mitre', 'ioa', 'kql', 'containment', 'quarantine', 'sentinelone', 'crowdstrike', 'carbon black', 'defender']
       },
       {
         id: 'nav-rules',

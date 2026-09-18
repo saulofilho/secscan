@@ -45,6 +45,8 @@ import { SecurityOnionSocView } from './components/SecurityOnionSocView';
 import { CrowdStrikeSuiteView } from './components/CrowdStrikeSuiteView';
 import { NmapNetworkSuiteView } from './components/NmapNetworkSuiteView';
 import { NiktoWebScannerView } from './components/NiktoWebScannerView';
+import { NgfwSuiteView } from './components/NgfwSuiteView';
+import { EdrSuiteView } from './components/EdrSuiteView';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -1846,6 +1848,24 @@ export default function App() {
             report={report}
             onNavigateToScanner={() => setActiveTab('scanner')}
             onNavigateToEndpoints={() => setActiveTab('endpoints')}
+          />
+        )}
+
+        {activeTab === 'ngfw' && (
+          <NgfwSuiteView
+            report={report}
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onNavigateToEndpoints={() => setActiveTab('endpoints')}
+            onNavigateToSecurityOnion={() => setActiveTab('securityonion')}
+          />
+        )}
+
+        {activeTab === 'edr' && (
+          <EdrSuiteView
+            report={report}
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onNavigateToSecurityOnion={() => setActiveTab('securityonion')}
+            onNavigateToNgfw={() => setActiveTab('ngfw')}
           />
         )}
 
