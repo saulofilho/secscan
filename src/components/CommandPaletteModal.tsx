@@ -32,7 +32,8 @@ import {
   ShieldCheck,
   Crosshair,
   Radio,
-  Zap
+  Zap,
+  Globe
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
 
@@ -415,6 +416,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           setActiveTab('crowdstrike');
         },
         keywords: ['crowdstrike', 'falcon', 'edr', 'xdr', 'ioa', 'indicadores de ataque', 'process tree', 'containment', 'isolamento', 'rtr', 'threat intel', 'adversarios', 'overwatch']
+      },
+      {
+        id: 'nav-nmap',
+        title: 'Módulo: Nmap (Network Discovery & Port Recon Suite)',
+        subtitle: 'Auditoria de portas abertas, fingerprint de SO, banners, scripts NSE e topologia de rede',
+        category: 'Navegação',
+        icon: Globe,
+        badge: 'Port / Host Recon',
+        badgeColor: 'bg-[#00FF41]/15 text-[#00FF41] border-[#00FF41]/30',
+        action: () => {
+          onClose();
+          setActiveTab('nmap');
+        },
+        keywords: ['nmap', 'portas', 'scan', 'network', 'rede', 'recon', 'banner', 'nse', 'fingerprint', 'os', 'topologia', 'port scanner']
       },
       {
         id: 'nav-rules',

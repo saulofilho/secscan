@@ -22,7 +22,8 @@ import {
   Command,
   Keyboard,
   Radio,
-  Zap
+  Zap,
+  Globe
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
 
@@ -77,6 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'frameworks', label: 'Frameworks (MITRE/NIST/OWASP)', icon: ShieldCheck },
     { id: 'securityonion', label: 'Security Onion (SOC)', icon: Radio, badge: report.findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length },
     { id: 'crowdstrike', label: 'CrowdStrike (EDR/IOA)', icon: Zap, badge: 3 },
+    { id: 'nmap', label: 'Nmap (Network Suite)', icon: Globe, badge: 'Recon' },
     { id: 'rules', label: 'Regras Regex', icon: SlidersHorizontal },
     { id: 'cli', label: 'Terminal CLI', icon: Terminal },
     { id: 'cicd', label: 'CI/CD & Cloud', icon: CloudCog },
