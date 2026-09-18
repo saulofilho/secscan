@@ -35,7 +35,8 @@ import {
   Zap,
   Globe,
   FileSearch,
-  Flame
+  Flame,
+  Binary
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
 
@@ -474,6 +475,48 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           setActiveTab('edr');
         },
         keywords: ['edr', 'endpoint', 'processo', 'tree', 'threat hunting', 'hunting', 'yara', 'dump', 'memoria', 'mitre', 'ioa', 'kql', 'containment', 'quarantine', 'sentinelone', 'crowdstrike', 'carbon black', 'defender']
+      },
+      {
+        id: 'nav-idsips',
+        title: 'Módulo: IDS/IPS (Snort & Suricata Signature Engine)',
+        subtitle: 'Inspeção profunda de pacotes (DPI), regras Snort/Suricata, alertas e drops inline, decodificador PCAP e detecção de anomalias',
+        category: 'Navegação',
+        icon: Binary,
+        badge: 'IDS / IPS',
+        badgeColor: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('idsips');
+        },
+        keywords: ['ids', 'ips', 'snort', 'suricata', 'dpi', 'pcap', 'hex', 'drop', 'reject', 'inline', 'signature', 'anomalia', 'zeek', 'bro']
+      },
+      {
+        id: 'nav-dnssec',
+        title: 'Módulo: DNS Security (RPZ, Sinkhole & DNSSEC)',
+        subtitle: 'Proteção contra exfiltração por tunelamento DNS, detecção heurística DGA via ML, Response Policy Zones (RPZ) e validação de cadeia DNSSEC',
+        category: 'Navegação',
+        icon: Globe,
+        badge: 'DNS Security',
+        badgeColor: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('dnssec');
+        },
+        keywords: ['dns', 'dnssec', 'sinkhole', 'rpz', 'dga', 'tunnel', 'tunelamento', 'exfiltracao', 'doh', 'dot', 'rrsig', 'dnskey', 'ksk', 'zsk', 'shannon']
+      },
+      {
+        id: 'nav-waf',
+        title: 'Módulo: WAF (Web Application Firewall - L7)',
+        subtitle: 'Proteção OWASP CRS v3.3, mitigação de SQLi, XSS, RCE, SSRF, Virtual Patching de CVEs, Rate Limiting e gestão de bots',
+        category: 'Navegação',
+        icon: ShieldCheck,
+        badge: 'WAF L7',
+        badgeColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('waf');
+        },
+        keywords: ['waf', 'modsecurity', 'coreruleset', 'crs', 'sqli', 'xss', 'rce', 'ssrf', 'rate limit', 'virtual patch', 'cloudflare', 'akamai', 'imperva', 'bot']
       },
       {
         id: 'nav-rules',

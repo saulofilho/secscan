@@ -47,6 +47,10 @@ import { NmapNetworkSuiteView } from './components/NmapNetworkSuiteView';
 import { NiktoWebScannerView } from './components/NiktoWebScannerView';
 import { NgfwSuiteView } from './components/NgfwSuiteView';
 import { EdrSuiteView } from './components/EdrSuiteView';
+import { IdsIpsSuiteView } from './components/IdsIpsSuiteView';
+import { DnsSecuritySuiteView } from './components/DnsSecuritySuiteView';
+import { WafSuiteView } from './components/WafSuiteView';
+import { SdwanSuiteView } from './components/SdwanSuiteView';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -1866,6 +1870,37 @@ export default function App() {
             onNavigateToScanner={() => setActiveTab('scanner')}
             onNavigateToSecurityOnion={() => setActiveTab('securityonion')}
             onNavigateToNgfw={() => setActiveTab('ngfw')}
+          />
+        )}
+
+        {activeTab === 'idsips' && (
+          <IdsIpsSuiteView
+            report={report}
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onNavigateToSecurityOnion={() => setActiveTab('securityonion')}
+            onNavigateToNgfw={() => setActiveTab('ngfw')}
+            onNavigateToEdr={() => setActiveTab('edr')}
+          />
+        )}
+
+        {activeTab === 'dnssec' && (
+          <DnsSecuritySuiteView
+            report={report}
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onNavigateToSecurityOnion={() => setActiveTab('securityonion')}
+            onNavigateToNgfw={() => setActiveTab('ngfw')}
+            onNavigateToIdsIps={() => setActiveTab('idsips')}
+          />
+        )}
+
+        {activeTab === 'waf' && (
+          <WafSuiteView
+            report={report}
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onNavigateToSecurityOnion={() => setActiveTab('securityonion')}
+            onNavigateToNgfw={() => setActiveTab('ngfw')}
+            onNavigateToIdsIps={() => setActiveTab('idsips')}
+            onNavigateToDns={() => setActiveTab('dnssec')}
           />
         )}
 

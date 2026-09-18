@@ -26,7 +26,8 @@ import {
   Globe,
   FileSearch,
   Flame,
-  Crosshair
+  Crosshair,
+  Binary
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
 
@@ -85,6 +86,10 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'nmap', label: 'Nmap (Network Suite)', icon: Globe, badge: 'Recon' },
     { id: 'nikto', label: 'Nikto (Web Scanner)', icon: FileSearch, badge: 'Audit' },
     { id: 'ngfw', label: 'NGFW (Next-Gen Firewall)', icon: Flame, badge: 'L7/IPS' },
+    { id: 'idsips', label: 'IDS/IPS (Snort/Suricata)', icon: Binary, badge: 'DPI' },
+    { id: 'dnssec', label: 'DNS Security (RPZ/DNSSEC)', icon: Globe, badge: 'DoH' },
+    { id: 'waf', label: 'WAF (ModSecurity CRS)', icon: ShieldCheck, badge: 'OWASP' },
+    { id: 'sdwan', label: 'SD-WAN (Fabric & Steering)', icon: Network, badge: 'Overlay' },
     { id: 'rules', label: 'Regras Regex', icon: SlidersHorizontal },
     { id: 'cli', label: 'Terminal CLI', icon: Terminal },
     { id: 'cicd', label: 'CI/CD & Cloud', icon: CloudCog },
