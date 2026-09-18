@@ -14,6 +14,7 @@ import {
   CheckCircle2, 
   AlertTriangle,
   RotateCcw,
+  Trash2,
   Compass,
   Ban,
   BookOpen,
@@ -34,6 +35,7 @@ interface HeaderProps {
   onRunScan: () => void;
   onOpenExport: () => void;
   onResetWorkspace: () => void;
+  onClearWorkspace?: () => void;
   onOpenTour: () => void;
   onOpenIgnoreModal?: () => void;
   activeIgnoreCount?: number;
@@ -51,6 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
   onRunScan,
   onOpenExport,
   onResetWorkspace,
+  onClearWorkspace,
   onOpenTour,
   onOpenIgnoreModal,
   activeIgnoreCount,
@@ -313,6 +316,18 @@ export const Header: React.FC<HeaderProps> = ({
                 className="h-8 w-8 rounded flex items-center justify-center text-zinc-400 hover:text-white bg-[#0F0F0F] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#444] transition-colors cursor-pointer shrink-0"
               >
                 <Keyboard className="w-3.5 h-3.5 text-zinc-400" />
+              </button>
+            )}
+
+            {/* Clear Workspace (Zerar Plataforma) */}
+            {onClearWorkspace && (
+              <button
+                id="btn-header-clear-workspace"
+                onClick={onClearWorkspace}
+                title="Limpar workspace e começar com a plataforma zerada"
+                className="h-8 w-8 rounded flex items-center justify-center text-rose-500/70 hover:text-rose-400 bg-[#0F0F0F] hover:bg-rose-950/40 border border-[#2A2A2A] hover:border-rose-800/60 transition-colors cursor-pointer shrink-0"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
 

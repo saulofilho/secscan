@@ -41,9 +41,11 @@ import {
   Scale,
   Grid,
   Ticket,
-  ListOrdered
+  ListOrdered,
+  Radio
 } from 'lucide-react';
 import { ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem } from '../types';
+import { ThreatIntelligenceDashboard } from './ThreatIntelligenceDashboard';
 import { BreachHeatmap } from './BreachHeatmap';
 import { VulnerabilityHeatmap } from './VulnerabilityHeatmap';
 import { VulnerabilitySeverityPieChart } from './VulnerabilitySeverityPieChart';
@@ -554,6 +556,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             >
               <Activity className="w-3 h-3 text-[#00FF41]" />
               <span>CI/CD HEALTH &darr;</span>
+            </button>
+            <button
+              id="dashboard-header-threat-intel-btn"
+              onClick={() => {
+                const el = document.getElementById('threat-intel-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="text-[10px] font-mono text-white hover:text-[#00FF41] bg-[#141414] hover:bg-[#1A1A1A] px-2 py-0.5 border border-[#333] hover:border-[#00FF41]/50 uppercase font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+              title="Visualizar Inteligência de Ameaças OSINT em Tempo Real (AlienVault OTX, Abuse.ch, CISA KEV)"
+            >
+              <Radio className="w-3 h-3 text-[#00FF41]" />
+              <span>THREAT INTEL (OSINT) &darr;</span>
             </button>
             <button
               onClick={() => {
@@ -1296,6 +1310,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           onNavigateToTab('scanner');
         }}
         onNavigateToScanner={() => onNavigateToTab('scanner')}
+        onNavigateToFile={onNavigateToFile}
+        onNavigateToTab={onNavigateToTab}
+      />
+
+      {/* Real-time Threat Intelligence & OSINT Feeds: AlienVault OTX, Abuse.ch (URLhaus, ThreatFox, Feodo), CISA KEV */}
+      <ThreatIntelligenceDashboard
+        report={report}
         onNavigateToFile={onNavigateToFile}
         onNavigateToTab={onNavigateToTab}
       />

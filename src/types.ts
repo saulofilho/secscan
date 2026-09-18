@@ -761,6 +761,47 @@ export interface OwaspWstgTestCase {
   correlatedRules?: string[];
 }
 
+export type ThreatIntelSource = 'ALIENVAULT_OTX' | 'ABUSE_CH_URLHAUS' | 'ABUSE_CH_THREATFOX' | 'ABUSE_CH_FEODO' | 'CISA_KEV';
+
+export type ThreatIndicatorType = 'IP' | 'DOMAIN' | 'URL' | 'HASH_SHA256' | 'CVE' | 'API_SIGNATURE';
+
+export interface ThreatIntelActivity {
+  id: string;
+  source: ThreatIntelSource;
+  sourceName: string;
+  indicator: string;
+  indicatorType: ThreatIndicatorType;
+  threatType: string;
+  malwareFamily?: string;
+  confidenceScore: number; // 0 - 100
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  title: string;
+  description: string;
+  firstSeen: string;
+  lastSeen: string;
+  tags: string[];
+  referenceUrl: string;
+  asnOrCountry?: string;
+  status: 'ACTIVE' | 'INVESTIGATING' | 'MITIGATED';
+  matchedFindingId?: string;
+  matchedFindingTitle?: string;
+  defenseAction: string;
+}
+
+export interface ThreatIntelFeedSummary {
+  totalIndicators: number;
+  activeCampaignsCount: number;
+  lastSyncTimestamp: string;
+  sourcesOnline: {
+    name: string;
+    source: ThreatIntelSource;
+    status: 'ONLINE' | 'DEGRADED' | 'RATE_LIMITED';
+    indicatorsCount: number;
+    latencyMs: number;
+  }[];
+}
+
+
 
 
 

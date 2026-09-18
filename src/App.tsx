@@ -28,6 +28,7 @@ import { CliTerminalView } from './components/CliTerminalView';
 import { CiCdIntegrationView } from './components/CiCdIntegrationView';
 import { ExportModal } from './components/ExportModal';
 import { QuickTourModal } from './components/QuickTourModal';
+import { WelcomeWorkspaceModal } from './components/WelcomeWorkspaceModal';
 import { GlobalIgnoreModal } from './components/GlobalIgnoreModal';
 import { SecurityGlossaryModal } from './components/SecurityGlossary';
 import { SnippetHighlighter } from './components/SnippetHighlighter';
@@ -316,6 +317,21 @@ export default function App() {
       };
     });
   }, [validationNotice?.details, noticeSeverityFilters]);
+  const [showWelcomeModal, setShowWelcomeModal] = useState<boolean>(() => {
+    return !safeGetItem('secscan_welcome_completed');
+  });
+
+  const handleExploreWithMock = () => {
+    safeSetItem('secscan_welcome_completed', 'true');
+    setShowWelcomeModal(false);
+  };
+
+  const handleStartCleanWorkspace = () => {
+    safeSetItem('secscan_welcome_completed', 'true');
+    setShowWelcomeModal(false);
+    handleClearAllFilesAndValidation();
+  };
+
   const [showTour, setShowTour] = useState<boolean>(() => {
     return !safeGetItem('secscan_tour_completed');
   });
@@ -1154,6 +1170,7 @@ export default function App() {
         onRunScan={() => executeScan(files, rules, ignorePatterns)}
         onOpenExport={() => setShowExportModal(true)}
         onResetWorkspace={handleResetWorkspace}
+        onClearWorkspace={handleClearAllFilesAndValidation}
         onOpenTour={() => setShowTour(true)}
         onOpenIgnoreModal={() => setShowIgnoreModal(true)}
         activeIgnoreCount={ignorePatterns.filter(p => p.enabled).length}
@@ -1893,9 +1910,17 @@ export default function App() {
         />
       )}
 
+      {/* Welcome & Workspace Mode Selection Modal */}
+      <WelcomeWorkspaceModal
+        isOpen={showWelcomeModal}
+        onExploreWithMock={handleExploreWithMock}
+        onStartCleanWorkspace={handleStartCleanWorkspace}
+        onClose={handleExploreWithMock}
+      />
+
       {/* Quick Tour Modal */}
       <QuickTourModal
-        isOpen={showTour}
+        isOpen={showTour && !showWelcomeModal}
         onClose={handleCloseTour}
         onNavigateToTab={setActiveTab}
       />
@@ -1930,7 +1955,9 @@ export default function App() {
         onOpenIgnoreModal={() => setShowIgnoreModal(true)}
         onOpenGlossary={() => handleOpenGlossary()}
         onOpenTour={() => setShowTour(true)}
+        onOpenWelcomeModal={() => setShowWelcomeModal(true)}
         onResetWorkspace={handleResetWorkspace}
+        onClearWorkspace={handleClearAllFilesAndValidation}
         onOpenShortcuts={() => setShowShortcutsModal(true)}
         files={files}
         onSelectFile={(f) => {

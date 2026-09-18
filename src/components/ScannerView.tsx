@@ -196,7 +196,13 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
           </div>
 
           <div className="max-h-[500px] overflow-y-auto">
-            {safeFiles.map((file) => {
+            {safeFiles.length === 0 ? (
+              <div className="p-6 text-center text-zinc-500 font-mono text-xs space-y-2">
+                <FileCode className="w-8 h-8 mx-auto text-zinc-700 mb-1" />
+                <p className="text-zinc-400 font-bold">Nenhum arquivo no workspace</p>
+                <p className="text-[10px] text-zinc-600">Carregue arquivos ou cole código para iniciar a análise.</p>
+              </div>
+            ) : safeFiles.map((file) => {
               const isSelected = activeFile?.path === file.path;
               const fileFindingCount = safeFindings.filter(f => f.file === file.path).length;
 
@@ -247,14 +253,14 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         <div className="bg-[#0A0A0A] p-4 border border-[#222] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2.5">
-              <span className="font-mono text-sm font-black text-white">{activeFile?.name}</span>
+              <span className="font-mono text-sm font-black text-white">{activeFile?.name || 'Nenhum arquivo selecionado'}</span>
               {activeFile?.isIgnored && (
                 <span className="px-2 py-0.5 text-[9px] font-mono font-bold bg-[#141414] text-[#888] border border-[#333]">
                   DEPENDÊNCIA IGNORADA: {activeFile.ignoreReason}
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-[#666] font-mono mt-0.5">{activeFile?.path}</p>
+            <p className="text-[11px] text-[#666] font-mono mt-0.5">{activeFile?.path || 'Selecione ou carregue um arquivo para inspecionar'}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -330,44 +336,52 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
           </div>
 
           <div className="p-4 font-mono text-xs overflow-x-auto max-h-[460px] leading-relaxed">
-            {lines.map((lineContent, idx) => {
-              const lineNum = idx + 1;
-              const lineFindings = fileFindings.filter(f => f.line === lineNum);
-              const hasAlert = lineFindings.length > 0;
+            {lines.length === 0 ? (
+              <div className="p-8 text-center text-zinc-500 space-y-2">
+                <Code2 className="w-8 h-8 mx-auto text-zinc-700" />
+                <p className="text-zinc-400 font-bold">Nenhum código para exibir</p>
+                <p className="text-[11px] text-zinc-600">Selecione um arquivo da lista ou adicione um novo arquivo para visualizar o código.</p>
+              </div>
+            ) : (
+              lines.map((lineContent, idx) => {
+                const lineNum = idx + 1;
+                const lineFindings = fileFindings.filter(f => f.line === lineNum);
+                const hasAlert = lineFindings.length > 0;
 
-              return (
-                <div
-                  key={idx}
-                  className={`flex items-start group py-0.5 px-2 -mx-2 transition-colors ${
-                    hasAlert ? 'bg-[#220700] border-l-2 border-[#FF3E00] text-rose-100' : 'hover:bg-[#111]'
-                  }`}
-                >
-                  {/* Line Number */}
-                  <span className={`w-10 text-right pr-4 shrink-0 select-none ${
-                    hasAlert ? 'text-[#FF3E00] font-bold' : 'text-[#444]'
-                  }`}>
-                    {lineNum}
-                  </span>
+                return (
+                  <div
+                    key={idx}
+                    className={`flex items-start group py-0.5 px-2 -mx-2 transition-colors ${
+                      hasAlert ? 'bg-[#220700] border-l-2 border-[#FF3E00] text-rose-100' : 'hover:bg-[#111]'
+                    }`}
+                  >
+                    {/* Line Number */}
+                    <span className={`w-10 text-right pr-4 shrink-0 select-none ${
+                      hasAlert ? 'text-[#FF3E00] font-bold' : 'text-[#444]'
+                    }`}>
+                      {lineNum}
+                    </span>
 
-                  {/* Line Code */}
-                  <div className="flex-1 whitespace-pre break-all">
-                    {hasAlert ? (
-                      <span className="flex items-center gap-2">
-                        <AlertTriangle className="w-3.5 h-3.5 text-[#FF3E00] shrink-0 inline" />
-                        <span>
-                          {showRawSecret 
-                            ? lineContent 
-                            : lineFindings.reduce((acc, f) => acc.replace(f.matchedSecret, f.maskedSecret), lineContent)
-                          }
+                    {/* Line Code */}
+                    <div className="flex-1 whitespace-pre break-all">
+                      {hasAlert ? (
+                        <span className="flex items-center gap-2">
+                          <AlertTriangle className="w-3.5 h-3.5 text-[#FF3E00] shrink-0 inline" />
+                          <span>
+                            {showRawSecret 
+                              ? lineContent 
+                              : lineFindings.reduce((acc, f) => acc.replace(f.matchedSecret, f.maskedSecret), lineContent)
+                            }
+                          </span>
                         </span>
-                      </span>
-                    ) : (
-                      <span>{lineContent}</span>
-                    )}
+                      ) : (
+                        <span>{lineContent}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 

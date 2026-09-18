@@ -7,6 +7,7 @@ import {
   BookOpen,
   Ban,
   RotateCcw,
+  Trash2,
   Compass,
   FileCode2,
   ShieldAlert,
@@ -58,7 +59,9 @@ interface CommandPaletteModalProps {
   onOpenIgnoreModal: () => void;
   onOpenGlossary: () => void;
   onOpenTour: () => void;
+  onOpenWelcomeModal?: () => void;
   onResetWorkspace: () => void;
+  onClearWorkspace?: () => void;
   onOpenShortcuts: () => void;
   files: ScannedFile[];
   onSelectFile: (file: ScannedFile) => void;
@@ -77,7 +80,9 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   onOpenIgnoreModal,
   onOpenGlossary,
   onOpenTour,
+  onOpenWelcomeModal,
   onResetWorkspace,
+  onClearWorkspace,
   onOpenShortcuts,
   files,
   onSelectFile,
@@ -203,6 +208,18 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         },
         keywords: ['tutorial', 'tour', 'guia', 'passo a passo', 'ajuda', 'introducao']
       },
+      ...(onOpenWelcomeModal ? [{
+        id: 'cmd-open-welcome',
+        title: 'Modal de Boas-Vindas & Configuração do Workspace',
+        subtitle: 'Alternar entre dados demonstrativos de mock ou começar zerado',
+        category: 'Ações Rápidas' as const,
+        icon: Sparkles,
+        action: () => {
+          onClose();
+          onOpenWelcomeModal();
+        },
+        keywords: ['welcome', 'boas vindas', 'mock', 'zerar', 'configuracao', 'inicio', 'apresentacao']
+      }] : []),
       {
         id: 'cmd-reset-demo',
         title: 'Restaurar Arquivos de Exemplo (Workspace Demo)',
@@ -216,6 +233,18 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         },
         keywords: ['reset', 'restaurar', 'demo', 'exemplo', 'padrao', 'workspace']
       },
+      ...(onClearWorkspace ? [{
+        id: 'cmd-clear-workspace',
+        title: 'Limpar Workspace (Zerar Plataforma)',
+        subtitle: 'Remove todos os arquivos e dados de mock para iniciar limpo',
+        category: 'Ações Rápidas' as const,
+        icon: Trash2,
+        action: () => {
+          onClose();
+          onClearWorkspace();
+        },
+        keywords: ['limpar', 'zerar', 'clean', 'clear', 'remover', 'vazio', 'novo']
+      }] : []),
 
       // Navigation Modules
       {
@@ -248,6 +277,24 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           }, 100);
         },
         keywords: ['cicd', 'pipeline', 'health', 'github actions', 'workflows', 'runs', 'logs', 'success rate', 'actions']
+      },
+      {
+        id: 'nav-threat-intel',
+        title: 'Módulo: Threat Intelligence & Feeds OSINT',
+        subtitle: 'AlienVault OTX, Abuse.ch URLhaus, ThreatFox, Feodo e CISA KEV com correlação em tempo real',
+        category: 'Navegação',
+        icon: Radio,
+        badge: 'OSINT Live',
+        badgeColor: 'bg-[#00FF41]/15 text-[#00FF41] border-[#00FF41]/30',
+        action: () => {
+          onClose();
+          setActiveTab('dashboard');
+          setTimeout(() => {
+            const el = document.getElementById('threat-intel-section');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        },
+        keywords: ['threat', 'intelligence', 'osint', 'alienvault', 'otx', 'abuse.ch', 'urlhaus', 'threatfox', 'feodo', 'cisa', 'ioc', 'c2']
       },
       {
         id: 'nav-scan-history',
