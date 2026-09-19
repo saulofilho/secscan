@@ -51,6 +51,7 @@ import { IdsIpsSuiteView } from './components/IdsIpsSuiteView';
 import { DnsSecuritySuiteView } from './components/DnsSecuritySuiteView';
 import { WafSuiteView } from './components/WafSuiteView';
 import { SdwanSuiteView } from './components/SdwanSuiteView';
+import { IastSuiteView } from './components/IastSuiteView';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -1828,6 +1829,15 @@ export default function App() {
                 setActiveTab('scanner');
               }
             }}
+          />
+        )}
+
+        {activeTab === 'iast' && (
+          <IastSuiteView
+            report={report}
+            files={files}
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onNavigateToDataFlow={() => setActiveTab('dataflow')}
           />
         )}
 

@@ -27,7 +27,8 @@ import {
   FileSearch,
   Flame,
   Crosshair,
-  Binary
+  Binary,
+  Activity
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
 
@@ -79,6 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'endpoints', label: 'LinkFinder (APIs)', icon: Route, badge: report.apiEndpoints.length },
     { id: 'jsminer', label: 'JS Miner', icon: Boxes, badge: report.jsMiner?.totalAssetsCount },
     { id: 'dataflow', label: 'Fluxo & Sinks (D3)', icon: Network, badge: report.dataFlowGraph?.metrics.totalTaintFlows },
+    { id: 'iast', label: 'IAST (Runtime Hooks)', icon: Activity, badge: report.iastReport?.findings.length ? `${report.iastReport.findings.length} hooks` : 'IAST' },
     { id: 'frameworks', label: 'Frameworks (MITRE/NIST/OWASP)', icon: ShieldCheck },
     { id: 'securityonion', label: 'Security Onion (SOC)', icon: Radio, badge: report.findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length },
     { id: 'crowdstrike', label: 'CrowdStrike (EDR/IOA)', icon: Zap, badge: 3 },

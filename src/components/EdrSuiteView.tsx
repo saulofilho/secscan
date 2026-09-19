@@ -33,23 +33,37 @@ import {
   ArrowRight,
   GitBranch,
   Database,
-  Share2
+  Share2,
+  Laptop,
+  CheckSquare,
+  Send,
+  Workflow,
+  Sparkles,
+  ShieldCheck,
+  HardDrive
 } from 'lucide-react';
-import { ScanReport, ScanFinding } from '../types';
+import { ScanReport } from '../types';
 import {
   EdrProcessNode,
   EdrBehavioralRule,
   EdrMemoryDumpAnalysis,
   EdrThreatHuntingQuery,
   EdrLiveTelemetry,
-  EdrProcessAction
+  EdrHostEndpoint,
+  EdrResponsePlaybook,
+  EdrIocItem,
+  EdrRtrCommandResult
 } from '../types/edr';
 import {
   INITIAL_PROCESS_TREES,
   INITIAL_BEHAVIORAL_RULES,
   INITIAL_MEMORY_DUMPS,
   INITIAL_HUNTING_QUERIES,
-  INITIAL_EDR_TELEMETRY
+  INITIAL_EDR_TELEMETRY,
+  INITIAL_HOST_ENDPOINTS,
+  INITIAL_RESPONSE_PLAYBOOKS,
+  INITIAL_IOC_ITEMS,
+  INITIAL_RTR_COMMANDS
 } from '../lib/edrEngine';
 
 interface EdrSuiteViewProps {
@@ -59,6 +73,17 @@ interface EdrSuiteViewProps {
   onNavigateToNgfw?: () => void;
 }
 
+type EdrSubTab = 
+  | 'process_tree' 
+  | 'behavioral_rules' 
+  | 'threat_hunting' 
+  | 'memory_forensics' 
+  | 'endpoints_inventory'
+  | 'response_playbooks'
+  | 'rtr_terminal'
+  | 'ioc_vault'
+  | 'isolation_matrix';
+
 export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
   report,
   onNavigateToScanner,
@@ -66,14 +91,18 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
   onNavigateToNgfw
 }) => {
   // Navigation tabs
-  const [activeSubTab, setActiveSubTab] = useState<'process_tree' | 'behavioral_rules' | 'threat_hunting' | 'memory_forensics' | 'isolation_matrix'>('process_tree');
+  const [activeSubTab, setActiveSubTab] = useState<EdrSubTab>('process_tree');
 
-  // State
+  // Core EDR Datasets
   const [processTree, setProcessTree] = useState<EdrProcessNode[]>(INITIAL_PROCESS_TREES);
   const [behavioralRules, setBehavioralRules] = useState<EdrBehavioralRule[]>(INITIAL_BEHAVIORAL_RULES);
   const [memoryDumps, setMemoryDumps] = useState<EdrMemoryDumpAnalysis[]>(INITIAL_MEMORY_DUMPS);
   const [huntingQueries, setHuntingQueries] = useState<EdrThreatHuntingQuery[]>(INITIAL_HUNTING_QUERIES);
   const [telemetry, setTelemetry] = useState<EdrLiveTelemetry>(INITIAL_EDR_TELEMETRY);
+  const [endpoints, setEndpoints] = useState<EdrHostEndpoint[]>(INITIAL_HOST_ENDPOINTS);
+  const [playbooks, setPlaybooks] = useState<EdrResponsePlaybook[]>(INITIAL_RESPONSE_PLAYBOOKS);
+  const [iocList, setIocList] = useState<EdrIocItem[]>(INITIAL_IOC_ITEMS);
+  const [rtrHistory, setRtrHistory] = useState<EdrRtrCommandResult[]>(INITIAL_RTR_COMMANDS);
 
   // Selected process inspection
   const [selectedProcessPid, setSelectedProcessPid] = useState<number>(7921);
@@ -83,6 +112,20 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
   const [customHuntingQuery, setCustomHuntingQuery] = useState<string>('EventType == "ProcessCreation" and ThreatScore > 70');
   const [huntingExecuting, setHuntingExecuting] = useState<boolean>(false);
   const [huntingResultCount, setHuntingResultCount] = useState<number | null>(null);
+
+  // RTR Terminal Interactive state
+  const [selectedHostForRtr, setSelectedHostForRtr] = useState<string>('prod-api-gateway-01');
+  const [rtrCommandInput, setRtrCommandInput] = useState<string>('');
+  const [isExecutingRtr, setIsExecutingRtr] = useState<boolean>(false);
+
+  // New IOC state
+  const [newIocType, setNewIocType] = useState<EdrIocItem['type']>('SHA256');
+  const [newIocValue, setNewIocValue] = useState<string>('');
+  const [newIocThreat, setNewIocThreat] = useState<string>('');
+  const [showAddIocModal, setShowAddIocModal] = useState<boolean>(false);
+
+  // Endpoint filter
+  const [endpointSearch, setEndpointSearch] = useState<string>('');
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -146,13 +189,120 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
     }, 600);
   };
 
+  // Host Isolation Toggle
+  const handleToggleIsolation = (endpointId: string) => {
+    setEndpoints(prev => prev.map(ep => {
+      if (ep.id === endpointId) {
+        const newStatus = ep.isolationStatus === 'NORMAL' ? 'ISOLATED' : 'NORMAL';
+        const newMode = newStatus === 'ISOLATED' ? 'KERNEL_FILTER' : 'NONE';
+        return {
+          ...ep,
+          isolationStatus: newStatus,
+          containmentMode: newMode
+        };
+      }
+      return ep;
+    }));
+  };
+
+  // Run Playbook
+  const handleRunPlaybook = (playbookId: string) => {
+    setPlaybooks(prev => prev.map(pb => {
+      if (pb.id === playbookId) {
+        return {
+          ...pb,
+          status: 'EXECUTING'
+        };
+      }
+      return pb;
+    }));
+
+    setTimeout(() => {
+      setPlaybooks(prev => prev.map(pb => {
+        if (pb.id === playbookId) {
+          return {
+            ...pb,
+            status: 'COMPLETED',
+            lastRun: `Executado agora com sucesso em ${endpoints.length} hosts.`
+          };
+        }
+        return pb;
+      }));
+    }, 1200);
+  };
+
+  // Run RTR Command
+  const handleExecuteRtr = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!rtrCommandInput.trim() || isExecutingRtr) return;
+
+    const cmd = rtrCommandInput.trim();
+    setIsExecutingRtr(true);
+
+    setTimeout(() => {
+      let outputText = '';
+      if (cmd.startsWith('ps')) {
+        outputText = `PID  PPID USER     %CPU %MEM CMD\n 5124  2410 app-runner 14.2  4.0 node dist/server.cjs\n 2410  1402 root        1.8  1.4 /usr/bin/dockerd\n 1402     1 root        0.1  0.3 /sbin/init`;
+      } else if (cmd.startsWith('kill') || cmd.startsWith('pkill')) {
+        outputText = `[eBPF Sensor] Process signal sent successfully. Kernel hook confirmation: PID terminated.`;
+      } else if (cmd.startsWith('netstat') || cmd.startsWith('ss')) {
+        outputText = `Netid State  Recv-Q Send-Q Local Address:Port  Peer Address:Port\ntcp   LISTEN 0      128    0.0.0.0:3000        0.0.0.0:*`;
+      } else if (cmd.startsWith('isolate')) {
+        outputText = `[Containment] Host ${selectedHostForRtr} has been ISOLATED at kernel network driver level. All non-EDR traffic dropped.`;
+      } else if (cmd.startsWith('quarantine')) {
+        outputText = `[Forensics] File marked as immutable (chattr +i) and placed into /var/quarantine/edr-vault.enc.`;
+      } else {
+        outputText = `[Host: ${selectedHostForRtr}] Command executed via secure RTR channel.\nStdout: OK. Process exit code 0.`;
+      }
+
+      const newEntry: EdrRtrCommandResult = {
+        id: `RTR-${Date.now()}`,
+        command: cmd,
+        output: outputText,
+        timestamp: new Date().toLocaleTimeString(),
+        status: 'SUCCESS',
+        exitCode: 0
+      };
+
+      setRtrHistory(prev => [newEntry, ...prev]);
+      setRtrCommandInput('');
+      setIsExecutingRtr(false);
+    }, 500);
+  };
+
+  // Add IOC
+  const handleAddIoc = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newIocValue.trim()) return;
+
+    const newIoc: EdrIocItem = {
+      id: `IOC-${Date.now()}`,
+      type: newIocType,
+      value: newIocValue.trim(),
+      threatType: newIocThreat.trim() || 'Ameaça Identificada por Investigador',
+      confidence: 95,
+      mitreRef: 'T1059',
+      action: 'BLOCK_AND_KILL',
+      dateAdded: 'Agora'
+    };
+
+    setIocList(prev => [newIoc, ...prev]);
+    setNewIocValue('');
+    setNewIocThreat('');
+    setShowAddIocModal(false);
+  };
+
   const handleExportForensicsReport = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
       telemetry,
+      endpoints,
       processTree,
       behavioralRules,
       memoryDumps,
-      huntingQueries
+      huntingQueries,
+      playbooks,
+      iocList,
+      rtrHistory
     }, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
@@ -161,6 +311,17 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
     downloadAnchor.click();
     downloadAnchor.remove();
   };
+
+  // Filtered Endpoints
+  const filteredEndpoints = useMemo(() => {
+    if (!endpointSearch.trim()) return endpoints;
+    const term = endpointSearch.toLowerCase();
+    return endpoints.filter(ep => 
+      ep.hostname.toLowerCase().includes(term) ||
+      ep.ip.toLowerCase().includes(term) ||
+      ep.os.toLowerCase().includes(term)
+    );
+  }, [endpoints, endpointSearch]);
 
   // Render Process Tree Node Recursively
   const renderTreeNode = (node: EdrProcessNode, depth: number = 0) => {
@@ -231,19 +392,19 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="p-2 rounded-lg bg-red-500/10 text-red-500 border border-red-500/30">
-                <Zap className="w-5 h-5 animate-pulse" />
+                <Crosshair className="w-5 h-5 animate-pulse" />
               </span>
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white font-mono">
-                    Endpoint Detection &amp; Response (EDR)
+                    SecScan EDR &amp; Live Response Suite
                   </h1>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/40 font-bold uppercase">
-                    eBPF Kernel Enclave
+                    eBPF Sensor Engine
                   </span>
                 </div>
                 <p className="text-xs text-zinc-400">
-                  Visibilidade profunda de processos, interceptação de chamadas de sistema, análise de memória RWX e caça a ameaças (Threat Hunting)
+                  Monitoramento profundo de endpoints, árvore de processos parent-child, Live Response Shell (RTR), forense de memória e contenção Zero Trust.
                 </p>
               </div>
             </div>
@@ -251,6 +412,10 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
 
           {/* Quick Metrics Bar */}
           <div className="flex items-center gap-2 sm:gap-4 flex-wrap font-mono">
+            <div className="px-3 py-1.5 rounded-lg bg-[#111] border border-[#222] text-center">
+              <span className="text-[10px] text-zinc-500 uppercase block">Hosts Monitorados</span>
+              <span className="text-sm font-bold text-white">{endpoints.length} ativos</span>
+            </div>
             <div className="px-3 py-1.5 rounded-lg bg-[#111] border border-[#222] text-center">
               <span className="text-[10px] text-zinc-500 uppercase block">Processos Ativos</span>
               <span className="text-sm font-bold text-white">{telemetry.totalMonitoredProcesses}</span>
@@ -260,13 +425,13 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
               <span className="text-sm font-bold text-red-400">{telemetry.blockedAttacksToday}</span>
             </div>
             <div className="px-3 py-1.5 rounded-lg bg-[#111] border border-[#222] text-center">
-              <span className="text-[10px] text-zinc-500 uppercase block">Quarentena Binária</span>
+              <span className="text-[10px] text-zinc-500 uppercase block">Quarentenas</span>
               <span className="text-sm font-bold text-amber-400">{telemetry.quarantinedBinaries}</span>
             </div>
             <button
               onClick={handleExportForensicsReport}
               className="h-9 px-3 rounded-lg bg-[#141414] hover:bg-[#1E1E1E] text-zinc-300 hover:text-white border border-[#333] font-mono text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Exportar dossiê forense EDR em JSON"
+              title="Exportar dossiê forense EDR completo em JSON"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Exportar Forense</span>
@@ -302,7 +467,19 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
           }`}
         >
           <GitBranch className="w-3.5 h-3.5" />
-          <span>Árvore de Execução &amp; Processos</span>
+          <span>Árvore de Processos</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('endpoints_inventory')}
+          className={`px-3 py-2 rounded-t-lg font-bold uppercase transition-colors flex items-center gap-1.5 cursor-pointer border-b-2 ${
+            activeSubTab === 'endpoints_inventory'
+              ? 'text-red-400 border-red-500 bg-[#0A0A0A]'
+              : 'text-zinc-400 border-transparent hover:text-white'
+          }`}
+        >
+          <Laptop className="w-3.5 h-3.5" />
+          <span>Inventário de Endpoints ({endpoints.length})</span>
         </button>
 
         <button
@@ -314,7 +491,19 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
           }`}
         >
           <Crosshair className="w-3.5 h-3.5" />
-          <span>Regras Comportamentais (IOA / MITRE) ({behavioralRules.length})</span>
+          <span>Regras IOA / MITRE ({behavioralRules.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('rtr_terminal')}
+          className={`px-3 py-2 rounded-t-lg font-bold uppercase transition-colors flex items-center gap-1.5 cursor-pointer border-b-2 ${
+            activeSubTab === 'rtr_terminal'
+              ? 'text-red-400 border-red-500 bg-[#0A0A0A]'
+              : 'text-zinc-400 border-transparent hover:text-white'
+          }`}
+        >
+          <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Real-Time Response (RTR Shell)</span>
         </button>
 
         <button
@@ -326,7 +515,31 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
           }`}
         >
           <Search className="w-3.5 h-3.5" />
-          <span>Threat Hunting (Busca Ativa de Ameaças)</span>
+          <span>Threat Hunting (KQL)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('response_playbooks')}
+          className={`px-3 py-2 rounded-t-lg font-bold uppercase transition-colors flex items-center gap-1.5 cursor-pointer border-b-2 ${
+            activeSubTab === 'response_playbooks'
+              ? 'text-red-400 border-red-500 bg-[#0A0A0A]'
+              : 'text-zinc-400 border-transparent hover:text-white'
+          }`}
+        >
+          <Workflow className="w-3.5 h-3.5 text-amber-400" />
+          <span>Playbooks de Resposta ({playbooks.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('ioc_vault')}
+          className={`px-3 py-2 rounded-t-lg font-bold uppercase transition-colors flex items-center gap-1.5 cursor-pointer border-b-2 ${
+            activeSubTab === 'ioc_vault'
+              ? 'text-red-400 border-red-500 bg-[#0A0A0A]'
+              : 'text-zinc-400 border-transparent hover:text-white'
+          }`}
+        >
+          <Database className="w-3.5 h-3.5 text-cyan-400" />
+          <span>Cofre de IOCs ({iocList.length})</span>
         </button>
 
         <button
@@ -338,7 +551,7 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
           }`}
         >
           <Cpu className="w-3.5 h-3.5" />
-          <span>Forense de Memória &amp; Dumps YARA ({memoryDumps.length})</span>
+          <span>Forense de Memória ({memoryDumps.length})</span>
         </button>
 
         <button
@@ -350,7 +563,7 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
           }`}
         >
           <ShieldAlert className="w-3.5 h-3.5" />
-          <span>Contenção &amp; Quarentena Host</span>
+          <span>Contenção Host</span>
         </button>
       </div>
 
@@ -471,7 +684,124 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
         </div>
       )}
 
-      {/* SUBTAB 2: Behavioral Rules (IOA / MITRE) */}
+      {/* SUBTAB 2: Endpoints Inventory */}
+      {activeSubTab === 'endpoints_inventory' && (
+        <div className="space-y-4">
+          <div className="bg-[#0E0E0E] p-4 rounded-xl border border-[#222] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-mono font-bold uppercase text-white flex items-center gap-2">
+                <Laptop className="w-4 h-4 text-red-500" />
+                <span>Inventário de Endpoints &amp; Sensores EDR</span>
+              </h2>
+              <p className="text-xs text-zinc-400">
+                Parque computacional sob monitoramento do agente eBPF com telemetria contínua de recursos e status de contenção.
+              </p>
+            </div>
+
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-zinc-500" />
+              <input
+                type="text"
+                placeholder="Filtrar por hostname, IP ou OS..."
+                value={endpointSearch}
+                onChange={(e) => setEndpointSearch(e.target.value)}
+                className="pl-9 pr-3 py-1.5 bg-[#141414] border border-[#333] rounded-lg text-xs text-white focus:outline-none focus:border-red-500 w-64 font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredEndpoints.map(ep => (
+              <div 
+                key={ep.id} 
+                className={`bg-[#0D0D0D] border rounded-xl p-4.5 space-y-3 font-mono text-xs transition-all ${
+                  ep.isolationStatus === 'ISOLATED'
+                    ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.15)]'
+                    : 'border-[#222] hover:border-[#333]'
+                }`}
+              >
+                <div className="flex items-center justify-between border-b border-[#1E1E1E] pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${ep.isolationStatus === 'ISOLATED' ? 'bg-red-500 animate-ping' : 'bg-emerald-500'}`} />
+                    <strong className="text-white text-sm">{ep.hostname}</strong>
+                    <span className="text-zinc-500 text-[10px]">({ep.ip})</span>
+                  </div>
+
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                    ep.isolationStatus === 'ISOLATED'
+                      ? 'bg-red-950 text-red-300 border border-red-800'
+                      : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                  }`}>
+                    {ep.isolationStatus === 'ISOLATED' ? 'CONTEÚDO ISOLADO' : 'NORMAL'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-zinc-400 text-[11px]">
+                  <div>
+                    <span className="text-zinc-500 text-[10px] uppercase block">Sistema Operacional:</span>
+                    <span className="text-zinc-200 truncate block">{ep.os}</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500 text-[10px] uppercase block">Versão do Agente:</span>
+                    <span className="text-cyan-400 font-semibold">{ep.agentVersion}</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500 text-[10px] uppercase block">Carga de CPU:</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${ep.cpuLoad > 80 ? 'bg-red-500' : 'bg-emerald-400'}`}
+                          style={{ width: `${Math.min(ep.cpuLoad, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-white font-bold">{ep.cpuLoad}%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500 text-[10px] uppercase block">Uso de Memória:</span>
+                    <span className="text-zinc-200 font-bold">{ep.memoryUsageMb} MB</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-[#1A1A1A] flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[10.5px]">
+                    <span className="text-zinc-500">Alertas Ativos:</span>
+                    <span className={`font-bold ${ep.activeAlertsCount > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {ep.activeAlertsCount}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setSelectedHostForRtr(ep.hostname);
+                        setActiveSubTab('rtr_terminal');
+                      }}
+                      className="px-2.5 py-1 rounded bg-[#181818] hover:bg-zinc-800 text-zinc-200 border border-[#333] text-[10.5px] font-bold cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <Terminal className="w-3 h-3 text-emerald-400" />
+                      <span>Abrir RTR</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleToggleIsolation(ep.id)}
+                      className={`px-2.5 py-1 rounded text-[10.5px] font-bold uppercase cursor-pointer border ${
+                        ep.isolationStatus === 'ISOLATED'
+                          ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700'
+                          : 'bg-red-900/60 text-red-200 border-red-800 hover:bg-red-800'
+                      }`}
+                    >
+                      {ep.isolationStatus === 'ISOLATED' ? 'Remover Isolamento' : 'Isolar Host'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* SUBTAB 3: Behavioral Rules (IOA / MITRE) */}
       {activeSubTab === 'behavioral_rules' && (
         <div className="space-y-4">
           <div className="bg-[#0E0E0E] p-4 rounded-xl border border-[#222] space-y-1">
@@ -538,7 +868,95 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
         </div>
       )}
 
-      {/* SUBTAB 3: Threat Hunting Console */}
+      {/* SUBTAB 4: Real-Time Response (RTR Shell) */}
+      {activeSubTab === 'rtr_terminal' && (
+        <div className="space-y-4 font-mono text-xs">
+          <div className="bg-[#0E0E0E] p-4 rounded-xl border border-[#222] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold uppercase text-white flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-emerald-400" />
+                <span>Real-Time Response (RTR Terminal)</span>
+              </h2>
+              <p className="text-xs text-zinc-400">
+                Sessão interativa direta com o sensor do endpoint para execução de comandos cirúrgicos de investigação e contenção remota.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-500 text-[10px] uppercase">Host Alvo:</span>
+              <select
+                value={selectedHostForRtr}
+                onChange={(e) => setSelectedHostForRtr(e.target.value)}
+                className="bg-[#141414] border border-[#333] rounded px-2.5 py-1 text-xs text-white focus:outline-none focus:border-red-500"
+              >
+                {endpoints.map(ep => (
+                  <option key={ep.id} value={ep.hostname}>
+                    {ep.hostname} ({ep.ip})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Terminal Console View */}
+          <div className="bg-[#050505] border border-[#222] rounded-xl overflow-hidden shadow-2xl">
+            <div className="bg-[#111] px-4 py-2 border-b border-[#222] flex items-center justify-between text-[11px]">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                <span className="text-zinc-400 font-bold ml-2">rtr-session://{selectedHostForRtr} (eBPF secure stream)</span>
+              </div>
+              <span className="text-emerald-400 font-bold">ONLINE [TLS 1.3 mTLS]</span>
+            </div>
+
+            {/* Terminal History */}
+            <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
+              <div className="text-zinc-500 text-[11px] leading-relaxed">
+                SecScan EDR Real-Time Response Shell v4.2.1-kernel<br />
+                Type &apos;help&apos;, &apos;ps&apos;, &apos;netstat&apos;, &apos;isolate&apos;, &apos;kill &lt;pid&gt;&apos; or &apos;quarantine &lt;path&gt;&apos;.<br />
+                ────────────────────────────────────────────────────────────────────────
+              </div>
+
+              {rtrHistory.map(entry => (
+                <div key={entry.id} className="space-y-1">
+                  <div className="flex items-center gap-2 text-cyan-300">
+                    <span className="text-red-500 font-black">root@{selectedHostForRtr}:~#</span>
+                    <span className="text-white font-bold">{entry.command}</span>
+                    <span className="text-zinc-600 text-[9.5px] ml-auto">{entry.timestamp}</span>
+                  </div>
+                  <pre className="p-2.5 rounded bg-[#0A0A0A] border border-[#1A1A1A] text-zinc-300 whitespace-pre-wrap leading-relaxed text-[11px]">
+                    {entry.output}
+                  </pre>
+                </div>
+              ))}
+            </div>
+
+            {/* Terminal Input Bar */}
+            <form onSubmit={handleExecuteRtr} className="p-2.5 bg-[#0D0D0D] border-t border-[#222] flex gap-2">
+              <span className="text-red-500 font-black flex items-center pl-2">#</span>
+              <input
+                type="text"
+                placeholder="Digite o comando RTR (ex: ps, netstat, kill 7921, isolate, quarantine /tmp/malware.sh)..."
+                value={rtrCommandInput}
+                onChange={(e) => setRtrCommandInput(e.target.value)}
+                disabled={isExecutingRtr}
+                className="flex-1 bg-transparent border-none text-white text-xs focus:outline-none font-mono"
+              />
+              <button
+                type="submit"
+                disabled={isExecutingRtr || !rtrCommandInput.trim()}
+                className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase text-[11px] cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+              >
+                {isExecutingRtr ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                <span>Enviar</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SUBTAB 5: Threat Hunting Console */}
       {activeSubTab === 'threat_hunting' && (
         <div className="space-y-4">
           <div className="bg-[#0E0E0E] p-4 rounded-xl border border-[#222] space-y-1">
@@ -608,7 +1026,227 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
         </div>
       )}
 
-      {/* SUBTAB 4: Memory Forensics & YARA */}
+      {/* SUBTAB 6: Response Playbooks */}
+      {activeSubTab === 'response_playbooks' && (
+        <div className="space-y-4 font-mono text-xs">
+          <div className="bg-[#0E0E0E] p-4 rounded-xl border border-[#222] space-y-1">
+            <h2 className="text-sm font-bold uppercase text-white flex items-center gap-2">
+              <Workflow className="w-4 h-4 text-amber-400" />
+              <span>Playbooks Automatizados de Resposta a Incidentes (SOAR Integrado)</span>
+            </h2>
+            <p className="text-xs text-zinc-400">
+              Ações orquestradas pré-configuradas para contenção instantânea, coleta forense de evidências e erradicação de ameaças em endpoints.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {playbooks.map(pb => (
+              <div key={pb.id} className="bg-[#0D0D0D] border border-[#222] rounded-xl p-4.5 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#1E1E1E] pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      pb.executionType === 'AUTOMATED' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-amber-950 text-amber-300 border border-amber-800'
+                    }`}>
+                      {pb.executionType}
+                    </span>
+                    <strong className="text-white text-sm">{pb.name}</strong>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      pb.status === 'COMPLETED' ? 'bg-zinc-800 text-emerald-400' :
+                      pb.status === 'EXECUTING' ? 'bg-amber-950 text-amber-300 animate-pulse' :
+                      'bg-zinc-800 text-zinc-400'
+                    }`}>
+                      {pb.status}
+                    </span>
+                    <button
+                      onClick={() => handleRunPlaybook(pb.id)}
+                      disabled={pb.status === 'EXECUTING'}
+                      className="px-3 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white font-bold uppercase text-[10.5px] cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                    >
+                      {pb.status === 'EXECUTING' ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                      <span>Disparar Playbook</span>
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-zinc-300 text-xs">{pb.description}</p>
+
+                <div className="bg-[#121212] p-3 rounded-lg border border-[#222] space-y-1">
+                  <span className="text-zinc-500 text-[10px] uppercase font-bold block">Etapas de Execução Orquestrada:</span>
+                  <ul className="space-y-1 text-zinc-400 text-[11px]">
+                    {pb.steps.map((st, i) => (
+                      <li key={i} className="flex items-center gap-2">
+                        <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>{st}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {pb.lastRun && (
+                  <span className="text-[10px] text-zinc-500 block">
+                    Última Execução: <strong className="text-zinc-400">{pb.lastRun}</strong>
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* SUBTAB 7: IOC Vault */}
+      {activeSubTab === 'ioc_vault' && (
+        <div className="space-y-4 font-mono text-xs">
+          <div className="bg-[#0E0E0E] p-4 rounded-xl border border-[#222] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold uppercase text-white flex items-center gap-2">
+                <Database className="w-4 h-4 text-cyan-400" />
+                <span>Cofre Central de Indicadores de Comprometimento (IOCs)</span>
+              </h2>
+              <p className="text-xs text-zinc-400">
+                Hashes maliciosos, endereços IPs de C2 e caminhos restritos sincronizados diretamente com os filtros de kernel dos agentes EDR.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowAddIocModal(true)}
+              className="px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold uppercase text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-md"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Adicionar IOC</span>
+            </button>
+          </div>
+
+          <div className="bg-[#0D0D0D] border border-[#222] rounded-xl overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#121212] border-b border-[#222] text-[10px] text-zinc-500 uppercase tracking-wider">
+                  <th className="py-2.5 px-3">Tipo</th>
+                  <th className="py-2.5 px-3">Valor do IOC</th>
+                  <th className="py-2.5 px-3">Classificação de Ameaça</th>
+                  <th className="py-2.5 px-3">MITRE</th>
+                  <th className="py-2.5 px-3">Confiança</th>
+                  <th className="py-2.5 px-3">Ação do Agente</th>
+                  <th className="py-2.5 px-3">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#1A1A1A] text-[11px]">
+                {iocList.map(ioc => (
+                  <tr key={ioc.id} className="hover:bg-[#111] transition-colors">
+                    <td className="py-2.5 px-3">
+                      <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-cyan-300 font-bold text-[10px]">
+                        {ioc.type}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-white font-mono break-all max-w-xs">
+                      {ioc.value}
+                    </td>
+                    <td className="py-2.5 px-3 text-zinc-300">
+                      {ioc.threatType}
+                    </td>
+                    <td className="py-2.5 px-3 text-zinc-400">
+                      {ioc.mitreRef}
+                    </td>
+                    <td className="py-2.5 px-3 font-bold text-[#00FF41]">
+                      {ioc.confidence}%
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        ioc.action === 'BLOCK_AND_KILL' ? 'bg-red-950 text-red-300 border border-red-800' : 'bg-amber-950 text-amber-300 border border-amber-800'
+                      }`}>
+                        {ioc.action}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <button
+                        onClick={() => setIocList(prev => prev.filter(i => i.id !== ioc.id))}
+                        className="text-zinc-500 hover:text-red-400 cursor-pointer"
+                        title="Remover IOC do cofre"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Add IOC Modal */}
+          {showAddIocModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
+              <div className="bg-[#111] border border-[#333] rounded-xl p-5 max-w-md w-full space-y-4">
+                <div className="flex items-center justify-between border-b border-[#222] pb-2">
+                  <strong className="text-white text-sm">Registrar Novo IOC no Sensor EDR</strong>
+                  <button onClick={() => setShowAddIocModal(false)} className="text-zinc-500 hover:text-white cursor-pointer">
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddIoc} className="space-y-3">
+                  <div>
+                    <label className="text-zinc-400 text-[10.5px] uppercase block mb-1">Tipo de Indicador:</label>
+                    <select
+                      value={newIocType}
+                      onChange={(e) => setNewIocType(e.target.value as any)}
+                      className="w-full bg-[#181818] border border-[#333] rounded p-2 text-xs text-white"
+                    >
+                      <option value="SHA256">SHA256 (Hash de Executável)</option>
+                      <option value="IPV4">IPV4 (Endereço C2 / Proxy Malicioso)</option>
+                      <option value="DOMAIN">DOMAIN (FQDN Exfiltração)</option>
+                      <option value="FILE_PATH">FILE_PATH (Local Restrito)</option>
+                      <option value="MUTEX">MUTEX (Identificador de Ransomware)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-zinc-400 text-[10.5px] uppercase block mb-1">Valor do Indicador:</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: 4b227777d... ou 198.51.100.44"
+                      value={newIocValue}
+                      onChange={(e) => setNewIocValue(e.target.value)}
+                      className="w-full bg-[#181818] border border-[#333] rounded p-2 text-xs text-white font-mono"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-zinc-400 text-[10.5px] uppercase block mb-1">Classificação / Descrição da Ameaça:</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Trojan Dropper / Cobalt Strike Beacon"
+                      value={newIocThreat}
+                      onChange={(e) => setNewIocThreat(e.target.value)}
+                      className="w-full bg-[#181818] border border-[#333] rounded p-2 text-xs text-white"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddIocModal(false)}
+                      className="px-3 py-1.5 rounded bg-zinc-800 text-zinc-300 text-xs font-bold cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold cursor-pointer"
+                    >
+                      Salvar IOC
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SUBTAB 8: Memory Forensics & YARA */}
       {activeSubTab === 'memory_forensics' && (
         <div className="space-y-4">
           <div className="bg-[#0E0E0E] p-4 rounded-xl border border-[#222] space-y-1">
@@ -679,7 +1317,7 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
         </div>
       )}
 
-      {/* SUBTAB 5: Isolation & Host Quarantine Matrix */}
+      {/* SUBTAB 9: Isolation & Host Quarantine Matrix */}
       {activeSubTab === 'isolation_matrix' && (
         <div className="space-y-4 font-mono text-xs">
           <div className="bg-[#0E0E0E] p-4 rounded-xl border border-[#222] space-y-1">
@@ -693,41 +1331,45 @@ export const EdrSuiteView: React.FC<EdrSuiteViewProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-[#0D0D0D] border border-red-500/30 rounded-xl p-5 space-y-3">
-              <div className="flex items-center justify-between border-b border-[#222] pb-2">
-                <strong className="text-white text-sm">Host: prod-api-gateway-01</strong>
-                <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px] font-bold">
-                  NORMAL
-                </span>
-              </div>
-              <p className="text-zinc-400 text-[11px] leading-relaxed">
-                Este host executa os microserviços de pagamento e gateway público. Em caso de comprometimento grave (RCE ou vazamento de chave mestre), clique abaixo para desconectá-lo da VPC.
-              </p>
-              <button
-                onClick={() => alert('Host isolado preventivamente a nível de kernel pelo sensor EDR.')}
-                className="w-full py-2 rounded bg-red-600 hover:bg-red-500 text-white font-bold uppercase text-xs cursor-pointer shadow-lg"
+            {endpoints.map(ep => (
+              <div 
+                key={ep.id} 
+                className={`bg-[#0D0D0D] border rounded-xl p-5 space-y-3 transition-all ${
+                  ep.isolationStatus === 'ISOLATED'
+                    ? 'border-red-500/60 shadow-[0_0_20px_rgba(239,68,68,0.2)]'
+                    : 'border-[#222]'
+                }`}
               >
-                Acionar Contenção de Rede Imediata
-              </button>
-            </div>
-
-            <div className="bg-[#0D0D0D] border border-[#222] rounded-xl p-5 space-y-3">
-              <div className="flex items-center justify-between border-b border-[#222] pb-2">
-                <strong className="text-white text-sm">Host: worker-node-k8s-pod-7</strong>
-                <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px] font-bold">
-                  NORMAL
-                </span>
+                <div className="flex items-center justify-between border-b border-[#222] pb-2">
+                  <div>
+                    <strong className="text-white text-sm">{ep.hostname}</strong>
+                    <span className="text-zinc-500 text-[10px] block">{ep.ip} • {ep.criticality}</span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                    ep.isolationStatus === 'ISOLATED'
+                      ? 'bg-red-950 text-red-300 border border-red-800'
+                      : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                  }`}>
+                    {ep.isolationStatus}
+                  </span>
+                </div>
+                <p className="text-zinc-400 text-[11px] leading-relaxed">
+                  {ep.isolationStatus === 'ISOLATED'
+                    ? 'Host desconectado da rede local e internet via filtro eBPF. Apenas a porta de telemetria TLS do agente SecScan EDR permanece aberta.'
+                    : 'Host em operação normal. Em caso de comprometimento severo (RCE ou vazamento de chave mestre), clique abaixo para desconectá-lo da VPC.'}
+                </p>
+                <button
+                  onClick={() => handleToggleIsolation(ep.id)}
+                  className={`w-full py-2 rounded font-bold uppercase text-xs cursor-pointer shadow-lg transition-colors ${
+                    ep.isolationStatus === 'ISOLATED'
+                      ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200'
+                      : 'bg-red-600 hover:bg-red-500 text-white'
+                  }`}
+                >
+                  {ep.isolationStatus === 'ISOLATED' ? 'Restaurar Acesso de Rede do Host' : 'Acionar Contenção de Rede Imediata'}
+                </button>
               </div>
-              <p className="text-zinc-400 text-[11px] leading-relaxed">
-                Nó de processamento assíncrono conectado ao Redis e PostgreSQL interno.
-              </p>
-              <button
-                onClick={() => alert('Host isolado preventivamente a nível de kernel pelo sensor EDR.')}
-                className="w-full py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold uppercase text-xs cursor-pointer"
-              >
-                Acionar Contenção de Rede Imediata
-              </button>
-            </div>
+            ))}
           </div>
         </div>
       )}

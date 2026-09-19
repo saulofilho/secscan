@@ -57,6 +57,53 @@ export interface EdrThreatHuntingQuery {
   description: string;
 }
 
+export interface EdrHostEndpoint {
+  id: string;
+  hostname: string;
+  ip: string;
+  macAddress: string;
+  os: string;
+  agentVersion: string;
+  isolationStatus: 'NORMAL' | 'ISOLATED';
+  containmentMode: 'KERNEL_FILTER' | 'FIREWALL_DROP' | 'NONE';
+  criticality: 'MISSION_CRITICAL' | 'HIGH' | 'MEDIUM';
+  activeAlertsCount: number;
+  lastSeen: string;
+  cpuLoad: number; // percentage
+  memoryUsageMb: number;
+}
+
+export interface EdrResponsePlaybook {
+  id: string;
+  name: string;
+  triggerEvent: string;
+  description: string;
+  steps: string[];
+  executionType: 'AUTOMATED' | 'HUMAN_CONFIRMATION';
+  status: 'READY' | 'TRIGGERED' | 'EXECUTING' | 'COMPLETED';
+  lastRun?: string;
+}
+
+export interface EdrRtrCommandResult {
+  id: string;
+  command: string;
+  output: string;
+  timestamp: string;
+  status: 'SUCCESS' | 'ERROR';
+  exitCode: number;
+}
+
+export interface EdrIocItem {
+  id: string;
+  type: 'SHA256' | 'IPV4' | 'DOMAIN' | 'MUTEX' | 'FILE_PATH';
+  value: string;
+  threatType: string;
+  confidence: number; // 0 - 100
+  mitreRef: string;
+  action: 'BLOCK_AND_KILL' | 'ALERT_ONLY' | 'QUARANTINE';
+  dateAdded: string;
+}
+
 export interface EdrLiveTelemetry {
   agentStatus: 'HEALTHY' | 'DEGRADED' | 'ISOLATED';
   kernelDriver: 'eBPF / Windows Filter Driver (Active)';

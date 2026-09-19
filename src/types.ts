@@ -249,6 +249,7 @@ export interface ScanReport {
   apiEndpoints: ApiEndpointFinding[];
   jsMiner?: JsMinerResults;
   dataFlowGraph?: DataFlowGraphData;
+  iastReport?: import('./types/iast').IastExecutionReport;
   metrics: {
     criticalCount: number;
     highCount: number;
@@ -493,6 +494,7 @@ export type ScanPhase =
   | 'LINK_FINDER' 
   | 'JS_MINER' 
   | 'DATA_FLOW' 
+  | 'IAST_EMULATION'
   | 'FINALIZING' 
   | 'COMPLETED';
 

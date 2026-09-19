@@ -23,6 +23,7 @@ import { extractLinkFinderEndpoints } from './linkFinderEngine';
 import { analyzeWithJsMiner } from './jsMinerEngine';
 import { buildDataFlowGraph } from './dataFlowGraphEngine';
 import { getOfficialDocLinksForFinding } from './remediationWikiData';
+import { runIastRuntimeEmulation, INITIAL_IAST_HOOKS } from './iastEngine';
 
 export const DEFAULT_GLOBAL_IGNORE_PATTERNS: IgnorePatternItem[] = [
   {
@@ -981,6 +982,9 @@ function assembleScanReport(
   const averageRiskScore = findings.length > 0 ? Math.round(totalRiskScore / findings.length) : 0;
   const maxRiskScore = findings.reduce((max, curr) => Math.max(max, curr.riskScore ?? 0), 0);
 
+  // Run IAST runtime emulation to track runtime dataflow and detect vulnerabilities visible during execution
+  const iastReport = runIastRuntimeEmulation(files, INITIAL_IAST_HOOKS);
+
   const durationMs = Math.max(1, Math.round(performance.now() - startTime));
 
   onLog?.({
@@ -1002,6 +1006,7 @@ function assembleScanReport(
     apiEndpoints,
     jsMiner,
     dataFlowGraph,
+    iastReport,
     metrics: {
       criticalCount,
       highCount,
@@ -1295,9 +1300,9 @@ export async function scanSourceFilesAsync(
     await new Promise(r => setTimeout(r, 35));
   }
 
-  // Phase: Data Flow Graph (93%)
+  // Phase: Data Flow Graph (92%)
   onProgress?.({
-    percentage: 93,
+    percentage: 92,
     currentFileIndex: files.length,
     totalFiles: files.length,
     currentFileName: '',
@@ -1311,12 +1316,31 @@ export async function scanSourceFilesAsync(
   });
 
   if (files.length <= 15) {
-    await new Promise(r => setTimeout(r, 35));
+    await new Promise(r => setTimeout(r, 30));
   }
 
-  // Phase: Finalizing metrics (97%)
+  // Phase: IAST Runtime Emulation (95%)
   onProgress?.({
-    percentage: 97,
+    percentage: 95,
+    currentFileIndex: files.length,
+    totalFiles: files.length,
+    currentFileName: '',
+    currentFilePath: '',
+    phase: 'IAST_EMULATION',
+    phaseLabel: 'Emulação de Runtime IAST & Rastreamento Dinâmico de Taint...',
+    findingsFoundCount: findings.length,
+    scannedCount,
+    ignoredCount,
+    elapsedMs: Math.round(performance.now() - startTime)
+  });
+
+  if (files.length <= 15) {
+    await new Promise(r => setTimeout(r, 30));
+  }
+
+  // Phase: Finalizing metrics (98%)
+  onProgress?.({
+    percentage: 98,
     currentFileIndex: files.length,
     totalFiles: files.length,
     currentFileName: '',

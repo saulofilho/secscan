@@ -740,6 +740,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </button>
           )}
           <button
+            onClick={() => onNavigateToTab('iast')}
+            className="px-4 py-3.5 border border-cyan-500/40 hover:border-cyan-400 bg-cyan-950/20 hover:bg-cyan-500 hover:text-black text-cyan-300 font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.15)]"
+            title="Abrir módulo de IAST (Interactive Application Security Testing & Runtime Hooks)"
+          >
+            <Activity className="w-3.5 h-3.5 text-cyan-400" />
+            <span>IAST Suite</span>
+          </button>
+          <button
             onClick={() => onNavigateToTab('cli')}
             className="px-5 py-3.5 border border-[#333] hover:border-white bg-[#0A0A0A] hover:bg-white hover:text-black text-white font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 cursor-pointer"
           >

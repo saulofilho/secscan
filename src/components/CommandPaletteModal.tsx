@@ -379,6 +379,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         keywords: ['fluxo', 'taint', 'dataflow', 'grafo', 'd3', 'sinks', 'sources']
       },
       {
+        id: 'nav-iast',
+        title: 'Módulo: IAST (Interactive Application Security Testing)',
+        subtitle: 'Hooks de instrumentação em runtime, emulação dinâmica de taint, validação em sinks e zero falsos positivos',
+        category: 'Navegação',
+        icon: Activity,
+        badge: report.iastReport?.findings.length ? `${report.iastReport.findings.length} hooks` : 'IAST',
+        badgeColor: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('iast');
+        },
+        keywords: ['iast', 'runtime', 'hooks', 'taint', 'emulacao', 'dynamic', 'execucao', 'sinks', 'interceptor', 'sqli', 'rce', 'contrast', 'synopsys', 'seeker']
+      },
+      {
         id: 'nav-frameworks',
         title: 'Módulo: Frameworks de Cibersegurança (MITRE / NIST / OWASP)',
         subtitle: 'Mapeamento tático MITRE ATT&CK/D3FEND, auditoria NIST CSF 2.0 e checklist defensivo OWASP WSTG',
@@ -465,7 +479,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       {
         id: 'nav-edr',
         title: 'Módulo: EDR (Endpoint Detection and Response)',
-        subtitle: 'Árvore de processos parent-child, regras comportamentais IOA/MITRE, console de Threat Hunting e forense de memória com YARA',
+        subtitle: 'Árvore de processos parent-child, Live Response Shell (RTR), Playbooks SOAR, Cofre de IOCs, Threat Hunting KQL e contenção Zero Trust',
         category: 'Navegação',
         icon: Crosshair,
         badge: 'eBPF / EDR',
@@ -474,7 +488,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           onClose();
           setActiveTab('edr');
         },
-        keywords: ['edr', 'endpoint', 'processo', 'tree', 'threat hunting', 'hunting', 'yara', 'dump', 'memoria', 'mitre', 'ioa', 'kql', 'containment', 'quarantine', 'sentinelone', 'crowdstrike', 'carbon black', 'defender']
+        keywords: ['edr', 'endpoint', 'processo', 'tree', 'rtr', 'real-time response', 'threat hunting', 'hunting', 'playbook', 'soar', 'ioc', 'yara', 'dump', 'memoria', 'mitre', 'ioa', 'kql', 'containment', 'quarantine', 'sentinelone', 'crowdstrike', 'carbon black', 'defender']
       },
       {
         id: 'nav-idsips',

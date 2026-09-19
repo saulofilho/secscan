@@ -84,15 +84,35 @@
 - **Túneis IPsec & Zero-Trust Mesh:** Criptografia ponta a ponta (AES-256-GCM / WireGuard) com monitoramento de status e rotação de chaves.
 - **Failover e Simulação de Tráfego:** Painel de simulação para testar degradação de links e conferir a reação dinâmica da malha SD-WAN em tempo real.
 
-### 8. 🛡️ Módulos Adicionais de Segurança de Rede e Endpoint
+### 8. 🎯 EDR (Endpoint Detection & Response) & Live Response Suite
+- **Inventário de Endpoints & Telemetria em Tempo Real:**
+  - Descoberta e monitoramento de hosts com status de saúde do agente, carga de CPU/Memória e integridade do driver eBPF.
+  - Ações cirúrgicas de contenção host com isolamento preventivo a nível de kernel (Zero Trust Host Containment).
+- **Árvore de Execução & Parent-Child Process Tracking:**
+  - Rastreamento hierárquico de processos (`PID`, `PPID`, usuário, integrity level e linha de comando executada).
+  - Identificação de bifurcações perigosas (ex: processo web Node.js/Python spawnando `/bin/sh` ou PowerShell).
+  - Encerramento cirúrgico em tempo real de árvores inteiras de processos maliciosos (`SIGKILL`).
+- **Regras Comportamentais de Indicadores de Ataque (IOA) & MITRE ATT&CK:**
+  - Assinaturas comportamentais para execução de LOLBins, dumping de credenciais em `.env`, process hollowing e conexões reversas para redes Tor/C2.
+- **Real-Time Response (RTR Terminal):**
+  - Sessão interativa remota direta com os sensores dos endpoints para coleta de evidências e execução de comandos de remediação (`ps`, `netstat`, `kill`, `isolate`, `quarantine`).
+- **Threat Hunting Ativo (KQL / Query Syntax):**
+  - Motor de busca em telemetria histórica de eventos de processos, sockets e modificações de arquivos com playbooks prontos para LOLBins, exfiltração DNS e injeção de bibliotecas (`LD_PRELOAD`).
+- **Playbooks Automatizados de Resposta a Incidentes (SOAR):**
+  - Orquestração de ações defensivas imediatas com disparos automáticos ou validação por operador humano.
+- **Cofre Centralizado de Indicadores de Comprometimento (IOCs):**
+  - Gerenciamento de hashes SHA-256, IPs maliciosos, FQDNs e caminhos de arquivos sincronizados dinamicamente com os agentes locais.
+- **Forense de Memória & Assinaturas YARA:**
+  - Varredura de dumps de memória de processos suspeitos para extração de credenciais, detecção de DLLs injetadas e identificação de regiões RWX violadas.
+
+### 9. 🛡️ Módulos Complementares de Segurança de Rede
 - **Proteção DNS (DNS Security):** Detecção de DNS Tunneling, filtragem de domínios maliciosos e DGA (Domain Generation Algorithms), e validação de DNSSEC / DoH.
 - **Firewall de Próxima Geração (NGFW) & IDS/IPS:** Inspeção profunda de pacotes (DPI), controle de aplicações L7 e assinaturas de intrusão Snort/Suricata.
-- **EDR & Containment de Endpoints:** Monitoramento de telemetria de processos (Sysmon/Falcon), árvores de processos e quarentena de endpoints comprometidos.
 
-### 9. ⚙️ Motor de Regras Customizáveis (Custom Regex)
+### 10. ⚙️ Motor de Regras Customizáveis (Custom Regex)
 - Criação e validação dinâmica de regras regex customizadas na interface ou via arquivo JSON, com suporte a categorias personalizadas, severidade e limiar de entropia mínima.
 
-### 10. 🚀 CI/CD & Automação DevSecOps
+### 11. 🚀 CI/CD & Automação DevSecOps
 - Exportação instantânea em múltiplos formatos: **SARIF 2.1.0** (nativamente renderizado na aba *Security > Code Scanning* do GitHub), **JSON Estruturado** e **CSV**.
 - Interface de Linha de Comando (CLI) executável em qualquer ambiente Node.js com qualidade gate duplo: por severidade (`--fail-on critical`) e por pontuação de risco cumulativo (`--max-risk <score>`).
 

