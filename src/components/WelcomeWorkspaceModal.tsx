@@ -109,61 +109,65 @@ export const WelcomeWorkspaceModal: React.FC<WelcomeWorkspaceModalProps> = ({
             </div>
           </div>
 
-          {/* Question / Choice Prompt */}
-          <div className="px-3 py-2 bg-[#141414] border border-zinc-800 rounded text-center sm:text-left">
-            <p className="text-[11px] text-zinc-300">
-              Escolha como deseja iniciar: explore com arquivos vulneráveis de teste ou limpe o mock para analisar seu próprio código.
+          {/* Question / Choice Prompt with Direct Clarity */}
+          <div className="p-3.5 bg-[#141414] border border-zinc-800 rounded-lg text-center sm:text-left space-y-1">
+            <div className="text-xs font-bold text-white font-mono flex items-center gap-1.5 justify-center sm:justify-start">
+              <span className="w-2 h-2 rounded-full bg-[#FF3E00]" />
+              <span>Deseja popular o workspace com dados demonstrativos de mock?</span>
+            </div>
+            <p className="text-[11px] text-zinc-400">
+              O aplicativo vem por padrão limpo. Escolha <strong className="text-[#FF3E00]">"Sim, Popular com Mock"</strong> para carregar arquivos de teste com vulnerabilidades, gráficos e alertas, ou <strong className="text-emerald-400">"Não, Usar Ferramenta Limpa"</strong> para começar zerado.
             </p>
           </div>
 
-          {/* Action Buttons: prominently visible */}
+          {/* Action Buttons: prominently visible Yes / No */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
-            {/* Option A: Explore with mock */}
+            {/* Option A: Yes, populate with mock */}
             <button
               id="btn-welcome-explore-mock"
               type="button"
               onClick={onExploreWithMock}
-              className="w-full group p-3 rounded bg-[#1A1A1A] hover:bg-[#222] border border-[#333] hover:border-[#FF3E00]/60 text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5"
+              className="w-full group p-3.5 rounded-lg bg-[#1A1A1A] hover:bg-[#222] border border-[#333] hover:border-[#FF3E00]/70 text-left transition-all cursor-pointer flex flex-col justify-between gap-2 shadow-sm"
             >
               <div className="flex items-center justify-between w-full">
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold font-mono uppercase tracking-wider text-white group-hover:text-[#FF3E00] transition-colors">
-                  <Play className="w-3 h-3 fill-current text-[#FF3E00]" />
-                  Explorar com Mock
+                  <Play className="w-3.5 h-3.5 fill-current text-[#FF3E00]" />
+                  Sim, Popular com Mock
                 </span>
-                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-[#FF7A00] border border-zinc-700 font-bold">
                   Demo
                 </span>
               </div>
-              <p className="text-[10px] text-zinc-400 leading-snug">
-                Carrega arquivos de exemplo com alertas, gráficos e dados prontos.
+              <p className="text-[10.5px] text-zinc-400 leading-snug">
+                Carrega repositório de teste vulnerável com alertas de segredos, rotas e gráficos preenchidos.
               </p>
-              <div className="flex items-center gap-1 text-[10px] font-mono font-bold text-[#FF3E00] pt-0.5">
-                <span>Acessar demonstração</span>
+              <div className="flex items-center gap-1 text-[10.5px] font-mono font-bold text-[#FF3E00] pt-0.5">
+                <span>Carregar mock agora</span>
                 <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </button>
 
-            {/* Option B: Clean workspace and start from zero */}
+            {/* Option B: No, keep clean */}
             <button
               id="btn-welcome-clean-workspace"
               type="button"
               onClick={onStartCleanWorkspace}
-              className="w-full group p-3 rounded bg-[#160a08] hover:bg-[#220e0a] border border-[#441a14] hover:border-rose-500/70 text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5"
+              className="w-full group p-3.5 rounded-lg bg-[#0c1810] hover:bg-[#122418] border border-emerald-900/60 hover:border-emerald-500/70 text-left transition-all cursor-pointer flex flex-col justify-between gap-2 shadow-sm"
             >
               <div className="flex items-center justify-between w-full">
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold font-mono uppercase tracking-wider text-rose-300 group-hover:text-rose-200 transition-colors">
-                  <Trash2 className="w-3 h-3 text-rose-400" />
-                  Limpar Mock e Zerar
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold font-mono uppercase tracking-wider text-emerald-300 group-hover:text-emerald-200 transition-colors">
+                  <Trash2 className="w-3.5 h-3.5 text-emerald-400" />
+                  Não, Usar Ferramenta Limpa
                 </span>
-                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-rose-950/70 text-rose-300 border border-rose-800/60">
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-bold">
                   Limpo
                 </span>
               </div>
-              <p className="text-[10px] text-zinc-400 leading-snug">
-                Remove os arquivos fictícios para você colar código ou subir arquivos.
+              <p className="text-[10.5px] text-zinc-400 leading-snug">
+                Inicia a ferramenta 100% vazia para colar seu próprio código ou fazer upload de repositórios reais.
               </p>
-              <div className="flex items-center gap-1 text-[10px] font-mono font-bold text-rose-400 pt-0.5">
-                <span>Começar zerado</span>
+              <div className="flex items-center gap-1 text-[10.5px] font-mono font-bold text-emerald-400 pt-0.5">
+                <span>Iniciar workspace limpo</span>
                 <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </button>

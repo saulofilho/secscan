@@ -65,10 +65,34 @@
 - **Cloud Storage Buckets:** Busca por referências a buckets S3 da AWS, Google Cloud Storage e Azure Blob Storage.
 - **Extração Profunda de Endpoints:** Reconhecimento automático de rotas REST, GraphQL, chamadas `fetch()`, `axios` e mapeamento de superfícies de ataque internas/administrativas (`/api/admin/*`, `/internal/*`).
 
-### 6. ⚙️ Motor de Regras Customizáveis (Custom Regex)
+### 6. 🛡️ Defesa e Infraestrutura de Aplicações Web (WAF - Web Application Firewall)
+- **Painel de Inspeção & Telemetria em Tempo Real:** Monitoramento dinâmico de tráfego HTTP/HTTPS com estatísticas de requisições inspecionadas, taxa de bloqueio (Block Rate), RPS e latência de inspeção (P95/P99).
+- **Cobertura OWASP Top 10 & Virtual Patching:**
+  - `SQL Injection (SQLi)`: Detecção de UNION, boolean/time-based payloads.
+  - `Cross-Site Scripting (XSS)`: Sanitização de scripts reflexivos e baseados em DOM.
+  - `Remote Code Execution (RCE)` e `Local/Remote File Inclusion (LFI/RFI)`.
+  - `Server-Side Request Forgery (SSRF)`.
+- **Proteção Anti-DDoS e Rate Limiting:** Controles granulares por IP e rota (ex.: rotas de login `/api/v1/auth/login` e `/checkout`).
+- **Simulador de Requisições HTTP Interativo:** Envio de requisições com teste em tempo real de payloads maliciosos, avaliação do motor de regras e indicação clara de decisão (`BLOCKED` vs `ALLOWED`).
+- **Gerenciador de Regras e ACLs:** Listas de bloqueio por IP/CIDR, geo-blocking e criação de regras customizadas.
+
+### 7. 🌐 SD-WAN Corporativo (Software-Defined WAN Suite)
+- **Topologia de Túneis e Edge Routers:** Visualização da malha SD-WAN com nós de borda (Hub HQ, Branch Offices, Multi-Cloud Gateways AWS/GCP/Azure).
+- **Políticas de Roteamento Baseadas em SLA (Application-Aware Routing):**
+  - Monitoramento contínuo de Latência (ms), Jitter (ms) e Perda de Pacotes (%).
+  - Steering automático de tráfego crítico (VoIP, Videoconferência, SaaS ERP) para links primários (MPLS, Fibra Dedicada) ou failover inteligente para 5G/Banda Larga.
+- **Túneis IPsec & Zero-Trust Mesh:** Criptografia ponta a ponta (AES-256-GCM / WireGuard) com monitoramento de status e rotação de chaves.
+- **Failover e Simulação de Tráfego:** Painel de simulação para testar degradação de links e conferir a reação dinâmica da malha SD-WAN em tempo real.
+
+### 8. 🛡️ Módulos Adicionais de Segurança de Rede e Endpoint
+- **Proteção DNS (DNS Security):** Detecção de DNS Tunneling, filtragem de domínios maliciosos e DGA (Domain Generation Algorithms), e validação de DNSSEC / DoH.
+- **Firewall de Próxima Geração (NGFW) & IDS/IPS:** Inspeção profunda de pacotes (DPI), controle de aplicações L7 e assinaturas de intrusão Snort/Suricata.
+- **EDR & Containment de Endpoints:** Monitoramento de telemetria de processos (Sysmon/Falcon), árvores de processos e quarentena de endpoints comprometidos.
+
+### 9. ⚙️ Motor de Regras Customizáveis (Custom Regex)
 - Criação e validação dinâmica de regras regex customizadas na interface ou via arquivo JSON, com suporte a categorias personalizadas, severidade e limiar de entropia mínima.
 
-### 7. 🚀 CI/CD & Automação DevSecOps
+### 10. 🚀 CI/CD & Automação DevSecOps
 - Exportação instantânea em múltiplos formatos: **SARIF 2.1.0** (nativamente renderizado na aba *Security > Code Scanning* do GitHub), **JSON Estruturado** e **CSV**.
 - Interface de Linha de Comando (CLI) executável em qualquer ambiente Node.js com qualidade gate duplo: por severidade (`--fail-on critical`) e por pontuação de risco cumulativo (`--max-risk <score>`).
 
@@ -174,6 +198,24 @@ npm run dev
 # Compilar para produção
 npm run build
 ```
+
+---
+
+## 🌍 Portabilidade e Hospedagem Externa (Deploy fora do AI Studio)
+
+**Sim, todo o código do repositório é 100% funcional e portável!** 
+
+A aplicação foi construída como uma SPA (Single Page Application) moderna em **React 18 + TypeScript + Vite + Tailwind CSS**, sem dependências proprietárias travadas ao AI Studio:
+
+- **Hospedagem Estática Imediata:** Pode ser hospedada gratuitamente em plataformas como **Vercel**, **Netlify**, **Cloudflare Pages**, **GitHub Pages**, **AWS S3/CloudFront** ou qualquer servidor web tradicional (Nginx, Apache, Caddy).
+  - Basta executar `npm run build`, e o diretório `dist/` resultante conterá todos os arquivos HTML, CSS e bundles JS estáticos e otimizados.
+- **Configuração Simples para Vercel / Netlify:**
+  - **Build Command:** `npm run build`
+  - **Output Directory:** `dist`
+  - **Node Version:** 18+ ou 20+
+- **Execução em Containers Docker:**
+  - O projeto pode ser facilmente empacotado em uma imagem Docker com Nginx Alpine para servir o conteúdo estático ou orquestrado em Kubernetes / AWS ECS / Google Cloud Run.
+- **Autonomia da CLI:** O utilitário `bin/secscan.js` roda de forma 100% independente em pipelines CI/CD (GitHub Actions, GitLab CI, Jenkins, Azure DevOps) precisando apenas do runtime Node.js padrão.
 
 ---
 

@@ -519,6 +519,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         keywords: ['waf', 'modsecurity', 'coreruleset', 'crs', 'sqli', 'xss', 'rce', 'ssrf', 'rate limit', 'virtual patch', 'cloudflare', 'akamai', 'imperva', 'bot']
       },
       {
+        id: 'nav-sdwan',
+        title: 'Módulo: SD-WAN (Orchestrator, Steering & Overlay Mesh)',
+        subtitle: 'Roteamento dinâmico App-Aware SLA, agregação multi-link (MPLS/Fibra/5G), malha IPsec de filiais, FEC e duplicação de pacotes',
+        category: 'Navegação',
+        icon: Network,
+        badge: 'SD-WAN',
+        badgeColor: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('sdwan');
+        },
+        keywords: ['sdwan', 'sd-wan', 'mpls', 'dia', 'fibra', '5g', 'ipsec', 'fec', 'sla', 'jitter', 'latency', 'cisco viptela', 'fortigate', 'velocloud', 'failover']
+      },
+      {
         id: 'nav-rules',
         title: 'Módulo: Regras Regex & Entropia de Shannon',
         subtitle: 'Configuração e teste de expressões regulares para detecção SAST',

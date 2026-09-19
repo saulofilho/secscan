@@ -75,7 +75,7 @@ export interface NoticeDetailItem {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [files, setFiles] = useState<ScannedFile[]>(SAMPLE_FILES);
+  const [files, setFiles] = useState<ScannedFile[]>([]);
   const [rules, setRules] = useState<RegexRule[]>(() => {
     const saved = safeGetItem('secscan_rules');
     if (saved) {
@@ -115,7 +115,7 @@ export default function App() {
     return DEFAULT_GLOBAL_IGNORE_PATTERNS;
   });
 
-  const [selectedFile, setSelectedFile] = useState<ScannedFile | null>(SAMPLE_FILES[0]);
+  const [selectedFile, setSelectedFile] = useState<ScannedFile | null>(null);
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [auditLogs, setAuditLogs] = useState<AuditLogEvent[]>([]);
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
@@ -150,80 +150,8 @@ export default function App() {
     message: string;
     phase?: string;
     details?: NoticeDetailItem[];
-  } | null>(() => {
-    const noticeDetails: NoticeDetailItem[] = [];
-    const blockedFiles: string[] = [];
-    const warningFiles: string[] = [];
-
-    SAMPLE_FILES.forEach((file) => {
-      const nameCheck = isForbiddenWorkspaceFile(file.name);
-      if (nameCheck.isForbidden) {
-        blockedFiles.push(`${file.name} (${nameCheck.reason})`);
-        noticeDetails.push({
-          fileName: file.name,
-          blockedReason: nameCheck.reason,
-          status: 'BLOCKED',
-          findings: [
-            {
-              patternId: 'forbidden-filename',
-              name: 'Arquivo Bloqueado',
-              severity: 'CRITICAL',
-              description: nameCheck.reason || 'Tipo de arquivo restrito.',
-              matchedPreview: file.name,
-              line: 1,
-              remediation: 'Não envie arquivos de configuração de ambiente (.env) ou chaves privadas.',
-              securityImpact: 'Credentials exposure risk (Master environment keys & private certificates)'
-            }
-          ]
-        });
-        return;
-      }
-
-      const validation = validateFileForSensitivePatterns(file.name, file.content);
-      if (validation.isForbiddenFile || validation.hasBlockers) {
-        blockedFiles.push(`${file.name} [${validation.findings.map(f => f.name).join(', ')}]`);
-        noticeDetails.push({
-          fileName: file.name,
-          blockedReason: validation.blockedReason,
-          status: 'BLOCKED',
-          findings: validation.findings
-        });
-      } else if (validation.hasWarnings) {
-        warningFiles.push(`${file.name} (${validation.findings.length} aviso(s))`);
-        noticeDetails.push({
-          fileName: file.name,
-          status: 'WARNING',
-          findings: validation.findings
-        });
-      } else {
-        noticeDetails.push({
-          fileName: file.name,
-          status: 'VALIDATED',
-          findings: []
-        });
-      }
-    });
-
-    if (blockedFiles.length > 0) {
-      return {
-        type: 'error',
-        title: 'Arquivos Sensíveis Bloqueados',
-        phase: 'Blocked',
-        message: `Violações detectadas durante a verificação de integridade: ${blockedFiles.join('; ')}`,
-        details: noticeDetails.filter(d => d.status === 'BLOCKED')
-      };
-    } else if (warningFiles.length > 0) {
-      return {
-        type: 'warning',
-        title: 'Varredura com Alertas de Padrões',
-        phase: 'Filtered',
-        message: `Análise concluída com potenciais tokens detectados: ${warningFiles.join('; ')}`,
-        details: noticeDetails.filter(d => d.status === 'WARNING')
-      };
-    }
-    return null;
-  });
-  const [isNoticeDetailsOpen, setIsNoticeDetailsOpen] = useState<boolean>(true);
+  } | null>(null);
+  const [isNoticeDetailsOpen, setIsNoticeDetailsOpen] = useState<boolean>(false);
 
   const noticeSeverityDistribution = useMemo(() => {
     if (!validationNotice?.details || validationNotice.details.length === 0) {
@@ -332,6 +260,97 @@ export default function App() {
   const handleExploreWithMock = () => {
     safeSetItem('secscan_welcome_completed', 'true');
     setShowWelcomeModal(false);
+    setFiles(SAMPLE_FILES);
+    setSelectedFile(SAMPLE_FILES[0]);
+
+    // Compute validation notice for sample files
+    const noticeDetails: NoticeDetailItem[] = [];
+    const blockedFiles: string[] = [];
+    const warningFiles: string[] = [];
+
+    SAMPLE_FILES.forEach((file) => {
+      const nameCheck = isForbiddenWorkspaceFile(file.name);
+      if (nameCheck.isForbidden) {
+        blockedFiles.push(`${file.name} (${nameCheck.reason})`);
+        noticeDetails.push({
+          fileName: file.name,
+          blockedReason: nameCheck.reason,
+          status: 'BLOCKED',
+          findings: [
+            {
+              patternId: 'forbidden-filename',
+              name: 'Arquivo Bloqueado',
+              severity: 'CRITICAL',
+              description: nameCheck.reason || 'Tipo de arquivo restrito.',
+              matchedPreview: file.name,
+              line: 1,
+              remediation: 'Não envie arquivos de configuração de ambiente (.env) ou chaves privadas.',
+              securityImpact: 'Credentials exposure risk (Master environment keys & private certificates)'
+            }
+          ]
+        });
+        return;
+      }
+
+      const validation = validateFileForSensitivePatterns(file.name, file.content);
+      if (validation.isForbiddenFile || validation.hasBlockers) {
+        blockedFiles.push(`${file.name} [${validation.findings.map(f => f.name).join(', ')}]`);
+        noticeDetails.push({
+          fileName: file.name,
+          blockedReason: validation.blockedReason,
+          status: 'BLOCKED',
+          findings: validation.findings
+        });
+      } else if (validation.hasWarnings) {
+        warningFiles.push(`${file.name} (${validation.findings.length} aviso(s))`);
+        noticeDetails.push({
+          fileName: file.name,
+          status: 'WARNING',
+          findings: validation.findings
+        });
+      } else {
+        noticeDetails.push({
+          fileName: file.name,
+          status: 'VALIDATED',
+          findings: []
+        });
+      }
+    });
+
+    if (blockedFiles.length > 0) {
+      setValidationNotice({
+        type: 'error',
+        title: 'Arquivos Sensíveis Bloqueados',
+        phase: 'Blocked',
+        message: `Violações detectadas durante a verificação de integridade: ${blockedFiles.join('; ')}`,
+        details: noticeDetails.filter(d => d.status === 'BLOCKED')
+      });
+      setIsNoticeDetailsOpen(true);
+    } else if (warningFiles.length > 0) {
+      setValidationNotice({
+        type: 'warning',
+        title: 'Varredura com Alertas de Padrões',
+        phase: 'Filtered',
+        message: `Análise concluída com potenciais tokens detectados: ${warningFiles.join('; ')}`,
+        details: noticeDetails.filter(d => d.status === 'WARNING')
+      });
+      setIsNoticeDetailsOpen(true);
+    } else {
+      setValidationNotice(null);
+      setIsNoticeDetailsOpen(false);
+    }
+
+    executeScan(SAMPLE_FILES, rules, ignorePatterns);
+
+    const mockEvent: AuditLogEvent = {
+      id: `audit-mock-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'SCAN_COMPLETE',
+      message: `${SAMPLE_FILES.length} arquivos demonstrativos carregados no workspace.`,
+      severity: 'LOW',
+      details: { action: 'EXPLORE_WITH_MOCK', filesCount: SAMPLE_FILES.length }
+    };
+    setAuditLogs(prev => [mockEvent, ...prev].slice(0, 80));
   };
 
   const handleStartCleanWorkspace = () => {
@@ -349,11 +368,11 @@ export default function App() {
     setShowTour(false);
   };
 
-  // Run initial scan
+  // Run initial scan (starts clean with 0 files by default)
   const [report, setReport] = useState<ScanReport>(() => {
     const safePatterns = Array.isArray(ignorePatterns) ? ignorePatterns : DEFAULT_GLOBAL_IGNORE_PATTERNS;
     const activeIgnoreStrings = safePatterns.filter(p => p && p.enabled).map(p => p.pattern);
-    return scanSourceFiles(SAMPLE_FILES, DEFAULT_RULES, activeIgnoreStrings);
+    return scanSourceFiles([], DEFAULT_RULES, activeIgnoreStrings);
   });
 
   const [previousWorkspaceSize, setPreviousWorkspaceSize] = useState<number | undefined>(undefined);
@@ -1904,6 +1923,17 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'sdwan' && (
+          <SdwanSuiteView
+            report={report}
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onNavigateToNgfw={() => setActiveTab('ngfw')}
+            onNavigateToIdsIps={() => setActiveTab('idsips')}
+            onNavigateToWaf={() => setActiveTab('waf')}
+            onNavigateToDns={() => setActiveTab('dnssec')}
+          />
+        )}
+
         {activeTab === 'rules' && (
           <CustomRulesView
             rules={rules}
@@ -1988,7 +2018,7 @@ export default function App() {
         isOpen={showWelcomeModal}
         onExploreWithMock={handleExploreWithMock}
         onStartCleanWorkspace={handleStartCleanWorkspace}
-        onClose={handleExploreWithMock}
+        onClose={handleStartCleanWorkspace}
       />
 
       {/* Quick Tour Modal */}
