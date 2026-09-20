@@ -39,25 +39,28 @@ import {
   IAST_SIMULATION_SCENARIOS,
   runIastRuntimeEmulation
 } from '../lib/iastEngine';
+import { IastTaintFlowVisualizer } from './IastTaintFlowVisualizer';
 
 interface IastSuiteViewProps {
   report: ScanReport;
   files: ScannedFile[];
   onNavigateToScanner?: () => void;
   onNavigateToDataFlow?: () => void;
+  onSelectFile?: (filePath: string, line?: number) => void;
 }
 
 export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
   report,
   files,
   onNavigateToScanner,
-  onNavigateToDataFlow
+  onNavigateToDataFlow,
+  onSelectFile
 }) => {
   const [hooks, setHooks] = useState<IastHookSensor[]>(INITIAL_IAST_HOOKS);
   const [scenarios] = useState<IastSimulationScenario[]>(IAST_SIMULATION_SCENARIOS);
   const [selectedScenarioId, setSelectedScenarioId] = useState<string>(IAST_SIMULATION_SCENARIOS[0].id);
   const [isEmulating, setIsEmulating] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'FINDINGS' | 'HOOKS_REGISTRY' | 'SIMULATION_LAB' | 'ARCHITECTURE'>('FINDINGS');
+  const [activeTab, setActiveTab] = useState<'FINDINGS' | 'TAINT_VISUALIZER' | 'HOOKS_REGISTRY' | 'SIMULATION_LAB' | 'ARCHITECTURE'>('FINDINGS');
   
   // Custom scenario form
   const [customRoute, setCustomRoute] = useState<string>('/api/v1/orders/checkout');
@@ -76,6 +79,8 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
 
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
+
+  const [findingFlowMode, setFindingFlowMode] = useState<'GRAPH' | 'STEPS'>('GRAPH');
 
   const selectedFinding = useMemo(() => {
     return iastReport.findings.find(f => f.id === selectedFindingId) || iastReport.findings[0];
@@ -242,6 +247,23 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
         >
           <Bug className="w-3.5 h-3.5" />
           <span>Vulnerabilidades em Runtime ({iastReport.findings.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('TAINT_VISUALIZER')}
+          className={`px-4 py-2 text-xs font-mono font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+            activeTab === 'TAINT_VISUALIZER'
+              ? 'border-cyan-400 text-cyan-400 bg-cyan-500/5'
+              : 'border-transparent text-white/60 hover:text-white'
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="flex items-center gap-1.5">
+            Taint Flow Graph
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 font-bold">
+              Source &rarr; Sink
+            </span>
+          </span>
         </button>
 
         <button
@@ -416,55 +438,92 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
                   </div>
                 </div>
 
-                {/* Step-by-Step Taint Propagation Flow */}
+                {/* Step-by-Step Taint Propagation Flow & Visualizer */}
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-xs font-mono font-bold text-white flex items-center gap-2 uppercase tracking-wider">
                       <Activity className="w-3.5 h-3.5 text-purple-400" />
-                      Trilha de Propagação de Dados (Taint Flow em Runtime)
+                      Mapeamento de Propagação (Taint Flow em Runtime)
                     </h3>
-                    <span className="text-[10px] font-mono text-white/40">
-                      {selectedFinding.tracePath.length} Etapas Rastreadas
-                    </span>
-                  </div>
-
-                  <div className="relative border-l-2 border-cyan-500/30 ml-3 space-y-4 py-1">
-                    {selectedFinding.tracePath.map((step, idx) => (
-                      <div key={idx} className="relative pl-6">
-                        {/* Dot indicator */}
-                        <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-cyan-500/20 border-2 border-cyan-400 flex items-center justify-center">
-                          <div className="w-1.5 h-1.5 rounded-full bg-cyan-300" />
-                        </div>
-
-                        <div className="p-3 rounded-lg bg-black/40 border border-white/10 space-y-1.5 text-xs font-mono">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-bold text-cyan-300">
-                              Etapa #{step.stepIndex}: {step.functionName}
-                            </span>
-                            <span className="text-[10px] text-white/50">
-                              {step.file}:{step.line}
-                            </span>
-                          </div>
-
-                          <div className="text-[11px] text-white/80">
-                            {step.description}
-                          </div>
-
-                          <div className="bg-black/60 p-2 rounded border border-white/5 text-[10.5px] flex items-center justify-between gap-2">
-                            <div className="truncate">
-                              <span className="text-white/40">Variável: </span>
-                              <span className="text-purple-300">{step.variableName}</span>
-                              <span className="text-white/40"> = </span>
-                              <span className="text-amber-300">"{step.runtimeValue}"</span>
-                            </div>
-                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 shrink-0">
-                              TAINTED
-                            </span>
-                          </div>
-                        </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <div className="flex p-0.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-mono">
+                        <button
+                          onClick={() => setFindingFlowMode('GRAPH')}
+                          className={`px-2 py-0.5 rounded cursor-pointer transition-colors flex items-center gap-1 ${
+                            findingFlowMode === 'GRAPH'
+                              ? 'bg-cyan-500/20 text-cyan-300 font-bold'
+                              : 'text-white/50 hover:text-white'
+                          }`}
+                        >
+                          <Activity className="w-3 h-3" />
+                          <span>Visualizador Gráfico</span>
+                        </button>
+                        <button
+                          onClick={() => setFindingFlowMode('STEPS')}
+                          className={`px-2 py-0.5 rounded cursor-pointer transition-colors flex items-center gap-1 ${
+                            findingFlowMode === 'STEPS'
+                              ? 'bg-cyan-500/20 text-cyan-300 font-bold'
+                              : 'text-white/50 hover:text-white'
+                          }`}
+                        >
+                          <Layers className="w-3 h-3" />
+                          <span>Lista de Passos ({selectedFinding.tracePath.length})</span>
+                        </button>
                       </div>
-                    ))}
+
+                      <span className="text-[10px] font-mono text-white/40">
+                        {selectedFinding.tracePath.length} Etapas
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Render Visualizer or Step Timeline */}
+                  {findingFlowMode === 'GRAPH' ? (
+                    <IastTaintFlowVisualizer
+                      finding={selectedFinding}
+                      allHooks={hooks}
+                      onSelectFile={onSelectFile}
+                    />
+                  ) : (
+                    <div className="relative border-l-2 border-cyan-500/30 ml-3 space-y-4 py-1">
+                      {selectedFinding.tracePath.map((step, idx) => (
+                        <div key={idx} className="relative pl-6">
+                          {/* Dot indicator */}
+                          <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-cyan-500/20 border-2 border-cyan-400 flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 rounded-full bg-cyan-300" />
+                          </div>
+
+                          <div className="p-3 rounded-lg bg-black/40 border border-white/10 space-y-1.5 text-xs font-mono">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[11px] font-bold text-cyan-300">
+                                Etapa #{step.stepIndex}: {step.functionName}
+                              </span>
+                              <span className="text-[10px] text-white/50">
+                                {step.file}:{step.line}
+                              </span>
+                            </div>
+
+                            <div className="text-[11px] text-white/80">
+                              {step.description}
+                            </div>
+
+                            <div className="bg-black/60 p-2 rounded border border-white/5 text-[10.5px] flex items-center justify-between gap-2">
+                              <div className="truncate">
+                                <span className="text-white/40">Variável: </span>
+                                <span className="text-purple-300">{step.variableName}</span>
+                                <span className="text-white/40"> = </span>
+                                <span className="text-amber-300">"{step.runtimeValue}"</span>
+                              </div>
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 shrink-0">
+                                TAINTED
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Call Stack Inspection */}
@@ -533,6 +592,47 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Tab: Taint Flow Graph Dedicated Mode */}
+      {activeTab === 'TAINT_VISUALIZER' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl border border-white/10 bg-black/60 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <h2 className="text-sm font-bold font-mono text-white flex items-center gap-2">
+                <Activity className="w-4 h-4 text-cyan-400" />
+                Mapeamento Visual de Propagação de Dados Não Confiáveis (Source &rarr; Sink)
+              </h2>
+              <p className="text-xs text-white/60">
+                Selecione um achado interceptado para visualizar o grafo dinâmico de propagação de dados, nós de instrumentação e execução do payload nos sinks.
+              </p>
+            </div>
+
+            {/* Finding Selector dropdown */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-white/60 shrink-0">Vulnerabilidade:</span>
+              <select
+                value={selectedFinding?.id || ''}
+                onChange={(e) => setSelectedFindingId(e.target.value)}
+                className="bg-black/90 border border-cyan-500/40 text-cyan-300 rounded-lg px-3 py-1.5 text-xs font-mono focus:outline-none focus:border-cyan-400 max-w-[280px] truncate"
+              >
+                {iastReport.findings.map(f => (
+                  <option key={f.id} value={f.id} className="bg-black text-white">
+                    [{f.severity}] {f.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {selectedFinding && (
+            <IastTaintFlowVisualizer
+              finding={selectedFinding}
+              allHooks={hooks}
+              onSelectFile={onSelectFile}
+            />
+          )}
         </div>
       )}
 

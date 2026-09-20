@@ -91,6 +91,12 @@ export const GlobalScanProgressBar: React.FC<GlobalScanProgressBarProps> = ({
       text: 'text-indigo-300',
       border: 'border-indigo-500/30'
     },
+    IAST_EMULATION: {
+      label: 'IAST Runtime Emulation',
+      bg: 'bg-cyan-500/15',
+      text: 'text-cyan-300',
+      border: 'border-cyan-500/30'
+    },
     FINALIZING: {
       label: 'Consolidando Score',
       bg: 'bg-cyan-500/15',

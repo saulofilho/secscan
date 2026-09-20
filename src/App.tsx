@@ -56,7 +56,7 @@ import { IastSuiteView } from './components/IastSuiteView';
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
 import { scanSourceFiles, scanSourceFilesAsync, exportToJson, DEFAULT_GLOBAL_IGNORE_PATTERNS } from './lib/scanner';
-import { RegexRule, ScannedFile, ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem, ScanProgress, SecScanGlobalConfig } from './types';
+import { RegexRule, ScannedFile, ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem, ScanProgress, SecScanGlobalConfig, DataFlowGraphData } from './types';
 import { SecurityGlossaryEntry } from './lib/securityGlossary';
 import { safeGetItem, safeSetItem } from './lib/storage';
 import { getSecScanConfig, calculateDynamicRemediationTime } from './lib/secscanConfig';
@@ -377,6 +377,7 @@ export default function App() {
   });
 
   const [previousWorkspaceSize, setPreviousWorkspaceSize] = useState<number | undefined>(undefined);
+  const [previousDataFlowGraph, setPreviousDataFlowGraph] = useState<DataFlowGraphData | undefined>(undefined);
   const lastScanWorkspaceBytesRef = useRef<number | null>(null);
 
   // Global scan progress tracking
@@ -436,7 +437,12 @@ export default function App() {
       );
 
       if (activeScanSequenceRef.current === currentSeq) {
-        setReport(result);
+        setReport(prevReport => {
+          if (prevReport?.dataFlowGraph && prevReport.dataFlowGraph.nodes && prevReport.dataFlowGraph.nodes.length > 0) {
+            setPreviousDataFlowGraph(prevReport.dataFlowGraph);
+          }
+          return result;
+        });
         setAuditLogs(prev => [...newLogs.reverse(), ...prev].slice(0, 80));
       }
     } catch (err) {
@@ -1821,6 +1827,7 @@ export default function App() {
         {activeTab === 'dataflow' && (
           <DataFlowGraphView
             graphData={report.dataFlowGraph}
+            previousGraphData={previousDataFlowGraph}
             files={files}
             onSelectFile={(filePath) => {
               const target = files.find(f => f.path === filePath);
@@ -1838,6 +1845,13 @@ export default function App() {
             files={files}
             onNavigateToScanner={() => setActiveTab('scanner')}
             onNavigateToDataFlow={() => setActiveTab('dataflow')}
+            onSelectFile={(filePath) => {
+              const target = files.find(f => f.name.includes(filePath) || filePath.includes(f.name));
+              if (target) {
+                setSelectedFile(target);
+                setActiveTab('scanner');
+              }
+            }}
           />
         )}
 

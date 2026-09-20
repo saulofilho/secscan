@@ -46,13 +46,19 @@ import {
   ScannedFile,
   SeverityLevel,
   DataFlowLayoutMode,
-  DataFlowGraphSettings
+  DataFlowGraphSettings,
+  TaintVariableFlow,
+  DataFlowNodeType
 } from '../types';
 import { DataFlowSettingsPanel } from './DataFlowSettingsPanel';
 import { DataFlowTutorialOverlay } from './DataFlowTutorialOverlay';
+import { DataFlowTaintLegend } from './DataFlowTaintLegend';
+import { calculateDataFlowDelta, generateSimulatedPreviousGraph } from '../lib/dataFlowDelta';
+import { DataFlowDeltaPanel, DeltaFilterMode } from './DataFlowDeltaPanel';
 
 interface DataFlowGraphViewProps {
   graphData?: DataFlowGraphData;
+  previousGraphData?: DataFlowGraphData;
   files: ScannedFile[];
   onSelectFile?: (filePath: string, line?: number) => void;
 }
@@ -75,6 +81,7 @@ const DEFAULT_SETTINGS: DataFlowGraphSettings = {
 
 export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
   graphData,
+  previousGraphData,
   files,
   onSelectFile
 }) => {
@@ -97,6 +104,21 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
   const [zoomScale, setZoomScale] = useState(100);
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
+  // Delta Analysis States
+  const [pinnedBaseline, setPinnedBaseline] = useState<DataFlowGraphData | null>(null);
+  const [simulatedBaseline, setSimulatedBaseline] = useState<DataFlowGraphData | null>(null);
+  const [baselineType, setBaselineType] = useState<'AUTO_PREVIOUS' | 'MANUAL_PINNED' | 'SIMULATED' | 'NONE'>('AUTO_PREVIOUS');
+  const [deltaFilterMode, setDeltaFilterMode] = useState<DeltaFilterMode>('ALL');
+  const [showGhostNodes, setShowGhostNodes] = useState<boolean>(false);
+
+  // Taint Variable Path Tracing States
+  const [selectedTaintFlow, setSelectedTaintFlow] = useState<TaintVariableFlow | null>(null);
+  const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
+  const [isPlayingFlow, setIsPlayingFlow] = useState<boolean>(false);
+  const [highlightAllTainted, setHighlightAllTainted] = useState<boolean>(false);
+  const [showVariableLabels, setShowVariableLabels] = useState<boolean>(true);
+  const [filterNodeType, setFilterNodeType] = useState<DataFlowNodeType | 'TAINTED' | null>(null);
+
   const isPanModeRef = useRef(isPanMode);
   useEffect(() => {
     isPanModeRef.current = isPanMode;
@@ -117,9 +139,49 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
     }
   };
 
+  // Delta Analysis Computations
+  const effectiveBaseline = useMemo(() => {
+    if (baselineType === 'SIMULATED') return simulatedBaseline;
+    if (baselineType === 'MANUAL_PINNED') return pinnedBaseline;
+    if (baselineType === 'NONE') return null;
+    return previousGraphData || null;
+  }, [baselineType, simulatedBaseline, pinnedBaseline, previousGraphData]);
+
+  const baselineLabel = useMemo(() => {
+    if (baselineType === 'SIMULATED') return 'Simulação de Commit Recente';
+    if (baselineType === 'MANUAL_PINNED') return 'Linha de Base Fixada';
+    if (baselineType === 'AUTO_PREVIOUS' && previousGraphData) return 'Scan Anterior';
+    return 'Scan Anterior';
+  }, [baselineType, previousGraphData]);
+
+  const deltaAnalysis = useMemo(() => {
+    return calculateDataFlowDelta(effectiveBaseline, safeGraph, baselineLabel);
+  }, [effectiveBaseline, safeGraph, baselineLabel]);
+
+  const newVulnNodeIds = useMemo(() => {
+    const ids = new Set<string>();
+    deltaAnalysis.newVulnerabilities.forEach(v => {
+      v.flow.pathNodeIds.forEach(id => ids.add(id));
+    });
+    return ids;
+  }, [deltaAnalysis.newVulnerabilities]);
+
   // Filter nodes & links based on user criteria
   const { filteredNodes, filteredLinks } = useMemo(() => {
-    let nodes = [...safeGraph.nodes];
+    let nodes: DataFlowNode[] = safeGraph.nodes.map(n => {
+      const deltaInfo = deltaAnalysis.nodeDeltaMap[n.id];
+      return {
+        ...n,
+        deltaStatus: deltaInfo?.status || 'UNCHANGED',
+        isNewlyTainted: deltaInfo?.isNewlyTainted || false,
+        deltaReason: deltaInfo?.changeDescription
+      };
+    });
+
+    // Optionally include ghost removed nodes
+    if (showGhostNodes && deltaAnalysis.removedNodes.length > 0) {
+      nodes = [...nodes, ...deltaAnalysis.removedNodes];
+    }
 
     if (onlyTainted) {
       nodes = nodes.filter(n => n.tainted);
@@ -127,6 +189,15 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
 
     if (filterType !== 'ALL') {
       nodes = nodes.filter(n => n.type === filterType);
+    }
+
+    // Delta Filter Modes
+    if (deltaFilterMode === 'NEW_VULNERABILITIES') {
+      nodes = nodes.filter(n => newVulnNodeIds.has(n.id));
+    } else if (deltaFilterMode === 'NEW_NODES') {
+      nodes = nodes.filter(n => n.deltaStatus === 'NEW' || n.isNewlyTainted);
+    } else if (deltaFilterMode === 'RESOLVED') {
+      nodes = nodes.filter(n => n.deltaStatus === 'REMOVED' || n.isGhostRemoved);
     }
 
     if (searchTerm.trim()) {
@@ -142,7 +213,15 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
     }
 
     let nodeIds = new Set(nodes.map(n => n.id));
-    let links = safeGraph.links.filter(l => {
+    let links: DataFlowLink[] = safeGraph.links.map(l => {
+      const deltaL = deltaAnalysis.linkDeltaMap[l.id];
+      return {
+        ...l,
+        deltaStatus: deltaL?.status || 'UNCHANGED',
+        isNewlyTainted: deltaL?.isNewlyTainted || false,
+        deltaReason: deltaL?.changeDescription
+      };
+    }).filter(l => {
       const sId = typeof l.source === 'string' ? l.source : (l.source as DataFlowNode).id;
       const tId = typeof l.target === 'string' ? l.target : (l.target as DataFlowNode).id;
       return nodeIds.has(sId) && nodeIds.has(tId);
@@ -166,12 +245,148 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
     }
 
     return { filteredNodes: nodes, filteredLinks: links };
-  }, [safeGraph, onlyTainted, filterType, searchTerm, settings.hideIsolatedNodes]);
+  }, [safeGraph, onlyTainted, filterType, searchTerm, settings.hideIsolatedNodes, deltaAnalysis, showGhostNodes, deltaFilterMode, newVulnNodeIds]);
 
-  // Compute connected nodes for highlighting upon click
+  // Map for fast node lookups by ID
+  const nodesMap = useMemo(() => {
+    return new Map<string, DataFlowNode>(safeGraph.nodes.map(n => [n.id, n]));
+  }, [safeGraph.nodes]);
+
+  // Available Taint Flows (extracted or reconstructed)
+  const availableTaintFlows = useMemo(() => {
+    if (safeGraph.taintFlows && safeGraph.taintFlows.length > 0) {
+      return safeGraph.taintFlows;
+    }
+    // Reconstruct flows from graph traversal if not already computed
+    const epNodes = safeGraph.nodes.filter(n => n.type === 'ENDPOINT');
+    const adj = new Map<string, string[]>();
+    safeGraph.links.forEach(l => {
+      const s = typeof l.source === 'string' ? l.source : (l.source as DataFlowNode).id;
+      const t = typeof l.target === 'string' ? l.target : (l.target as DataFlowNode).id;
+      if (!adj.has(s)) adj.set(s, []);
+      adj.get(s)!.push(t);
+    });
+
+    const flows: TaintVariableFlow[] = [];
+    epNodes.forEach(ep => {
+      const q = [{ curr: ep.id, path: [ep.id] }];
+      const visited = new Set<string>();
+      while (q.length > 0) {
+        const { curr, path } = q.shift()!;
+        const neighbors = adj.get(curr) || [];
+        for (const next of neighbors) {
+          if (!visited.has(next)) {
+            visited.add(next);
+            const newPath = [...path, next];
+            q.push({ curr: next, path: newPath });
+            const targetNode = safeGraph.nodes.find(n => n.id === next);
+            if (targetNode && targetNode.type === 'SINK') {
+              const pathLinkIds: string[] = [];
+              for (let i = 0; i < newPath.length - 1; i++) {
+                pathLinkIds.push(`${newPath[i]}__TO__${newPath[i + 1]}`);
+              }
+              const varName = targetNode.taintedVariables?.[0] || (
+                targetNode.sinkType === 'EVAL' ? 'payload.code' :
+                targetNode.sinkType === 'INNER_HTML' ? 'metadata.bioHtml' :
+                targetNode.sinkType === 'INSECURE_STORAGE' ? 'metadata.token' :
+                targetNode.sinkType === 'POST_MESSAGE' ? 'payload.token' : 'untrustedData'
+              );
+              flows.push({
+                id: `flow-auto-${flows.length + 1}`,
+                variableName: varName,
+                sourceNodeId: ep.id,
+                sourceLabel: ep.label,
+                sourceParamOrField: 'HTTP Request Body',
+                intermediateNodeIds: newPath.slice(1, -1),
+                sinkNodeId: targetNode.id,
+                sinkLabel: targetNode.label,
+                sinkType: targetNode.sinkType || 'SINK',
+                pathNodeIds: newPath,
+                pathLinkIds,
+                severity: targetNode.severity || 'CRITICAL',
+                riskCategory: targetNode.riskCategory || 'Dangerous Sink Execution',
+                cwe: targetNode.cwe,
+                description: `A variável "${varName}" transita de ${ep.label} até o sink crítico ${targetNode.label}.`,
+                variableTransformSummary: `Origem: ${ep.label} ➔ Sink: ${targetNode.label}`
+              });
+            }
+          }
+        }
+      }
+    });
+    return flows;
+  }, [safeGraph]);
+
+  // Automatic Step-by-Step Playback Loop
   useEffect(() => {
+    if (!isPlayingFlow || !selectedTaintFlow) return;
+    const interval = setInterval(() => {
+      setActiveStepIndex(prev => {
+        if (!selectedTaintFlow) return 0;
+        if (prev >= selectedTaintFlow.pathNodeIds.length - 1) {
+          return 0; // loop back to source
+        }
+        return prev + 1;
+      });
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [isPlayingFlow, selectedTaintFlow]);
+
+  // Synchronize selectedNode with the active step in the taint trace
+  useEffect(() => {
+    if (selectedTaintFlow && selectedTaintFlow.pathNodeIds[activeStepIndex]) {
+      const targetId = selectedTaintFlow.pathNodeIds[activeStepIndex];
+      const targetNode = safeGraph.nodes.find(n => n.id === targetId);
+      if (targetNode) {
+        setSelectedNode(targetNode);
+      }
+    }
+  }, [selectedTaintFlow, activeStepIndex, safeGraph.nodes]);
+
+  // Handle flow selection
+  const handleSelectTaintFlow = (flow: TaintVariableFlow | null) => {
+    setSelectedTaintFlow(flow);
+    setActiveStepIndex(0);
+    setIsPlayingFlow(false);
+    if (flow) {
+      const sourceNode = safeGraph.nodes.find(n => n.id === flow.sourceNodeId);
+      if (sourceNode) {
+        setSelectedNode(sourceNode);
+      }
+    }
+  };
+
+  // Handle node type filter toggle
+  const handleToggleFilterNodeType = (type: DataFlowNodeType | 'TAINTED') => {
+    if (filterNodeType === type) {
+      setFilterNodeType(null);
+      if (type === 'TAINTED') setOnlyTainted(false);
+      else setFilterType('ALL');
+    } else {
+      setFilterNodeType(type);
+      if (type === 'TAINTED') {
+        setOnlyTainted(true);
+        setFilterType('ALL');
+      } else {
+        setOnlyTainted(false);
+        setFilterType(type);
+      }
+    }
+  };
+
+  // Compute connected nodes for highlighting upon click or active taint flow
+  useEffect(() => {
+    if (selectedTaintFlow) {
+      setSelectedPathIds(new Set(selectedTaintFlow.pathNodeIds));
+      return;
+    }
+
     if (!selectedNode) {
-      setSelectedPathIds(new Set());
+      if (highlightAllTainted) {
+        setSelectedPathIds(new Set(safeGraph.nodes.filter(n => n.tainted).map(n => n.id)));
+      } else {
+        setSelectedPathIds(new Set());
+      }
       return;
     }
 
@@ -209,7 +424,7 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
     }
 
     setSelectedPathIds(activeIds);
-  }, [selectedNode, safeGraph.links]);
+  }, [selectedNode, safeGraph.links, safeGraph.nodes, selectedTaintFlow, highlightAllTainted]);
 
   // Render D3 graph
   useEffect(() => {
@@ -248,6 +463,7 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
         .attr('fill', color);
     };
 
+    createMarker('arrow-tainted-active', '#FF0055');
     createMarker('arrow-tainted', '#FF3E00');
     createMarker('arrow-safe', '#00E5FF');
     createMarker('arrow-consumer', '#F59E0B');
@@ -598,6 +814,22 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
         .force('collide', d3.forceCollide().radius(48));
     }
 
+    // Active taint flow link set
+    const activeFlowPathLinks = new Set(selectedTaintFlow?.pathLinkIds || []);
+
+    const isLinkHighlighted = (d: any) => {
+      if (selectedTaintFlow) {
+        return activeFlowPathLinks.has(d.id) || (selectedPathIds.has(d.source.id) && selectedPathIds.has(d.target.id));
+      }
+      if (highlightAllTainted) {
+        return d.isTainted;
+      }
+      if (selectedNode) {
+        return selectedPathIds.has(d.source.id) && selectedPathIds.has(d.target.id);
+      }
+      return false;
+    };
+
     // Links Layer
     const linkGroup = gRoot.append('g').attr('class', 'links-layer');
 
@@ -607,17 +839,100 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
       .append('path')
       .attr('class', 'graph-link transition-opacity duration-200 cursor-pointer')
       .attr('fill', 'none')
-      .attr('stroke', d => (d.isTainted ? '#FF3E00' : '#00E5FF'))
-      .attr('stroke-width', d => (d.isTainted ? (settings.highlightTaintEdges ? 3.2 : 2.5) : 1.5))
+      .attr('stroke', d => {
+        if (selectedTaintFlow && isLinkHighlighted(d)) return '#FF0055';
+        if (d.isNewlyTainted) return '#FF0055';
+        if (d.isTainted) return '#FF3E00';
+        return '#00E5FF';
+      })
+      .attr('stroke-width', d => {
+        if (selectedTaintFlow && isLinkHighlighted(d)) return 4.2;
+        if (d.isNewlyTainted) return 3.8;
+        if (d.isTainted) return settings.highlightTaintEdges ? 3.2 : 2.5;
+        return 1.5;
+      })
       .attr('stroke-dasharray', d => (d.isTainted ? '6 4' : 'none'))
       .attr('opacity', d => {
+        if (selectedTaintFlow) {
+          return isLinkHighlighted(d) ? 1 : 0.08;
+        }
+        if (highlightAllTainted) {
+          return d.isTainted ? 1 : 0.12;
+        }
         if (!selectedNode) return d.isTainted ? (settings.highlightTaintEdges ? 1 : 0.9) : 0.45;
-        return selectedPathIds.has(d.source.id) && selectedPathIds.has(d.target.id) ? 1 : 0.15;
+        return isLinkHighlighted(d) ? 1 : 0.15;
       })
-      .attr('marker-end', d => (d.isTainted ? 'url(#arrow-tainted)' : 'url(#arrow-safe)'));
+      .attr('marker-end', d => {
+        if (selectedTaintFlow && isLinkHighlighted(d)) return 'url(#arrow-tainted-active)';
+        return d.isTainted ? 'url(#arrow-tainted)' : 'url(#arrow-safe)';
+      });
 
     // Animated Taint Flow Effect for Tainted Paths
     linkPaths.filter(d => d.isTainted).style('animation', 'dash 1.2s linear infinite');
+
+    // Variable Labels Layer on Tainted Links
+    const varLabelGroup = gRoot.append('g').attr('class', 'var-labels-layer');
+    const taintedSimLinks = simLinks.filter(d => d.isTainted || d.taintedVariable);
+
+    const varLabels = varLabelGroup.selectAll<SVGGElement, any>('.var-tag')
+      .data(showVariableLabels ? taintedSimLinks : [])
+      .enter()
+      .append('g')
+      .attr('class', 'var-tag cursor-pointer transition-opacity duration-200 select-none')
+      .attr('opacity', d => {
+        if (selectedTaintFlow) {
+          return isLinkHighlighted(d) ? 1 : 0.06;
+        }
+        return highlightAllTainted ? 1 : 0.85;
+      });
+
+    varLabels.append('rect')
+      .attr('rx', 4)
+      .attr('ry', 4)
+      .attr('fill', d => {
+        const isCurrentVar = selectedTaintFlow && isLinkHighlighted(d);
+        return isCurrentVar ? '#350612' : '#0F0F0F';
+      })
+      .attr('stroke', d => {
+        const isCurrentVar = selectedTaintFlow && isLinkHighlighted(d);
+        return isCurrentVar ? '#FF0055' : '#FF3E00';
+      })
+      .attr('stroke-width', d => {
+        const isCurrentVar = selectedTaintFlow && isLinkHighlighted(d);
+        return isCurrentVar ? 1.5 : 1;
+      })
+      .attr('height', 18);
+
+    varLabels.append('text')
+      .attr('text-anchor', 'middle')
+      .attr('y', 3.5)
+      .attr('font-size', '9px')
+      .attr('font-family', 'monospace')
+      .attr('font-weight', 'bold')
+      .attr('fill', d => {
+        const isCurrentVar = selectedTaintFlow && isLinkHighlighted(d);
+        return isCurrentVar ? '#FDA4AF' : '#FCA5A5';
+      })
+      .text(d => {
+        const varName = (selectedTaintFlow && isLinkHighlighted(d))
+          ? selectedTaintFlow.variableName
+          : (d.taintedVariable || 'taint');
+        return `$var: ${varName}`;
+      });
+
+    varLabels.each(function () {
+      const g = d3.select(this);
+      const textNode = g.select<SVGTextElement>('text').node();
+      if (textNode) {
+        const bbox = textNode.getBBox();
+        const paddingX = 12;
+        const width = bbox.width + paddingX;
+        g.select('rect')
+          .attr('x', -width / 2)
+          .attr('y', -9)
+          .attr('width', width);
+      }
+    });
 
     // Nodes Layer
     const nodeGroup = gRoot.append('g').attr('class', 'nodes-layer');
@@ -657,6 +972,16 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
         return `M${sourceX},${sourceY} L${targetX},${targetY}`;
       });
 
+      varLabels.attr('transform', d => {
+        const sourceX = (d.source as DataFlowNode).x || 0;
+        const sourceY = (d.source as DataFlowNode).y || 0;
+        const targetX = (d.target as DataFlowNode).x || 0;
+        const targetY = (d.target as DataFlowNode).y || 0;
+        const mx = (sourceX + targetX) / 2;
+        const my = (sourceY + targetY) / 2;
+        return `translate(${mx}, ${my})`;
+      });
+
       nodeG.attr('transform', d => `translate(${d.x || 0},${d.y || 0})`);
     };
 
@@ -666,6 +991,12 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
       .append('g')
       .attr('class', 'graph-node cursor-pointer select-none transition-all duration-150')
       .attr('opacity', d => {
+        if (selectedTaintFlow) {
+          return selectedTaintFlow.pathNodeIds.includes(d.id) ? 1 : 0.1;
+        }
+        if (highlightAllTainted) {
+          return d.tainted ? 1 : 0.15;
+        }
         if (!selectedNode) return 1;
         return selectedPathIds.has(d.id) ? 1 : 0.2;
       })
@@ -712,6 +1043,31 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
     nodeG.each(function (d) {
       const g = d3.select(this);
       const isSelected = selectedNode?.id === d.id;
+
+      // Active Taint Path Step Check
+      const isInActivePath = selectedTaintFlow && selectedTaintFlow.pathNodeIds.includes(d.id);
+      const stepIndexInPath = selectedTaintFlow ? selectedTaintFlow.pathNodeIds.indexOf(d.id) : -1;
+      const isCurrentActiveStep = isInActivePath && stepIndexInPath === activeStepIndex;
+
+      // Active step pulse/halo ring
+      if (isCurrentActiveStep) {
+        g.append('circle')
+          .attr('r', 30)
+          .attr('fill', 'rgba(255, 0, 85, 0.25)')
+          .attr('stroke', '#FF0055')
+          .attr('stroke-width', 2.2)
+          .attr('stroke-dasharray', '4 2')
+          .attr('filter', 'url(#glow-critical)');
+      } else if (d.isNewlyTainted) {
+        // Delta newly tainted regression ring
+        g.append('circle')
+          .attr('r', 28)
+          .attr('fill', 'rgba(255, 0, 85, 0.2)')
+          .attr('stroke', '#FF0055')
+          .attr('stroke-width', 2.2)
+          .attr('stroke-dasharray', '3 2')
+          .attr('filter', 'url(#glow-critical)');
+      }
 
       // Glow effect for tainted or critical nodes
       if (d.tainted || d.type === 'SINK') {
@@ -885,6 +1241,123 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
           .attr('stroke-dasharray', '4 3')
           .attr('opacity', 0.75);
       }
+
+      // Taint Step Badge or Variable Tag
+      if (isInActivePath) {
+        const stepNum = stepIndexInPath + 1;
+        const totalSteps = selectedTaintFlow!.pathNodeIds.length;
+        const roleLabel = stepIndexInPath === 0
+          ? `Passo ${stepNum} (Origem: $${selectedTaintFlow!.variableName})`
+          : stepIndexInPath === totalSteps - 1
+          ? `Passo ${stepNum} (Sink Crítico: Exploit)`
+          : `Passo ${stepNum} (Repasse: $${selectedTaintFlow!.variableName})`;
+
+        const badgeG = g.append('g').attr('class', 'step-badge-tag').attr('transform', 'translate(0, -26)');
+        badgeG.append('rect')
+          .attr('x', -68)
+          .attr('y', -8)
+          .attr('width', 136)
+          .attr('height', 16)
+          .attr('rx', 4)
+          .attr('fill', isCurrentActiveStep ? '#FF0055' : '#3B0711')
+          .attr('stroke', isCurrentActiveStep ? '#FFFFFF' : '#F43F5E')
+          .attr('stroke-width', isCurrentActiveStep ? 1.5 : 1);
+
+        badgeG.append('text')
+          .attr('text-anchor', 'middle')
+          .attr('y', 3.5)
+          .attr('font-size', '8.5px')
+          .attr('font-family', 'monospace')
+          .attr('font-weight', 'bold')
+          .attr('fill', '#FFFFFF')
+          .text(roleLabel);
+      } else if (highlightAllTainted && d.taintedVariables && d.taintedVariables.length > 0) {
+        const badgeG = g.append('g').attr('class', 'var-badge-tag').attr('transform', 'translate(0, -25)');
+        badgeG.append('rect')
+          .attr('x', -45)
+          .attr('y', -7)
+          .attr('width', 90)
+          .attr('height', 14)
+          .attr('rx', 3)
+          .attr('fill', '#1F050A')
+          .attr('stroke', '#E11D48')
+          .attr('stroke-width', 1);
+
+        badgeG.append('text')
+          .attr('text-anchor', 'middle')
+          .attr('y', 3)
+          .attr('font-size', '8px')
+          .attr('font-family', 'monospace')
+          .attr('font-weight', 'bold')
+          .attr('fill', '#FDA4AF')
+          .text(`$${d.taintedVariables[0]}`);
+      }
+
+      // Delta Badges & Markers on Nodes
+      if (!isInActivePath) {
+        if (d.isGhostRemoved) {
+          const ghostG = g.append('g').attr('class', 'delta-ghost-tag').attr('transform', 'translate(0, -26)');
+          ghostG.append('rect')
+            .attr('x', -48)
+            .attr('y', -7)
+            .attr('width', 96)
+            .attr('height', 15)
+            .attr('rx', 3)
+            .attr('fill', '#18181B')
+            .attr('stroke', '#71717A')
+            .attr('stroke-width', 1)
+            .attr('stroke-dasharray', '2 2');
+
+          ghostG.append('text')
+            .attr('text-anchor', 'middle')
+            .attr('y', 3.5)
+            .attr('font-size', '8px')
+            .attr('font-family', 'monospace')
+            .attr('font-weight', 'bold')
+            .attr('fill', '#A1A1AA')
+            .text('[- REMOVIDO]');
+        } else if (d.isNewlyTainted) {
+          const deltaG = g.append('g').attr('class', 'delta-taint-tag').attr('transform', 'translate(0, -26)');
+          deltaG.append('rect')
+            .attr('x', -54)
+            .attr('y', -8)
+            .attr('width', 108)
+            .attr('height', 16)
+            .attr('rx', 4)
+            .attr('fill', '#E11D48')
+            .attr('stroke', '#FFFFFF')
+            .attr('stroke-width', 1.2);
+
+          deltaG.append('text')
+            .attr('text-anchor', 'middle')
+            .attr('y', 3.5)
+            .attr('font-size', '8px')
+            .attr('font-family', 'monospace')
+            .attr('font-weight', 'bold')
+            .attr('fill', '#FFFFFF')
+            .text('! RECÉM TAINTED');
+        } else if (d.deltaStatus === 'NEW') {
+          const deltaG = g.append('g').attr('class', 'delta-new-tag').attr('transform', 'translate(0, -26)');
+          deltaG.append('rect')
+            .attr('x', -42)
+            .attr('y', -7)
+            .attr('width', 84)
+            .attr('height', 15)
+            .attr('rx', 3)
+            .attr('fill', '#0E7490')
+            .attr('stroke', '#38BDF8')
+            .attr('stroke-width', 1);
+
+          deltaG.append('text')
+            .attr('text-anchor', 'middle')
+            .attr('y', 3.5)
+            .attr('font-size', '8px')
+            .attr('font-family', 'monospace')
+            .attr('font-weight', 'bold')
+            .attr('fill', '#E0F2FE')
+            .text('+ NOVO NÓ');
+        }
+      }
     });
 
     // Tick update loop
@@ -899,7 +1372,7 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
     return () => {
       simulation.stop();
     };
-  }, [filteredNodes, filteredLinks, settings, selectedNode, selectedPathIds]);
+  }, [filteredNodes, filteredLinks, settings, selectedNode, selectedPathIds, selectedTaintFlow, activeStepIndex, highlightAllTainted, showVariableLabels]);
 
   // Zoom & Pan control helpers
   const handleZoomIn = () => {
@@ -950,6 +1423,62 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
 
     const centerX = bbox.x + bbox.width / 2;
     const centerY = bbox.y + bbox.height / 2;
+
+    const translateX = containerWidth / 2 - scale * centerX;
+    const translateY = containerHeight / 2 - scale * centerY;
+
+    const transform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
+
+    svg.transition()
+      .duration(duration)
+      .ease(d3.easeCubicOut)
+      .call(zoomBehaviorRef.current.transform, transform);
+  };
+
+  const handleZoomToPath = (nodeIds?: string[], duration = 650) => {
+    const targetIds = nodeIds || (selectedTaintFlow ? selectedTaintFlow.pathNodeIds : []);
+    if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current || targetIds.length === 0) {
+      handleZoomToFit(duration);
+      return;
+    }
+
+    const svg = d3.select(svgRef.current);
+    const containerWidth = containerRef.current.clientWidth || 960;
+    const containerHeight = Math.max(580, containerRef.current.clientHeight || 580);
+
+    const targetNodes = filteredNodes.filter(n => targetIds.includes(n.id));
+    if (targetNodes.length === 0) {
+      handleZoomToFit(duration);
+      return;
+    }
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    targetNodes.forEach(n => {
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+      minX = Math.min(minX, x - 80);
+      maxX = Math.max(maxX, x + 80);
+      minY = Math.min(minY, y - 40);
+      maxY = Math.max(maxY, y + 40);
+    });
+
+    const pathWidth = maxX - minX;
+    const pathHeight = maxY - minY;
+    if (pathWidth <= 0 || pathHeight <= 0) {
+      handleZoomToFit(duration);
+      return;
+    }
+
+    const padding = 80;
+    const scaleX = containerWidth / (pathWidth + padding * 2);
+    const scaleY = containerHeight / (pathHeight + padding * 2);
+    const scale = Math.max(0.35, Math.min(1.6, Math.min(scaleX, scaleY)));
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
 
     const translateX = containerWidth / 2 - scale * centerX;
     const translateY = containerHeight / 2 - scale * centerY;
@@ -1115,6 +1644,41 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Delta Analysis Panel (Regression & New Vulnerabilities Diff) */}
+      <DataFlowDeltaPanel
+        delta={deltaAnalysis}
+        filterMode={deltaFilterMode}
+        onSelectFilterMode={(mode) => setDeltaFilterMode(mode)}
+        showGhostNodes={showGhostNodes}
+        onToggleGhostNodes={() => setShowGhostNodes(prev => !prev)}
+        onFocusVulnerability={(flow) => {
+          setSelectedTaintFlow(flow);
+          setActiveStepIndex(flow.pathNodeIds.length - 1);
+          setSelectedPathIds(new Set(flow.pathNodeIds));
+          handleZoomToPath(flow.pathNodeIds);
+        }}
+        onInspectNode={(_nodeId, filePath, line) => {
+          if (onSelectFile && filePath) {
+            onSelectFile(filePath, line);
+          }
+        }}
+        onSetCurrentAsBaseline={() => {
+          setPinnedBaseline(JSON.parse(JSON.stringify(safeGraph)));
+          setBaselineType('MANUAL_PINNED');
+        }}
+        onSimulateCodeChanges={(scenario) => {
+          const sim = generateSimulatedPreviousGraph(safeGraph, scenario);
+          setSimulatedBaseline(sim);
+          setBaselineType('SIMULATED');
+        }}
+        baselineType={baselineType}
+        onResetBaselineToNone={() => {
+          setBaselineType('NONE');
+          setSimulatedBaseline(null);
+          setPinnedBaseline(null);
+        }}
+      />
 
       {/* Interactive Controls & Filters Toolbar */}
       <div className="bg-[#0D0D0D] p-3 border border-[#222] rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -1471,25 +2035,33 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
             totalTaintFlows={safeGraph.metrics.totalTaintFlows}
           />
 
-          {/* Canvas Floating Legend */}
-          <div className="absolute bottom-3 left-3 bg-[#0A0A0A]/90 backdrop-blur border border-[#262626] rounded-lg px-3 py-2 text-[10.5px] font-mono flex flex-wrap items-center gap-3 text-zinc-400 pointer-events-none">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded bg-[#00E5FF]" />
-              <span>Endpoint API</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded bg-[#F59E0B]" />
-              <span>Consumer Function</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded bg-[#FF3E00] animate-pulse" />
-              <span>Sink Perigoso</span>
-            </span>
-            <span className="flex items-center gap-1.5 text-rose-400 font-bold">
-              <span className="w-4 border-t-2 border-dashed border-[#FF3E00]" />
-              <span>Taint Flow (Crítico)</span>
-            </span>
-          </div>
+          {/* Interactive Taint Variable Path-Tracing Legend */}
+          <DataFlowTaintLegend
+            taintFlows={availableTaintFlows}
+            selectedTaintFlow={selectedTaintFlow}
+            onSelectTaintFlow={handleSelectTaintFlow}
+            activeStepIndex={activeStepIndex}
+            onSelectStepIndex={setActiveStepIndex}
+            isPlaying={isPlayingFlow}
+            onTogglePlay={() => setIsPlayingFlow(prev => !prev)}
+            highlightAllTainted={highlightAllTainted}
+            onToggleHighlightAll={() => {
+              setHighlightAllTainted(prev => !prev);
+              if (selectedTaintFlow) setSelectedTaintFlow(null);
+            }}
+            showVariableLabels={showVariableLabels}
+            onToggleShowVariableLabels={() => setShowVariableLabels(prev => !prev)}
+            filterNodeType={filterNodeType}
+            onToggleFilterNodeType={handleToggleFilterNodeType}
+            onZoomToPath={() => handleZoomToPath()}
+            onInspectNode={(nodeId) => {
+              const node = nodesMap.get(nodeId);
+              if (node && onSelectFile) {
+                onSelectFile(node.file, node.line);
+              }
+            }}
+            nodesMap={nodesMap}
+          />
 
           {/* Selected Node Hint */}
           <div className="absolute top-3 right-3 bg-[#0A0A0A]/85 backdrop-blur border border-[#262626] rounded-lg px-3 py-1.5 text-[10px] font-mono text-zinc-400">
@@ -1573,6 +2145,51 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Delta Analysis Section (Regression & New Vulnerabilities) */}
+            {selectedNode.deltaStatus && selectedNode.deltaStatus !== 'UNCHANGED' && (
+              <div
+                className={`p-3 rounded-lg border space-y-1.5 font-mono text-xs ${
+                  selectedNode.isNewlyTainted
+                    ? 'bg-rose-950/30 border-rose-500/50 text-rose-200'
+                    : selectedNode.deltaStatus === 'NEW'
+                    ? 'bg-cyan-950/30 border-cyan-500/50 text-cyan-200'
+                    : selectedNode.deltaStatus === 'REMOVED'
+                    ? 'bg-zinc-900 border-zinc-700 text-zinc-300'
+                    : 'bg-amber-950/20 border-amber-800/40 text-amber-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    Delta / Status Recente:
+                  </span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[9.5px] font-bold ${
+                      selectedNode.isNewlyTainted
+                        ? 'bg-rose-600 text-white animate-pulse'
+                        : selectedNode.deltaStatus === 'NEW'
+                        ? 'bg-cyan-600 text-white'
+                        : selectedNode.deltaStatus === 'REMOVED'
+                        ? 'bg-zinc-700 text-zinc-200'
+                        : 'bg-amber-700 text-amber-100'
+                    }`}
+                  >
+                    {selectedNode.isNewlyTainted ? '! RECÉM TAINTED' : selectedNode.deltaStatus === 'NEW' ? '+ NOVO NÓ' : selectedNode.deltaStatus}
+                  </span>
+                </div>
+                {selectedNode.deltaReason && (
+                  <p className="text-[11px] leading-relaxed">
+                    {selectedNode.deltaReason}
+                  </p>
+                )}
+                {selectedNode.taintedVariables && selectedNode.taintedVariables.length > 0 && (
+                  <div className="pt-1 text-[10px] text-rose-300">
+                    <span>Variáveis: </span>
+                    <span className="font-bold">{selectedNode.taintedVariables.map(v => `$${v}`).join(', ')}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Threat & CWE Classification (if Sink or Tainted) */}
             {selectedNode.riskCategory && (

@@ -5,6 +5,7 @@ import {
   DataFlowNode,
   DataFlowLink,
   DataFlowGraphData,
+  TaintVariableFlow,
   SeverityLevel
 } from '../types';
 
@@ -401,18 +402,69 @@ export function buildDataFlowGraph(
     }
   }
 
-  // 8. Taint Analysis: Propagate taint from Endpoints to Sinks
-  // A sink is tainted if there exists a directed path from an Endpoint to it
+  // 8. Taint Analysis: Propagate taint from Endpoints to Sinks and track tainted variables
+  const extractTaintedVariable = (sinkNode: DataFlowNode): { variableName: string; sourceField: string } => {
+    const snippet = sinkNode.snippet || '';
+
+    // eval(payload.code) or eval(code)
+    const evalMatch = /eval\s*\(\s*([a-zA-Z0-9_$.]+)/.exec(snippet);
+    if (evalMatch && evalMatch[1]) {
+      return { variableName: evalMatch[1], sourceField: 'req.body.code' };
+    }
+
+    // innerHTML = metadata.bioHtml or elem.innerHTML = val
+    const innerHtmlMatch = /innerHTML\s*=\s*([a-zA-Z0-9_$.]+)/.exec(snippet);
+    if (innerHtmlMatch && innerHtmlMatch[1]) {
+      return { variableName: innerHtmlMatch[1], sourceField: 'res.json().bioHtml' };
+    }
+
+    // document.write(x)
+    const docWriteMatch = /document\.write(?:ln)?\s*\(\s*([a-zA-Z0-9_$.]+)/.exec(snippet);
+    if (docWriteMatch && docWriteMatch[1]) {
+      return { variableName: docWriteMatch[1], sourceField: 'req.query.q' };
+    }
+
+    // localStorage.setItem("session_token", metadata.token)
+    const storageMatch = /(?:localStorage|sessionStorage)\.setItem\s*\(\s*['"`][^'"`]+['"`]\s*,\s*([a-zA-Z0-9_$.]+)/.exec(snippet);
+    if (storageMatch && storageMatch[1]) {
+      return { variableName: storageMatch[1], sourceField: 'res.json().token' };
+    }
+
+    // window.postMessage({ session: payload.token }, "*")
+    const postMsgMatch = /postMessage\s*\(\s*\{[^}]*:\s*([a-zA-Z0-9_$.]+)/.exec(snippet);
+    if (postMsgMatch && postMsgMatch[1]) {
+      return { variableName: postMsgMatch[1], sourceField: 'req.body.token' };
+    }
+
+    // Function(..., code)
+    const fnMatch = /Function\s*\([^)]*,\s*([a-zA-Z0-9_$.]+)\s*\)/.exec(snippet);
+    if (fnMatch && fnMatch[1]) {
+      return { variableName: fnMatch[1], sourceField: 'req.body.script' };
+    }
+
+    // Heuristics by sink type
+    if (sinkNode.sinkType === 'EVAL') return { variableName: 'payload.code', sourceField: 'req.body.code' };
+    if (sinkNode.sinkType === 'INNER_HTML') return { variableName: 'metadata.bioHtml', sourceField: 'res.data.bioHtml' };
+    if (sinkNode.sinkType === 'INSECURE_STORAGE') return { variableName: 'metadata.token', sourceField: 'res.data.token' };
+    if (sinkNode.sinkType === 'POST_MESSAGE') return { variableName: 'payload.token', sourceField: 'payload.token' };
+    if (sinkNode.sinkType === 'DOCUMENT_WRITE') return { variableName: 'searchQuery', sourceField: 'req.query.search' };
+    return { variableName: 'untrustedInput', sourceField: 'req.body' };
+  };
+
   const adjacency: Map<string, string[]> = new Map();
+  const linkByEndpoints: Map<string, DataFlowLink> = new Map();
   for (const link of links) {
     const s = typeof link.source === 'string' ? link.source : (link.source as DataFlowNode).id;
     const t = typeof link.target === 'string' ? link.target : (link.target as DataFlowNode).id;
     if (!adjacency.has(s)) adjacency.set(s, []);
     adjacency.get(s)!.push(t);
+    linkByEndpoints.set(`${s}__TO__${t}`, link);
   }
 
   const reachableFromEndpoint: Set<string> = new Set();
-  const taintedPaths: Set<string> = new Set();
+  const taintedPathLinks: Set<string> = new Set();
+  const taintFlows: TaintVariableFlow[] = [];
+  const registeredFlowKeys = new Set<string>();
 
   for (const epNode of endpointNodes) {
     const visitedInThisBfs: Set<string> = new Set();
@@ -432,22 +484,91 @@ export function buildDataFlowGraph(
           // If next is a sink, the entire path is a Tainted Flow!
           const nextNode = nodesMap.get(next);
           if (nextNode && nextNode.type === 'SINK') {
+            const { variableName, sourceField } = extractTaintedVariable(nextNode);
+            const pathLinkIds: string[] = [];
+
             for (let i = 0; i < newPath.length - 1; i++) {
-              taintedPaths.add(`${newPath[i]}__TO__${newPath[i + 1]}`);
+              const edgeKey = `${newPath[i]}__TO__${newPath[i + 1]}`;
+              taintedPathLinks.add(edgeKey);
+              pathLinkIds.push(edgeKey);
+
+              const linkObj = linkByEndpoints.get(edgeKey);
+              if (linkObj) {
+                linkObj.isTainted = true;
+                linkObj.taintedVariable = variableName;
+                if (!linkObj.taintedVariableList) linkObj.taintedVariableList = [];
+                if (!linkObj.taintedVariableList.includes(variableName)) {
+                  linkObj.taintedVariableList.push(variableName);
+                }
+              }
+
               const n = nodesMap.get(newPath[i]);
-              if (n) n.tainted = true;
+              if (n) {
+                n.tainted = true;
+                if (!n.taintedVariables) n.taintedVariables = [];
+                if (!n.taintedVariables.includes(variableName)) {
+                  n.taintedVariables.push(variableName);
+                }
+                n.taintRole = n.type === 'ENDPOINT' ? 'SOURCE' : 'PROPAGATOR';
+              }
             }
+
             nextNode.tainted = true;
+            if (!nextNode.taintedVariables) nextNode.taintedVariables = [];
+            if (!nextNode.taintedVariables.includes(variableName)) {
+              nextNode.taintedVariables.push(variableName);
+            }
+            nextNode.taintRole = 'SINK';
+
+            // Register distinct TaintVariableFlow
+            const flowKey = `${epNode.id}__${variableName}__${nextNode.id}`;
+            if (!registeredFlowKeys.has(flowKey)) {
+              registeredFlowKeys.add(flowKey);
+
+              const intermediates = newPath.slice(1, -1);
+              const intermediateLabels = intermediates
+                .map(id => nodesMap.get(id)?.label.replace('()', '') || id)
+                .filter(Boolean);
+
+              const transformSummary = intermediateLabels.length > 0
+                ? `Ingressado via ${epNode.label} (${sourceField}) ➔ Propagado em ${intermediateLabels.join(' ➔ ')} ➔ Consumido sem sanitização em ${nextNode.label}`
+                : `Ingressado via ${epNode.label} ➔ Consumido diretamente em ${nextNode.label}`;
+
+              const taxonomy = SINK_TAXONOMY[nextNode.sinkType as DangerousSinkFinding['sinkType']] || {
+                cwe: nextNode.cwe || { id: 'CWE-20', name: 'Improper Input Validation' },
+                riskCategory: nextNode.riskCategory || 'Dangerous Sink Execution',
+                threatDescription: nextNode.description || 'Execução insegura de variável não sanitizada.'
+              };
+
+              taintFlows.push({
+                id: `taint-flow-${taintFlows.length + 1}`,
+                variableName,
+                sourceNodeId: epNode.id,
+                sourceLabel: epNode.label,
+                sourceParamOrField: sourceField,
+                intermediateNodeIds: intermediates,
+                sinkNodeId: nextNode.id,
+                sinkLabel: nextNode.label,
+                sinkType: nextNode.sinkType || 'SINK',
+                pathNodeIds: newPath,
+                pathLinkIds,
+                severity: nextNode.severity || 'CRITICAL',
+                riskCategory: taxonomy.riskCategory,
+                cwe: taxonomy.cwe,
+                description: `A variável "${variableName}" é recebida do endpoint não confiável ${epNode.label} e transita sem validação até o sink crítico ${nextNode.label}.`,
+                variableTransformSummary: transformSummary
+              });
+            }
           }
         }
       }
     }
   }
 
-  // Update links with tainted status
+  // Update all links marked in tainted paths
   let totalTaintFlows = 0;
   for (const link of links) {
-    if (taintedPaths.has(link.id)) {
+    if (taintedPathLinks.has(link.id)) {
       link.isTainted = true;
       totalTaintFlows++;
     }
@@ -468,11 +589,12 @@ export function buildDataFlowGraph(
   return {
     nodes: finalNodes,
     links,
+    taintFlows,
     metrics: {
       totalEndpoints: endpointNodes.length,
       totalConsumers: consumerNodes.length,
       totalSinks: sinkNodes.length,
-      totalTaintFlows,
+      totalTaintFlows: taintFlows.length > 0 ? taintFlows.length : totalTaintFlows,
       criticalSinksCount,
       filesAnalyzed: activeFiles.length
     }

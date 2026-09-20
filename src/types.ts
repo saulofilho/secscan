@@ -362,6 +362,25 @@ export type DataFlowNodeType = 'ENDPOINT' | 'CONSUMER' | 'SINK';
 
 export type DataFlowLinkType = 'ENDPOINT_TO_CONSUMER' | 'CONSUMER_TO_SINK' | 'DIRECT_FLOW';
 
+export interface TaintVariableFlow {
+  id: string;
+  variableName: string;
+  sourceNodeId: string;
+  sourceLabel: string;
+  sourceParamOrField: string;
+  intermediateNodeIds: string[];
+  sinkNodeId: string;
+  sinkLabel: string;
+  sinkType: DangerousSinkFinding['sinkType'] | string;
+  pathNodeIds: string[];
+  pathLinkIds: string[];
+  severity: SeverityLevel;
+  riskCategory: string;
+  cwe?: { id: string; name: string };
+  description: string;
+  variableTransformSummary: string;
+}
+
 export interface DataFlowNode {
   id: string;
   type: DataFlowNodeType;
@@ -379,9 +398,17 @@ export interface DataFlowNode {
   remediation?: string;
   description?: string;
   tainted?: boolean;
+  taintedVariables?: string[];
+  taintRole?: 'SOURCE' | 'PROPAGATOR' | 'SINK';
   riskCategory?: string;
   cwe?: { id: string; name: string };
   connectionsCount?: number;
+  // Delta fields
+  deltaStatus?: DataFlowNodeDeltaStatus;
+  isNewlyTainted?: boolean;
+  deltaReason?: string;
+  isGhostRemoved?: boolean;
+  previousTainted?: boolean;
   // D3 force layout fields
   x?: number;
   y?: number;
@@ -398,13 +425,80 @@ export interface DataFlowLink {
   target: string | DataFlowNode;
   flowType: DataFlowLinkType;
   isTainted: boolean;
+  taintedVariable?: string;
+  taintedVariableList?: string[];
   label?: string;
   file: string;
+  // Delta fields
+  deltaStatus?: DataFlowLinkDeltaStatus;
+  isNewlyTainted?: boolean;
+  isGhostRemoved?: boolean;
+  deltaReason?: string;
+}
+
+export type DataFlowNodeDeltaStatus = 'NEW' | 'MODIFIED' | 'REMOVED' | 'UNCHANGED';
+export type DataFlowLinkDeltaStatus = 'NEW' | 'NEWLY_TAINTED' | 'REMEDIATED' | 'REMOVED' | 'UNCHANGED';
+
+export type DataFlowVulnerabilityDeltaType = 'NEW_VULNERABILITY' | 'RESOLVED_VULNERABILITY' | 'PERSISTENT_VULNERABILITY';
+
+export interface DataFlowVulnerabilityDelta {
+  id: string;
+  type: DataFlowVulnerabilityDeltaType;
+  flow: TaintVariableFlow;
+  severity: SeverityLevel;
+  changeReason: string;
+  introducedInFile: string;
+  introducedAtLine?: number;
+  variableName: string;
+  sourceLabel: string;
+  sinkLabel: string;
+  riskCategory: string;
+  cwe?: { id: string; name: string };
+  remediationAdvice: string;
+  codeSnippetPreview?: string;
+}
+
+export interface DataFlowDeltaAnalysis {
+  hasPreviousAnalysis: boolean;
+  baselineName?: string;
+  previousTimestamp?: string;
+  currentTimestamp?: string;
+  nodeDeltaMap: Record<string, {
+    status: DataFlowNodeDeltaStatus;
+    isNewlyTainted: boolean;
+    previousTainted?: boolean;
+    currentTainted?: boolean;
+    newlyAddedVariables?: string[];
+    changeDescription?: string;
+  }>;
+  linkDeltaMap: Record<string, {
+    status: DataFlowLinkDeltaStatus;
+    isNewlyTainted: boolean;
+    changeDescription?: string;
+  }>;
+  vulnerabilityDeltas: DataFlowVulnerabilityDelta[];
+  newVulnerabilities: DataFlowVulnerabilityDelta[];
+  resolvedVulnerabilities: DataFlowVulnerabilityDelta[];
+  persistentVulnerabilities: DataFlowVulnerabilityDelta[];
+  metrics: {
+    newVulnerabilitiesCount: number;
+    resolvedVulnerabilitiesCount: number;
+    netVulnerabilityDelta: number; // e.g. +2
+    newNodesCount: number;
+    removedNodesCount: number;
+    modifiedNodesCount: number;
+    newlyTaintedNodesCount: number;
+    newLinksCount: number;
+    riskStatus: 'REGRESSION_CRITICAL' | 'REGRESSION_WARNING' | 'IMPROVED' | 'NEUTRAL';
+  };
+  removedNodes: DataFlowNode[];
+  removedLinks: DataFlowLink[];
 }
 
 export interface DataFlowGraphData {
   nodes: DataFlowNode[];
   links: DataFlowLink[];
+  taintFlows?: TaintVariableFlow[];
   metrics: {
     totalEndpoints: number;
     totalConsumers: number;
@@ -431,6 +525,8 @@ export interface DataFlowGraphSettings {
   hideIsolatedNodes: boolean;
   showLevelGuides: boolean;
   highlightTaintEdges: boolean;
+  highlightTaintedVariables?: boolean;
+  showVariableLabelsOnLinks?: boolean;
 }
 
 export interface WorkspaceRiskValidation {

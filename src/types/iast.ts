@@ -1,4 +1,4 @@
-import { SeverityLevel } from './types';
+import { SeverityLevel } from '../types';
 
 /**
  * Types of instrumentation hooks installed by the IAST agent during runtime emulation
