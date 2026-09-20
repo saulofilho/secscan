@@ -52,6 +52,13 @@ import { DnsSecuritySuiteView } from './components/DnsSecuritySuiteView';
 import { WafSuiteView } from './components/WafSuiteView';
 import { SdwanSuiteView } from './components/SdwanSuiteView';
 import { IastSuiteView } from './components/IastSuiteView';
+import { ScaSecurityView } from './components/ScaSecurityView';
+import { IacSecurityView } from './components/IacSecurityView';
+import { DastFuzzerView } from './components/DastFuzzerView';
+import { SbomGeneratorView } from './components/SbomGeneratorView';
+import { EntropySecretsView } from './components/EntropySecretsView';
+import { ThreatModelingView } from './components/ThreatModelingView';
+import { AutoRemediationView } from './components/AutoRemediationView';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -1847,6 +1854,84 @@ export default function App() {
             onNavigateToDataFlow={() => setActiveTab('dataflow')}
             onSelectFile={(filePath) => {
               const target = files.find(f => f.name.includes(filePath) || filePath.includes(f.name));
+              if (target) {
+                setSelectedFile(target);
+                setActiveTab('scanner');
+              }
+            }}
+          />
+        )}
+
+        {activeTab === 'sca' && (
+          <ScaSecurityView
+            files={files}
+            onNavigateToFile={(filePath) => {
+              const target = files.find(f => f.path === filePath || f.name === filePath);
+              if (target) {
+                setSelectedFile(target);
+                setActiveTab('scanner');
+              }
+            }}
+          />
+        )}
+
+        {activeTab === 'iac' && (
+          <IacSecurityView
+            files={files}
+            onNavigateToFile={(filePath) => {
+              const target = files.find(f => f.path === filePath || f.name === filePath);
+              if (target) {
+                setSelectedFile(target);
+                setActiveTab('scanner');
+              }
+            }}
+          />
+        )}
+
+        {activeTab === 'dast' && (
+          <DastFuzzerView
+            endpoints={report.apiEndpoints}
+          />
+        )}
+
+        {activeTab === 'sbom' && (
+          <SbomGeneratorView
+            files={files}
+          />
+        )}
+
+        {activeTab === 'entropy' && (
+          <EntropySecretsView
+            files={files}
+            onNavigateToFile={(filePath) => {
+              const target = files.find(f => f.path === filePath || f.name === filePath);
+              if (target) {
+                setSelectedFile(target);
+                setActiveTab('scanner');
+              }
+            }}
+          />
+        )}
+
+        {activeTab === 'threatmodel' && (
+          <ThreatModelingView
+            findings={report.findings}
+            endpoints={report.apiEndpoints}
+          />
+        )}
+
+        {activeTab === 'autoremediation' && (
+          <AutoRemediationView
+            files={files}
+            findings={report.findings}
+            onUpdateFiles={(updated) => {
+              setFiles(updated);
+            }}
+            onReScan={() => {
+              executeScan(files, rules, ignorePatterns);
+            }}
+            onNavigateToFile={(filePath) => {
+              const target = files.find(f => f.path === filePath || f.name === filePath);
               if (target) {
                 setSelectedFile(target);
                 setActiveTab('scanner');

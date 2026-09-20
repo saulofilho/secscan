@@ -240,5 +240,166 @@ describe('AuthService Suite', () => {
     expect(auth).toBeDefined();
   });
 });`
+  },
+  {
+    name: 'package.json',
+    path: 'package.json',
+    extension: 'json',
+    size: 1850,
+    lastModified: 1757156400000,
+    content: `{
+  "name": "fintech-portal-api",
+  "version": "1.4.2",
+  "description": "Enterprise Financial Core & Payment API",
+  "main": "src/controllers/paymentController.js",
+  "license": "Proprietary",
+  "dependencies": {
+    "express": "4.18.2",
+    "lodash": "4.17.15",
+    "axios": "0.21.1",
+    "jsonwebtoken": "8.5.1",
+    "minimist": "1.2.5",
+    "cors": "2.8.5",
+    "dotenv": "16.0.3",
+    "pg": "8.11.0",
+    "gpl-crypto-tools": "2.1.0"
+  },
+  "devDependencies": {
+    "jest": "29.5.0",
+    "supertest": "6.3.3",
+    "typescript": "5.0.4"
+  }
+}`
+  },
+  {
+    name: 'Dockerfile',
+    path: 'Dockerfile',
+    extension: 'dockerfile',
+    size: 920,
+    lastModified: 1757156800000,
+    content: `# Insecure Dockerfile Configuration Example
+FROM node:latest
+
+WORKDIR /app
+
+# Insecure: Installing SSH and sudo in application container
+RUN apt-get update && apt-get install -y openssh-server sudo curl
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+# Insecure: Sensitive ports exposed (SSH 22 & App 3000)
+EXPOSE 22 3000
+
+# Insecure: Running container process as root without USER directive
+CMD ["npm", "start"]`
+  },
+  {
+    name: 'docker-compose.yml',
+    path: 'docker-compose.yml',
+    extension: 'yml',
+    size: 1150,
+    lastModified: 1757157200000,
+    content: `version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+      - "22:22"
+    environment:
+      - NODE_ENV=production
+      - DB_PASSWORD=unmasked_postgres_admin_pass
+    volumes:
+      # Insecure host docker socket mount
+      - /var/run/docker.sock:/var/run/docker.sock
+    privileged: true
+
+  database:
+    image: postgres:latest
+    ports:
+      # Insecure: Database exposed to all interfaces
+      - "0.0.0.0:5432:5432"
+    environment:
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: super_insecure_db_pass_123
+      POSTGRES_DB: finance_db`
+  },
+  {
+    name: 'deployment.yaml',
+    path: 'k8s/deployment.yaml',
+    extension: 'yaml',
+    size: 1420,
+    lastModified: 1757157600000,
+    content: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fintech-portal-deployment
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: fintech-portal
+  template:
+    metadata:
+      labels:
+        app: fintech-portal
+    spec:
+      containers:
+      - name: api-container
+        image: company/fintech-portal:latest
+        securityContext:
+          # Insecure K8s misconfiguration: privileged container
+          privileged: true
+          allowPrivilegeEscalation: true
+          readOnlyRootFilesystem: false
+        # Insecure: Missing resources requests & limits (DoS risk)
+        ports:
+        - containerPort: 3000
+        volumeMounts:
+        - name: host-root
+          mountPath: /host-system
+      volumes:
+      - name: host-root
+        hostPath:
+          path: /`
+  },
+  {
+    name: 'ci-deploy.yml',
+    path: '.github/workflows/ci-deploy.yml',
+    extension: 'yml',
+    size: 980,
+    lastModified: 1757158000000,
+    content: `name: Production CI/CD Pipeline
+
+on:
+  # Insecure: pull_request_target triggers with write access on external PRs
+  pull_request_target:
+    branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          ref: \${{ github.event.pull_request.head.sha }}
+
+      # Insecure script injection from untrusted PR title
+      - name: Print PR Summary
+        run: |
+          echo "Processing PR: \${{ github.event.pull_request.title }}"
+
+      - name: Deploy to Cloud
+        env:
+          PROD_DEPLOY_KEY: \${{ secrets.PROD_AWS_KEY }}
+        run: |
+          npm run build
+          echo "Deployed successfully"`
   }
 ];

@@ -28,7 +28,12 @@ import {
   Flame,
   Crosshair,
   Binary,
-  Activity
+  Activity,
+  Package,
+  Container,
+  FileSpreadsheet,
+  Target,
+  Wrench
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
 
@@ -81,6 +86,13 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'jsminer', label: 'JS Miner', icon: Boxes, badge: report.jsMiner?.totalAssetsCount },
     { id: 'dataflow', label: 'Fluxo & Sinks (D3)', icon: Network, badge: report.dataFlowGraph?.metrics.totalTaintFlows },
     { id: 'iast', label: 'IAST (Runtime Hooks)', icon: Activity, badge: report.iastReport?.findings.length ? `${report.iastReport.findings.length} hooks` : 'IAST' },
+    { id: 'sca', label: 'SCA (Dependências & CVEs)', icon: Package, badge: 'SCA' },
+    { id: 'iac', label: 'IaC Security (Docker/K8s)', icon: Container, badge: 'IaC' },
+    { id: 'dast', label: 'DAST (Fuzzer & Headers)', icon: Crosshair, badge: 'DAST' },
+    { id: 'sbom', label: 'SBOM Generator', icon: FileSpreadsheet, badge: 'CycloneDX' },
+    { id: 'entropy', label: 'Entropia & Segredos Git', icon: Binary, badge: 'Entropy' },
+    { id: 'threatmodel', label: 'Modelagem STRIDE & CVSS', icon: Target, badge: 'STRIDE' },
+    { id: 'autoremediation', label: 'Auto-Remediação (Patches)', icon: Wrench, badge: '1-Click' },
     { id: 'frameworks', label: 'Frameworks (MITRE/NIST/OWASP)', icon: ShieldCheck },
     { id: 'securityonion', label: 'Security Onion (SOC)', icon: Radio, badge: report.findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length },
     { id: 'crowdstrike', label: 'CrowdStrike (EDR/IOA)', icon: Zap, badge: 3 },
