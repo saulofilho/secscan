@@ -33,7 +33,8 @@ import {
   Container,
   FileSpreadsheet,
   Target,
-  Wrench
+  Wrench,
+  Scale
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
 
@@ -93,6 +94,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'entropy', label: 'Entropia & Segredos Git', icon: Binary, badge: 'Entropy' },
     { id: 'threatmodel', label: 'Modelagem STRIDE & CVSS', icon: Target, badge: 'STRIDE' },
     { id: 'autoremediation', label: 'Auto-Remediação (Patches)', icon: Wrench, badge: '1-Click' },
+    { id: 'compliance', label: 'Auditoria Compliance (SOC2/ISO/HIPAA)', icon: Scale, badge: 'SOC2' },
     { id: 'frameworks', label: 'Frameworks (MITRE/NIST/OWASP)', icon: ShieldCheck },
     { id: 'securityonion', label: 'Security Onion (SOC)', icon: Radio, badge: report.findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length },
     { id: 'crowdstrike', label: 'CrowdStrike (EDR/IOA)', icon: Zap, badge: 3 },

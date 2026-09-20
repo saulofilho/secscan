@@ -1,6 +1,6 @@
 {
   "name": "SecScan AppSec Suite - Advanced SAST, Secret Matrix & DataFlow Platform",
-  "description": "Plataforma avançada e completa de cibersegurança e AppSec: SAST com fluxo de dados D3 delta, IAST runtime hooks, SCA de dependências (CVEs/licenças), IaC Security (Docker/K8s/CI-CD), DAST Fuzzer de APIs, gerador de SBOM (CycloneDX/SPDX), caçador de segredos por Entropia de Shannon no Git, Modelagem de Ameaças STRIDE/ASVS/CVSS v3.1, e motor de Auto-Remediação de patches com 1 clique.",
+  "description": "Plataforma avançada e completa de cibersegurança e AppSec: ComplianceAuditView mapeando achados para SOC2, ISO 27001 e HIPAA com score de prontidão, SAST com fluxo de dados D3 delta, IAST runtime hooks, SCA de dependências (CVEs/licenças), IaC Security, DAST Fuzzer de APIs, gerador de SBOM (CycloneDX/SPDX), caçador de segredos por Entropia de Shannon no Git, Modelagem de Ameaças STRIDE/ASVS/CVSS v3.1, e motor de Auto-Remediação com 1 clique.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

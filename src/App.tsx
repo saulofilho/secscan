@@ -59,6 +59,7 @@ import { SbomGeneratorView } from './components/SbomGeneratorView';
 import { EntropySecretsView } from './components/EntropySecretsView';
 import { ThreatModelingView } from './components/ThreatModelingView';
 import { AutoRemediationView } from './components/AutoRemediationView';
+import { ComplianceAuditView } from './components/ComplianceAuditView';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -1937,6 +1938,20 @@ export default function App() {
                 setActiveTab('scanner');
               }
             }}
+          />
+        )}
+
+        {activeTab === 'compliance' && (
+          <ComplianceAuditView
+            findings={report.findings}
+            onNavigateToFile={(filePath) => {
+              const target = files.find(f => f.path === filePath || f.name === filePath);
+              if (target) {
+                setSelectedFile(target);
+                setActiveTab('scanner');
+              }
+            }}
+            onSelectFinding={handleSelectFinding}
           />
         )}
 
