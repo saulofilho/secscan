@@ -173,7 +173,7 @@ export const INITIAL_TUNNEL_SESSIONS: DnsTunnelExfiltrationSession[] = [
     apexDomain: 'exfil.attacker-tunnel.net',
     totalChunksCount: 48,
     estimatedBytesLeaked: 3072,
-    reassembledDataSample: 'eyJhY2Nlc3Nfa2V5X2lkIjoiQUtJQUpPWTJNVzRLR0dFWFFaM1EiLCJzZWNyZXRfa2V5Ijoi...',
+    reassembledDataSample: 'eyJhY2Nlc3Nfa2V5X2lkIjoiREVNT19BV1NfQUtJRF9TQU1QTEUiLCJzZWNyZXRfa2V5Ijoi...',
     status: 'ACTIVE_BLOCKING',
     detectedProtocol: 'BASE64_DNS_TUNNEL'
   }

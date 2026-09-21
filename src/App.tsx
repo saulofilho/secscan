@@ -60,6 +60,7 @@ import { EntropySecretsView } from './components/EntropySecretsView';
 import { ThreatModelingView } from './components/ThreatModelingView';
 import { AutoRemediationView } from './components/AutoRemediationView';
 import { ComplianceAuditView } from './components/ComplianceAuditView';
+import { ToolGuideModal } from './components/ToolGuideModal';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -134,6 +135,8 @@ export default function App() {
   const [showCommandPalette, setShowCommandPalette] = useState<boolean>(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState<boolean>(false);
   const [showMttrConfigModal, setShowMttrConfigModal] = useState<boolean>(false);
+  const [showToolGuideModal, setShowToolGuideModal] = useState<boolean>(false);
+  const [toolGuideTargetTab, setToolGuideTargetTab] = useState<string>('compliance');
   const [shortcutToast, setShortcutToast] = useState<{ message: string; key?: string } | null>(null);
 
   // Global SecScan configuration for dynamic remediationTime (MTTR) parameters
@@ -1219,6 +1222,10 @@ export default function App() {
         onOpenGlossary={() => handleOpenGlossary()}
         onOpenCommandPalette={() => setShowCommandPalette(true)}
         onOpenShortcuts={() => setShowShortcutsModal(true)}
+        onOpenToolGuide={(tabId) => {
+          setToolGuideTargetTab(tabId || activeTab);
+          setShowToolGuideModal(true);
+        }}
       />
 
       {/* Main Container Content */}
@@ -2212,6 +2219,17 @@ export default function App() {
         onClose={() => setShowMttrConfigModal(false)}
         config={secScanConfig}
         onUpdateConfig={setSecScanConfig}
+      />
+
+      {/* Interactive Tool Guide, Architecture & Practical Examples Modal */}
+      <ToolGuideModal
+        isOpen={showToolGuideModal}
+        onClose={() => setShowToolGuideModal(false)}
+        activeTab={toolGuideTargetTab}
+        onNavigateToTab={(tabId) => {
+          setActiveTab(tabId);
+          setShowToolGuideModal(false);
+        }}
       />
 
       {/* Non-intrusive Shortcut Toast Feedback */}

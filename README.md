@@ -32,7 +32,225 @@
 - **Quality Gate Interativo no Dashboard & CLI:** Ajuste do teto de risco tolerado (`--max-risk <score>`) com bloqueio imediato do pipeline (exit code `1`) se a pontuação agregada exceder a política da organização.
 - **Transparência do Cálculo:** Painel interativo no Dashboard exibindo a decomposição exata de pontos por severidade e a curva de saturação.
 
-### 2. 📚 Base de Dados de Remediação com Referências Oficiais (OWASP, Snyk, CWE)
+---
+
+### 2. ⚖️ Auditoria de Compliance (SOC 2 Type II, ISO 27001, HIPAA)
+- **O que é e Como Funciona:** O motor de conformidade audita determinísticamente a base de código e arquivos de infraestrutura contra os requisitos das três principais normas internacionais de segurança:
+  - **SOC 2 Type II (Trust Services Criteria):** CC6.1 (Perímetro Lógico e Autenticação), CC6.6 (Proteção contra Ameaças e Vulnerabilidades), CC6.7 (Transmissão Criptográfica Segura), CC7.1 (Monitoramento Contínuo de Vulnerabilidades).
+  - **ISO/IEC 27001:2022:** A.8.24 (Uso de Criptografia), A.8.28 (Codificação Segura), A.5.15 (Controle de Acesso), A.8.8 (Gestão de Vulnerabilidades Técnicas).
+  - **HIPAA Security Rule:** § 164.312(a)(2)(iv) (Criptografia e Descriptografia de ePHI), § 164.312(c)(1) (Integridade de Dados), § 164.312(e)(1) (Segurança na Transmissão de Redes).
+- **Como Usar no Sistema:**
+  1. No menu superior, clique na aba **"Auditoria Compliance (SOC2/ISO/HIPAA)"** ou clique em **"💡 Como Usar & Exemplos"** no cabeçalho.
+  2. Alterne entre as normas no seletor do topo (**SOC 2**, **ISO 27001** ou **HIPAA**).
+  3. Visualize a pontuação de prontidão (**Readiness Score** de 0 a 100%) e o status de cada controle (**COMPLIANT**, **AT_RISK**, **NON_COMPLIANT**).
+  4. Clique em um controle para inspecionar os achados do SAST associados a ele e os requisitos mandatórios de evidência.
+  5. Clique em **"Exportar Relatório Executivo"** para gerar um pacote formal para auditores externos.
+- **Exemplo Prático:**
+  - *Cenário:* Aplicação armazena tokens médicos e segredos de banco de dados diretamente em arquivos `.js` ou realiza tráfego HTTP sem TLS.
+  - *Código de Entrada:*
+    ```typescript
+    const dbClient = new PgClient({ connectionString: "postgres://app_user:REDACTED_PASSWORD@prod-db:5432/patients" });
+    app.use('/records', unencryptedHttpMiddleware);
+    ```
+  - *Detecção do SecScan:*
+    - **SOC 2 CC6.1 / ISO 27001 A.8.24:** `NON_COMPLIANT` — Credenciais em texto claro expostas no código fonte.
+    - **HIPAA § 164.312(a)(2)(iv):** `NON_COMPLIANT` — Ausência de criptografia em repouso e em trânsito de dados de saúde.
+  - *Código Remediado:*
+    ```typescript
+    import { getSecret } from './vault';
+    const dbClient = new PgClient({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: true, ca: getSecret('DB_CA_CERT') }
+    });
+    ```
+
+---
+
+### 3. 📦 SCA — Software Composition Analysis (Dependências, CVEs & Licenças)
+- **O que é e Como Funciona:** Analisa o arquivo `package.json` ou manifests de dependências, mapeando bibliotecas de terceiros contra bases conhecidas de vulnerabilidades (NVD/MITRE) e checando termos de licenciamento. Calcula o score de risco das dependências e alerta sobre bibliotecas obsoletas ou licenças copyleft (ex.: GPL v3) incompatíveis com softwares comerciais.
+- **Como Usar no Sistema:**
+  1. Acesse a aba **"SCA (Dependências & CVEs)"**.
+  2. Cole o conteúdo de um `package.json` no painel esquerdo ou utilize o projeto pré-carregado no workspace.
+  3. Clique em **"Auditar Dependências"**.
+  4. Analise a lista de pacotes com vulnerabilidades catalogadas, CVEs mapeadas, pontuação CVSS e a versão segura de correção (`Fixed In`).
+  5. Verifique a matriz de licenças (MIT, Apache-2.0, BSD vs GPL/AGPL).
+- **Exemplo Prático:**
+  - *Entrada (`package.json`):*
+    ```json
+    {
+      "dependencies": {
+        "axios": "0.21.1",
+        "lodash": "4.17.15",
+        "jsonwebtoken": "8.5.1"
+      }
+    }
+    ```
+  - *Detecção do SecScan:*
+    - `lodash@4.17.15`: **CVE-2020-8203** (CVSS 7.4 - Prototype Pollution em `zipObjectDeep`). Correção: Atualizar para `>= 4.17.21`.
+    - `axios@0.21.1`: **CVE-2020-28168** (CVSS 5.9 - SSRF bypass via redirecionamentos). Correção: Atualizar para `>= 0.21.2`.
+  - *Remediação:*
+    ```bash
+    npm install lodash@^4.17.21 axios@^1.7.0 jsonwebtoken@^9.0.2
+    ```
+
+---
+
+### 4. 🐳 IaC Security — Infrastructure as Code (Docker, Kubernetes & CI/CD)
+- **O que é e Como Funciona:** Scanner estático especializado em modelos de infraestrutura declarativa: Dockerfile, Kubernetes Manifests (`deployment.yaml`, `pod.yaml`) e workflows de CI/CD (`.github/workflows/*.yml`). Identifica execuções como usuário `root`, ausência de quotas de recursos (DoS), containers privilegiados e injeções de segredos em pipelines.
+- **Como Usar no Sistema:**
+  1. Abra a aba **"IaC Security (Docker/K8s)"**.
+  2. Selecione o tipo de arquivo: **Dockerfile**, **Kubernetes Manifest** ou **GitHub Actions CI/CD**.
+  3. Cole o template YAML/Dockerfile ou clique em "Carregar Exemplo Vulnerável".
+  4. Clique em **"Escanear Infraestrutura"** para ver a lista de regras violadas com severidade e recomendação de conformidade CIS Benchmark.
+- **Exemplo Prático:**
+  - *Entrada Vulnerável (`Dockerfile`):*
+    ```dockerfile
+    FROM node:18-alpine
+    WORKDIR /app
+    COPY . .
+    RUN npm install
+    # Risco: Executa como root (sem USER não-privilegiado)
+    CMD ["node", "server.js"]
+    ```
+  - *Detecção do SecScan:*
+    - `IAC-DOCKER-001 (HIGH)`: Container executando como `root`. Risco de escape de container e escalada de privilégios.
+  - *Remediação Aplicada:*
+    ```dockerfile
+    FROM node:18-alpine
+    WORKDIR /app
+    COPY package*.json ./
+    RUN npm ci --only=production
+    COPY . .
+    # Usuário sem privilégios para defesa em profundidade
+    USER node
+    EXPOSE 3000
+    CMD ["node", "server.js"]
+    ```
+
+---
+
+### 5. 🎯 DAST — Dynamic Application Security Testing (Fuzzer & Headers)
+- **O que é e Como Funciona:** Simula ataques dinâmicos do ponto de vista externo (Black-Box / Gray-Box). Testa rotas HTTP e endpoints REST enviando payloads de fuzzer (SQLi, XSS, Path Traversal, Command Injection) e audita os cabeçalhos de segurança HTTP da resposta do servidor (CSP, HSTS, X-Frame-Options, Permissions-Policy).
+- **Como Usar no Sistema:**
+  1. Acesse a aba **"DAST (Fuzzer & Headers)"**.
+  2. Configure a URL alvo (ex: `https://api.empresa.com/v1/search`), método HTTP (`GET`, `POST`) e o parâmetro a fuzzer (ex: `q` ou `id`).
+  3. Escolha os vetores de teste: **SQL Injection**, **Reflected XSS** ou **Command Injection**.
+  4. Clique em **"Executar DAST Fuzzer"**.
+  5. Copie o comando `cURL` gerado para reproduzir o teste no terminal do seu laboratório.
+- **Exemplo Prático:**
+  - *Teste de Injeção SQL:*
+    ```bash
+    curl -X GET "https://api.empresa.com/v1/search?q=%27%20UNION%20SELECT%20null,username,password%20FROM%20users--"
+    ```
+  - *Auditoria de Headers:*
+    - `Strict-Transport-Security (HSTS)`: ❌ AUSENTE (Risco de ataque Man-in-the-Middle e SSL Stripping).
+    - `Content-Security-Policy (CSP)`: ❌ AUSENTE (Risco de execução de scripts de terceiros e XSS).
+  - *Configuração Remediada no Servidor Express:*
+    ```typescript
+    import helmet from 'helmet';
+    app.use(helmet({
+      contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"] } },
+      hsts: { maxAge: 31536000, includeSubDomains: true, preload: true }
+    }));
+    ```
+
+---
+
+### 6. 📋 SBOM Generator (OWASP CycloneDX v1.5 & SPDX v2.3)
+- **O que é e Como Funciona:** Gera inventários oficiais de componentes de software (Software Bill of Materials) conforme as ordens executivas internacionais de segurança de software e requerimentos de cadeias de suprimento. Extrai metadados, autores, versões, hashes de integridade SHA-256 e termos de licenciamento nos formatos padronizados **CycloneDX v1.5 (JSON/XML)** e **SPDX v2.3 (JSON/Tag-Value)**.
+- **Como Usar no Sistema:**
+  1. Acesse a aba **"SBOM Generator"**.
+  2. Escolha o padrão desejado: **CycloneDX v1.5** ou **SPDX v2.3**.
+  3. Escolha a serialização: **JSON** ou **XML / Tag-Value**.
+  4. Clique em **"Gerar SBOM"** para inspecionar os componentes catalogados com suas respectivas licenças e hashes criptográficos.
+  5. Clique em **"Baixar Arquivo SBOM"** para incluir o artefato no pipeline de liberação de versão.
+
+---
+
+### 7. 🧬 Entropia de Shannon & Varredura Forense de Histórico Git
+- **O que é e Como Funciona:** Calcula a entropia da informação de Shannon para cada string suspeita:
+  $$H(X) = -\sum_{i=1}^{n} P(x_i) \log_2 P(x_i)$$
+  Strings com alta densidade aleatória ($H \ge 4.2$) são classificadas como segredos criptográficos ou chaves de API, mesmo que não possuam prefixos conhecidos. O módulo inclui também um scanner forense de commits para detectar segredos que foram apagados do código atual, mas permanecem vivos no histórico `.git`.
+- **Como Usar no Sistema:**
+  1. Acesse a aba **"Entropia & Segredos Git"**.
+  2. Ajuste a sensibilidade de entropia mínima (padrão: `4.2`).
+  3. Clique em **"Calcular Entropia do Workspace"** para ver a tabela de strings ranqueadas pelo valor de Shannon.
+  4. Na seção **"Git History Forensics"**, clique em **"Auditar Commits Anteriores"** para inspecionar hashes de commit passados e identificar vazamentos históricos.
+- **Exemplo Prático:**
+  - *String Detectada:* `"DEMO_HIGH_ENTROPY_SAMPLE_TOKEN_KEY_992182"` (Entropia: `4.89` — **EXTREMAMENTE ALTA**).
+  - *Diagnóstico:* Assinatura característica de AWS Secret Key ou token criptográfico de alta aleatoriedade.
+  - *Ação Corretiva:* Executar rotação imediata no painel AWS IAM e expurgar do histórico com `git-filter-repo --invert-paths`.
+
+---
+
+### 8. 🎯 Modelagem de Ameaças STRIDE & Calculadora Oficial CVSS v3.1
+- **O que é e Como Funciona:** Estrutura formalmente a análise de riscos baseada na metodologia **STRIDE** da Microsoft:
+  - **S**poofing (Falsificação de Identidade)
+  - **T**ampering (Adulteração de Dados)
+  - **R**epudiation (Repúdio de Transações)
+  - **I**nformation Disclosure (Vazamento de Informações)
+  - **D**enial of Service (Negação de Serviço)
+  - **E**levation of Privilege (Escalada de Privilégios)
+  Inclui a calculadora oficial **CVSS v3.1** (Attack Vector, Attack Complexity, Privileges Required, User Interaction, Scope, Confidentiality, Integrity, Availability) que gera o vetor canônico e a pontuação determinística (0.0 a 10.0).
+- **Como Usar no Sistema:**
+  1. Acesse a aba **"Modelagem STRIDE & CVSS"**.
+  2. Navegue pelos cards das 6 categorias STRIDE para ver as ameaças mapeadas para a arquitetura do workspace.
+  3. Na calculadora CVSS v3.1, selecione as métricas base para calcular o score e obter a string vetorial padronizada (ex.: `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H` = 9.8 Critical).
+
+---
+
+### 9. 🔧 Auto-Remediação com Git Unified Diffs (Patches em 1-Clique)
+- **O que é e Como Funciona:** Gera patches cirúrgicos no formato padrão **Unified Diff** (`diff --git a/... b/...`) para corrigir automaticamente vulnerabilidades de segredos hardcoded e injeções de código.
+- **Como Usar no Sistema:**
+  1. Acesse a aba **"Auto-Remediação (Patches)"**.
+  2. Visualize a lista de vulnerabilidades corrigíveis.
+  3. Inspecione o diff comparativo linha a linha em vermelho (linhas removidas) e verde (linhas adicionadas).
+  4. Clique no botão **"Aplicar Correção no Workspace (1-Clique)"** para atualizar o arquivo imediatamente no editor sem necessidade de edição manual.
+  5. Ou clique em **"Baixar Arquivo .patch"** para aplicar via terminal com `git apply patch.diff`.
+- **Exemplo de Patch Gerado:**
+  ```diff
+  --- a/src/services/payment.ts
+  +++ b/src/services/payment.ts
+  @@ -4,2 +4,2 @@
+  -const stripeKey = "DEMO_STRIPE_LIVE_KEY_PLACEHOLDER";
+  +const stripeKey = process.env.STRIPE_SECRET_KEY;
+  ```
+
+---
+
+### 10. ⚡ IAST — Interactive Application Security Testing (Runtime Hooks)
+- **O que é e Como Funciona:** O motor IAST injeta sensores (hooks) nos sinks de execução mais sensíveis da aplicação Node.js (`eval()`, `Function()`, `child_process.exec()`, consultas de banco de dados e métodos de resposta HTTP). Diferente do SAST puro, o IAST rastreia o valor concreto das variáveis durante a execução, confirmando se dados não confiáveis realmente alcançam o destino perigoso.
+- **Como Usar no Sistema:**
+  1. Acesse a aba **"IAST (Runtime Hooks)"**.
+  2. Visualize os sinks monitorados e os gatilhos disparados em tempo real.
+  3. Execute testes interativos enviando requisições com dados manipulados para observar a captura de stack trace e o fluxo de dados em memória.
+
+---
+
+### 11. 🛡️ Frameworks Cruzados (MITRE ATT&CK, NIST CSF 2.0 & OWASP WSTG)
+- **O que é e Como Funciona:** Mapeia todos os achados de vulnerabilidade do projeto para os catálogos universais da indústria:
+  - **MITRE ATT&CK:** Táticas de Acesso Inicial (TA0001), Execução (TA0002), Coleta de Credenciais (TA0006) e Exfiltração (TA0010).
+  - **NIST CSF 2.0:** Categorias de Governança (GV), Identificação (ID), Proteção (PR) e Detecção (DE).
+  - **OWASP WSTG v4.2:** Web Security Testing Guide com testes práticos de validação de autenticação, sessão e injeção.
+- **Como Usar no Sistema:**
+  1. Acesse a aba **"Frameworks (MITRE/NIST/OWASP)"**.
+  2. Filtre por tática MITRE ou função NIST.
+  3. Visualize os controles associados, as técnicas adversárias mapeadas e o status de cobertura do seu projeto.
+
+---
+
+### 12. 💡 Manual de Uso & Guia Interativo de Ferramentas
+- **Botão Rápido no Topo:** Clique em **`💡 Como Usar & Exemplos`** em qualquer tela do SecScan.
+- **Busca e Categorias:** Filtre ferramentas por categoria (*Conformidade & Governança*, *AppSec & SAST*, *Defesa & Runtime*, *Infraestrutura & DevSecOps*).
+- **Conteúdo em Três Seções:**
+  1. **Como Funciona:** Arquitetura e detalhes técnicos sob o capô.
+  2. **Passo a Passo:** Instruções práticas para operar a ferramenta no SecScan.
+  3. **Exemplo Prático Completo:** Cenário, código de entrada, diagnóstico gerado pelo sistema e snippet com a solução corrigida (com botão de cópia em 1 clique).
+- **Atalho Direto:** Botão **"Ir para a Ferramenta"** para navegar imediatamente para o módulo desejado.
+
+---
+
+### 13. 📚 Base de Dados de Remediação com Referências Oficiais (OWASP, Snyk, CWE)
 - **Links Oficiais em Tempo Real nos Cards de Achados:** Cada card de vulnerabilidade identificado pelo motor SAST renderiza links diretos e contextualizados para:
   - **OWASP Cheat Sheet Series:** *Key Management*, *Secrets Management*, *Cryptographic Storage*, *DOM-based XSS Prevention*, *Node.js Security*.
   - **OWASP Top 10:** *A01:2021 Broken Access Control*, *A02:2021 Cryptographic Failures*, *A03:2021 Injection*, *A07:2021 Identification and Authentication Failures*.
@@ -41,7 +259,9 @@
 - **Playbooks de Correção Passo a Passo:** Guias interativos incluindo comandos de expurgo de histórico Git (`git-filter-repo`), rotação de credenciais ativas, snippets comparativos (*Before vs. After*) e medidas preventivas de arquitetura.
 - **Wiki Modal Integrada:** Navegue por toda a base de conhecimento de remediação categorizada por tipo de vulnerabilidade.
 
-### 3. 🌊 Grafo de Fluxo de Dados (DataFlow Graph & Taint Analysis)
+---
+
+### 14. 🌊 Grafo de Fluxo de Dados (DataFlow Graph & Taint Analysis)
 - **Rastreamento Ponto a Ponto:** Mapeamento visual e algorítmico do fluxo de dados:
   - **Sources (Fontes):** Endpoints de API, rotas HTTP e parâmetros de requisição (`req.query`, `req.body`, `window.location`).
   - **Consumers (Consumidores):** Funções intermediárias e handlers que processam as variáveis.
@@ -49,23 +269,16 @@
   - **Sinks Perigosos:** Destinos arriscados como `innerHTML`, `dangerouslySetInnerHTML`, `child_process.exec`, `eval`, `document.write`.
 - **Tutorial Interativo Integrado (`DataFlowTutorialOverlay`):** Guia interativo integrado ao container do grafo com dicas sobre navegação, pan, zoom, layout e interpretação da trilha de contaminação (taint analysis).
 
-### 4. 🔍 Matriz de Detecção de Segredos & Entropia de Shannon
-- **Cobertura Extensa de Padrões:**
-  - **Nuvem:** AWS Access Key ID, Secret Access Key, Google Cloud API & Gemini, Azure.
-  - **Autenticação:** GitHub Personal Access Tokens (PATs), tokens JWT, Slack Webhooks e tokens de bots.
-  - **Finanças & Pagamentos:** Chaves de API de provedores de pagamento (ex.: Stripe).
-  - **Bancos de Dados:** URIs completas com credenciais (PostgreSQL, MongoDB, MySQL, Redis).
-  - **IA & LLMs:** Chaves de API OpenAI, Anthropic, HuggingFace.
-  - **Criptografia & Infra:** Chaves privadas PEM, RSA, SSH e blocos de certificados.
-- **Cálculo de Entropia de Shannon:** Medição da densidade de informação para mitigar falsos positivos e capturar chaves simétricas pseudoaleatórias.
-- **Ponderação por Criticidade de Arquivo:** Avaliação do risco contextual do achado baseado na sensibilidade do arquivo (`.env`, `docker-compose`, `k8s/`, rotas de backend vs. testes).
+---
 
-### 5. 🛰️ JS-Miner & LinkFinder Recon Engine
+### 15. 🛰️ JS-Miner & LinkFinder Recon Engine
 - **Source Maps Discovery:** Identificação de arquivos `.map` que possam expor código não transpilado em ambientes de produção.
 - **Cloud Storage Buckets:** Busca por referências a buckets S3 da AWS, Google Cloud Storage e Azure Blob Storage.
 - **Extração Profunda de Endpoints:** Reconhecimento automático de rotas REST, GraphQL, chamadas `fetch()`, `axios` e mapeamento de superfícies de ataque internas/administrativas (`/api/admin/*`, `/internal/*`).
 
-### 6. 🛡️ Defesa e Infraestrutura de Aplicações Web (WAF - Web Application Firewall)
+---
+
+### 16. 🛡️ Defesa e Infraestrutura de Aplicações Web (WAF - Web Application Firewall)
 - **Painel de Inspeção & Telemetria em Tempo Real:** Monitoramento dinâmico de tráfego HTTP/HTTPS com estatísticas de requisições inspecionadas, taxa de bloqueio (Block Rate), RPS e latência de inspeção (P95/P99).
 - **Cobertura OWASP Top 10 & Virtual Patching:**
   - `SQL Injection (SQLi)`: Detecção de UNION, boolean/time-based payloads.
@@ -76,7 +289,9 @@
 - **Simulador de Requisições HTTP Interativo:** Envio de requisições com teste em tempo real de payloads maliciosos, avaliação do motor de regras e indicação clara de decisão (`BLOCKED` vs `ALLOWED`).
 - **Gerenciador de Regras e ACLs:** Listas de bloqueio por IP/CIDR, geo-blocking e criação de regras customizadas.
 
-### 7. 🌐 SD-WAN Corporativo (Software-Defined WAN Suite)
+---
+
+### 17. 🌐 SD-WAN Corporativo (Software-Defined WAN Suite)
 - **Topologia de Túneis e Edge Routers:** Visualização da malha SD-WAN com nós de borda (Hub HQ, Branch Offices, Multi-Cloud Gateways AWS/GCP/Azure).
 - **Políticas de Roteamento Baseadas em SLA (Application-Aware Routing):**
   - Monitoramento contínuo de Latência (ms), Jitter (ms) e Perda de Pacotes (%).
@@ -84,7 +299,9 @@
 - **Túneis IPsec & Zero-Trust Mesh:** Criptografia ponta a ponta (AES-256-GCM / WireGuard) com monitoramento de status e rotação de chaves.
 - **Failover e Simulação de Tráfego:** Painel de simulação para testar degradação de links e conferir a reação dinâmica da malha SD-WAN em tempo real.
 
-### 8. 🎯 EDR (Endpoint Detection & Response) & Live Response Suite
+---
+
+### 18. 🎯 EDR (Endpoint Detection & Response) & Live Response Suite
 - **Inventário de Endpoints & Telemetria em Tempo Real:**
   - Descoberta e monitoramento de hosts com status de saúde do agente, carga de CPU/Memória e integridade do driver eBPF.
   - Ações cirúrgicas de contenção host com isolamento preventivo a nível de kernel (Zero Trust Host Containment).
@@ -105,14 +322,20 @@
 - **Forense de Memória & Assinaturas YARA:**
   - Varredura de dumps de memória de processos suspeitos para extração de credenciais, detecção de DLLs injetadas e identificação de regiões RWX violadas.
 
-### 9. 🛡️ Módulos Complementares de Segurança de Rede
+---
+
+### 19. 🛡️ Módulos Complementares de Segurança de Rede
 - **Proteção DNS (DNS Security):** Detecção de DNS Tunneling, filtragem de domínios maliciosos e DGA (Domain Generation Algorithms), e validação de DNSSEC / DoH.
 - **Firewall de Próxima Geração (NGFW) & IDS/IPS:** Inspeção profunda de pacotes (DPI), controle de aplicações L7 e assinaturas de intrusão Snort/Suricata.
 
-### 10. ⚙️ Motor de Regras Customizáveis (Custom Regex)
+---
+
+### 20. ⚙️ Motor de Regras Customizáveis (Custom Regex)
 - Criação e validação dinâmica de regras regex customizadas na interface ou via arquivo JSON, com suporte a categorias personalizadas, severidade e limiar de entropia mínima.
 
-### 11. 🚀 CI/CD & Automação DevSecOps
+---
+
+### 21. 🚀 CI/CD & Automação DevSecOps
 - Exportação instantânea em múltiplos formatos: **SARIF 2.1.0** (nativamente renderizado na aba *Security > Code Scanning* do GitHub), **JSON Estruturado** e **CSV**.
 - Interface de Linha de Comando (CLI) executável em qualquer ambiente Node.js com qualidade gate duplo: por severidade (`--fail-on critical`) e por pontuação de risco cumulativo (`--max-risk <score>`).
 

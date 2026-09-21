@@ -205,7 +205,7 @@ export const CrowdStrikeSuiteView: React.FC<CrowdStrikeSuiteViewProps> = ({
           ],
           sourceFile: 'src/config/aws.ts',
           line: 14,
-          iocs: ['AKIAIOSFODNN7EXAMPLE', '10.240.12.8', 'sts.amazonaws.com'],
+          iocs: ['DEMO_AWS_AKID_IOC_KEY', '10.240.12.8', 'sts.amazonaws.com'],
           suggestedAction: 'Isolar endpoint da rede imediatamente e revogar credencial no AWS IAM.',
           status: 'NEW',
           timestamp: '2026-09-17 07:22:15'

@@ -54,6 +54,7 @@ interface HeaderProps {
   onOpenGlossary?: () => void;
   onOpenCommandPalette?: () => void;
   onOpenShortcuts?: () => void;
+  onOpenToolGuide?: (toolId?: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -71,7 +72,8 @@ export const Header: React.FC<HeaderProps> = ({
   activeIgnoreCount,
   onOpenGlossary,
   onOpenCommandPalette,
-  onOpenShortcuts
+  onOpenShortcuts,
+  onOpenToolGuide
 }) => {
   const isMac = useMemo(() => {
     return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -81,34 +83,34 @@ export const Header: React.FC<HeaderProps> = ({
   const isHealthy = criticalCount === 0;
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard & Métricas', icon: ShieldAlert },
-    { id: 'scanner', label: 'Inspetor de Código', icon: FileCode2, badge: report.findings.length },
-    { id: 'endpoints', label: 'LinkFinder (APIs)', icon: Route, badge: report.apiEndpoints.length },
-    { id: 'jsminer', label: 'JS Miner', icon: Boxes, badge: report.jsMiner?.totalAssetsCount },
-    { id: 'dataflow', label: 'Fluxo & Sinks (D3)', icon: Network, badge: report.dataFlowGraph?.metrics.totalTaintFlows },
-    { id: 'iast', label: 'IAST (Runtime Hooks)', icon: Activity, badge: report.iastReport?.findings.length ? `${report.iastReport.findings.length} hooks` : 'IAST' },
-    { id: 'sca', label: 'SCA (Dependências & CVEs)', icon: Package, badge: 'SCA' },
-    { id: 'iac', label: 'IaC Security (Docker/K8s)', icon: Container, badge: 'IaC' },
-    { id: 'dast', label: 'DAST (Fuzzer & Headers)', icon: Crosshair, badge: 'DAST' },
-    { id: 'sbom', label: 'SBOM Generator', icon: FileSpreadsheet, badge: 'CycloneDX' },
-    { id: 'entropy', label: 'Entropia & Segredos Git', icon: Binary, badge: 'Entropy' },
-    { id: 'threatmodel', label: 'Modelagem STRIDE & CVSS', icon: Target, badge: 'STRIDE' },
-    { id: 'autoremediation', label: 'Auto-Remediação (Patches)', icon: Wrench, badge: '1-Click' },
-    { id: 'compliance', label: 'Auditoria Compliance (SOC2/ISO/HIPAA)', icon: Scale, badge: 'SOC2' },
-    { id: 'frameworks', label: 'Frameworks (MITRE/NIST/OWASP)', icon: ShieldCheck },
-    { id: 'securityonion', label: 'Security Onion (SOC)', icon: Radio, badge: report.findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length },
-    { id: 'crowdstrike', label: 'CrowdStrike (EDR/IOA)', icon: Zap, badge: 3 },
-    { id: 'edr', label: 'EDR (Detection & Response)', icon: Crosshair, badge: 'eBPF' },
-    { id: 'nmap', label: 'Nmap (Network Suite)', icon: Globe, badge: 'Recon' },
-    { id: 'nikto', label: 'Nikto (Web Scanner)', icon: FileSearch, badge: 'Audit' },
-    { id: 'ngfw', label: 'NGFW (Next-Gen Firewall)', icon: Flame, badge: 'L7/IPS' },
-    { id: 'idsips', label: 'IDS/IPS (Snort/Suricata)', icon: Binary, badge: 'DPI' },
-    { id: 'dnssec', label: 'DNS Security (RPZ/DNSSEC)', icon: Globe, badge: 'DoH' },
-    { id: 'waf', label: 'WAF (ModSecurity CRS)', icon: ShieldCheck, badge: 'OWASP' },
-    { id: 'sdwan', label: 'SD-WAN (Fabric & Steering)', icon: Network, badge: 'Overlay' },
-    { id: 'rules', label: 'Regras Regex', icon: SlidersHorizontal },
-    { id: 'cli', label: 'Terminal CLI', icon: Terminal },
-    { id: 'cicd', label: 'CI/CD & Cloud', icon: CloudCog },
+    { id: 'dashboard', label: 'Dashboard & Métricas', icon: ShieldAlert, tooltip: 'Visão executiva com Risk Score cumulativo (0-100), velocímetro de scan e gráficos de criticidade' },
+    { id: 'scanner', label: 'Inspetor de Código', icon: FileCode2, badge: report.findings.length, tooltip: 'Auditoria de código linha a linha com destaque de segredos, CWEs e remediação inline' },
+    { id: 'endpoints', label: 'LinkFinder (APIs)', icon: Route, badge: report.apiEndpoints.length, tooltip: 'Mapeamento de rotas REST, GraphQL, métodos HTTP e endpoints internos desprotegidos' },
+    { id: 'jsminer', label: 'JS Miner', icon: Boxes, badge: report.jsMiner?.totalAssetsCount, tooltip: 'Mineração de bundles JS, verificação de vazamento de Source Maps (.map) e buckets de nuvem' },
+    { id: 'dataflow', label: 'Fluxo & Sinks (D3)', icon: Network, badge: report.dataFlowGraph?.metrics.totalTaintFlows, tooltip: 'Grafo D3 de fluxo de dados não confiáveis: Sources ➔ Consumidores ➔ Sinks (Taint Analysis)' },
+    { id: 'iast', label: 'IAST (Runtime Hooks)', icon: Activity, badge: report.iastReport?.findings.length ? `${report.iastReport.findings.length} hooks` : 'IAST', tooltip: 'Testes de segurança interativos em tempo de execução com ganchos em sinks dinâmicos' },
+    { id: 'sca', label: 'SCA (Dependências & CVEs)', icon: Package, badge: 'SCA', tooltip: 'Auditoria de dependências open-source contra base de CVEs/NVD e risco de licença copyleft' },
+    { id: 'iac', label: 'IaC Security (Docker/K8s)', icon: Container, badge: 'IaC', tooltip: 'Análise estática de infraestrutura: Dockerfile root, pods K8s privilegiados e workflows CI/CD' },
+    { id: 'dast', label: 'DAST (Fuzzer & Headers)', icon: Crosshair, badge: 'DAST', tooltip: 'Fuzzer de injeção em APIs (SQLi/XSS), auditoria de headers HTTP (CSP/HSTS) e comandos cURL' },
+    { id: 'sbom', label: 'SBOM Generator', icon: FileSpreadsheet, badge: 'CycloneDX', tooltip: 'Geração de inventário SBOM nos padrões oficiais OWASP CycloneDX v1.5 e SPDX v2.3' },
+    { id: 'entropy', label: 'Entropia & Segredos Git', icon: Binary, badge: 'Entropy', tooltip: 'Cálculo de Entropia de Shannon (H) para segredos e varredura forense no histórico Git' },
+    { id: 'threatmodel', label: 'Modelagem STRIDE & CVSS', icon: Target, badge: 'STRIDE', tooltip: 'Matriz STRIDE da Microsoft, checklist OWASP ASVS v4 e calculadora oficial CVSS v3.1' },
+    { id: 'autoremediation', label: 'Auto-Remediação (Patches)', icon: Wrench, badge: '1-Click', tooltip: 'Geração automática de Git Unified Diffs e aplicação direta de patches corretivos no código' },
+    { id: 'compliance', label: 'Auditoria Compliance (SOC2/ISO/HIPAA)', icon: Scale, badge: 'SOC2', tooltip: 'Score de prontidão determinístico e mapeamento formal para SOC 2 Type II, ISO 27001 e HIPAA' },
+    { id: 'frameworks', label: 'Frameworks (MITRE/NIST/OWASP)', icon: ShieldCheck, tooltip: 'Mapeamento cruzado para MITRE ATT&CK, NIST CSF 2.0 e OWASP Web Security Testing Guide' },
+    { id: 'securityonion', label: 'Security Onion (SOC)', icon: Radio, badge: report.findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length, tooltip: 'Console de operações SOC e monitoramento de alertas de segurança' },
+    { id: 'crowdstrike', label: 'CrowdStrike (EDR/IOA)', icon: Zap, badge: 3, tooltip: 'Indicadores de Ataque (IOA) comportamentais e inteligência de ameaças Falcon' },
+    { id: 'edr', label: 'EDR (Detection & Response)', icon: Crosshair, badge: 'eBPF', tooltip: 'Sensor de endpoint com telemetria de processos, contenção Zero Trust e terminal RTR' },
+    { id: 'nmap', label: 'Nmap (Network Suite)', icon: Globe, badge: 'Recon', tooltip: 'Varredura de portas de rede, serviços ativos e fingerprinting de SO' },
+    { id: 'nikto', label: 'Nikto (Web Scanner)', icon: FileSearch, badge: 'Audit', tooltip: 'Scanner web de arquivos perigosos, versões obsoletas e configurações vulneráveis' },
+    { id: 'ngfw', label: 'NGFW (Next-Gen Firewall)', icon: Flame, badge: 'L7/IPS', tooltip: 'Firewall de aplicação L7 com inspeção profunda de pacotes e regras de tráfego' },
+    { id: 'idsips', label: 'IDS/IPS (Snort/Suricata)', icon: Binary, badge: 'DPI', tooltip: 'Sistema de detecção e prevenção de intrusões com assinaturas Snort/Suricata' },
+    { id: 'dnssec', label: 'DNS Security (RPZ/DNSSEC)', icon: Globe, badge: 'DoH', tooltip: 'Filtragem de DNS malicioso, Response Policy Zones (RPZ) e validação DNSSEC' },
+    { id: 'waf', label: 'WAF (ModSecurity CRS)', icon: ShieldCheck, badge: 'OWASP', tooltip: 'Web Application Firewall com simulador de ataques em tempo real e regras CRS' },
+    { id: 'sdwan', label: 'SD-WAN (Fabric & Steering)', icon: Network, badge: 'Overlay', tooltip: 'Malha de túneis IPsec e roteamento inteligente por SLA de latência/jitter' },
+    { id: 'rules', label: 'Regras Regex', icon: SlidersHorizontal, tooltip: 'Editor e testador interativo de expressões regulares corporativas customizadas' },
+    { id: 'cli', label: 'Terminal CLI', icon: Terminal, tooltip: 'Emulador de console para testar comandos do bin/secscan.js e flags de quality gate' },
+    { id: 'cicd', label: 'CI/CD & Cloud', icon: CloudCog, tooltip: 'Gerador de pipelines de automação para GitHub Actions, GitLab CI com SARIF 2.1.0' },
   ];
 
   return (
@@ -397,6 +399,20 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Navigation Tabs Bar */}
         <nav className="flex items-center gap-1 sm:gap-2 pt-1.5 pb-2 overflow-x-auto no-scrollbar">
+          {/* Tool Guide & Examples Button */}
+          {onOpenToolGuide && (
+            <button
+              id="btn-nav-open-tool-guide"
+              type="button"
+              onClick={() => onOpenToolGuide(activeTab)}
+              className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded text-[11px] font-mono font-bold tracking-wide uppercase whitespace-nowrap transition-all cursor-pointer bg-cyan-950/40 hover:bg-cyan-900/50 text-[#00F0FF] border border-cyan-500/40 hover:border-cyan-400 shrink-0 shadow-xs mr-1"
+              title="Abrir o Manual das Ferramentas com explicações, arquitetura, passo a passo e exemplos de código"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-[#00F0FF] shrink-0" />
+              <span>💡 Como Usar &amp; Exemplos</span>
+            </button>
+          )}
+
           {navItems.map(item => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -405,6 +421,7 @@ export const Header: React.FC<HeaderProps> = ({
                 key={item.id}
                 id={`nav-tab-${item.id}`}
                 onClick={() => setActiveTab(item.id)}
+                title={item.tooltip}
                 className={`flex items-center gap-2 py-2 px-3 rounded text-[11px] font-mono font-bold tracking-wide uppercase whitespace-nowrap transition-all cursor-pointer border ${
                   isActive
                     ? 'bg-[#141414] text-[#FF3E00] border-[#FF3E00]/40 shadow-sm'

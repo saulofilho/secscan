@@ -468,7 +468,7 @@ rule SecScan_${cleanName}_Detection {
 
   // Simulated raw hex dump for the inspected network packet / payload
   const simulatedHexDump = useMemo(() => {
-    const rawPayload = `POST ${activeEndpoint.path} HTTP/1.1\r\nHost: api.secscan.internal\r\nUser-Agent: SecScan-Sensor/4.2 (OnionEngine)\r\nAuthorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\r\nContent-Type: application/json\r\nContent-Length: 54\r\n\r\n{"username":"admin","client_nonce":"f8e91024bcda"}`;
+    const rawPayload = `POST ${activeEndpoint.path} HTTP/1.1\r\nHost: api.secscan.internal\r\nUser-Agent: SecScan-Sensor/4.2 (OnionEngine)\r\nAuthorization: Bearer DEMO_JWT_SESSION_TOKEN_SAMPLE...\r\nContent-Type: application/json\r\nContent-Length: 54\r\n\r\n{"username":"admin","client_nonce":"f8e91024bcda"}`;
 
     const lines: { offset: string; hex: string; ascii: string }[] = [];
     const bytes = new TextEncoder().encode(rawPayload);
