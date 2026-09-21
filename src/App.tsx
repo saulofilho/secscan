@@ -2043,6 +2043,10 @@ export default function App() {
                 setActiveTab('scanner');
               }
             }}
+            onApplyFix={handleApplyFix}
+            onLogAudit={(event) => {
+              setAuditLogs(prev => [event, ...prev].slice(0, 80));
+            }}
           />
         )}
 
