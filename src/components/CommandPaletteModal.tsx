@@ -36,7 +36,11 @@ import {
   Globe,
   FileSearch,
   Flame,
-  Binary
+  Binary,
+  Lock,
+  Container,
+  Key,
+  KeyRound
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
 
@@ -561,6 +565,76 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           setActiveTab('sdwan');
         },
         keywords: ['sdwan', 'sd-wan', 'mpls', 'dia', 'fibra', '5g', 'ipsec', 'fec', 'sla', 'jitter', 'latency', 'cisco viptela', 'fortigate', 'velocloud', 'failover']
+      },
+      {
+        id: 'nav-headers',
+        title: 'Módulo: Security Headers & CSP Studio',
+        subtitle: 'Auditoria de cabeçalhos HTTP, nota OWASP (A+ a F), simulador e gerador de Content-Security-Policy (CSP)',
+        category: 'Navegação',
+        icon: Lock,
+        badge: 'OWASP Headers',
+        badgeColor: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('headers');
+        },
+        keywords: ['headers', 'cabecalhos', 'csp', 'content-security-policy', 'hsts', 'x-frame-options', 'cors', 'owasp', 'nginx', 'apache', 'caddy', 'express']
+      },
+      {
+        id: 'nav-containerscan',
+        title: 'Módulo: Trivy & Container Security Scanner',
+        subtitle: 'Auditoria de Dockerfile contra benchmarks CIS Docker, execução não-root e vulnerabilidades de base',
+        category: 'Navegação',
+        icon: Container,
+        badge: 'CIS Benchmark',
+        badgeColor: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('containerscan');
+        },
+        keywords: ['container', 'docker', 'dockerfile', 'trivy', 'cis', 'root', 'hadolint', 'multistage', 'cve', 'alpine']
+      },
+      {
+        id: 'nav-cloudiam',
+        title: 'Módulo: Cloud IAM & CSPM Least-Privilege Auditor',
+        subtitle: 'Análise de políticas AWS IAM, privilégios excessivos (wildcard *), escalada de privilégios e exposição pública',
+        category: 'Navegação',
+        icon: Key,
+        badge: 'AWS IAM / CSPM',
+        badgeColor: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('cloudiam');
+        },
+        keywords: ['iam', 'aws', 'cspm', 'cloud', 'politica', 'passrole', 'wildcard', 'least privilege', 's3', 'privilegio minimo']
+      },
+      {
+        id: 'nav-jwtinspector',
+        title: 'Módulo: JWT & API Token Forensic Inspector',
+        subtitle: 'Decodificador e inspetor forense de tokens JWT, detecção de alg: none, senhas fracas e claims canônicas',
+        category: 'Navegação',
+        icon: KeyRound,
+        badge: 'RFC 7519',
+        badgeColor: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('jwtinspector');
+        },
+        keywords: ['jwt', 'token', 'bearer', 'forensics', 'alg none', 'hs256', 'rs256', 'hmac', 'segredo', 'expirado', 'claims', 'auth']
+      },
+      {
+        id: 'nav-ssrfvalidator',
+        title: 'Módulo: SSRF & Webhook Safety Validator',
+        subtitle: 'Validador de requisições de saída contra SSRF, proteção de metadados de nuvem (169.254.169.254) e IPs privados',
+        category: 'Navegação',
+        icon: Globe,
+        badge: 'SSRF Defense',
+        badgeColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('ssrfvalidator');
+        },
+        keywords: ['ssrf', 'webhook', 'request forgery', '169.254.169.254', 'metadata', 'imds', 'rfc1918', 'localhost', 'outbound', 'axios']
       },
       {
         id: 'nav-rules',

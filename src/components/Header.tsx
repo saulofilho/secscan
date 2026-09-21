@@ -34,7 +34,10 @@ import {
   FileSpreadsheet,
   Target,
   Wrench,
-  Scale
+  Scale,
+  Lock,
+  Key,
+  KeyRound
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
 
@@ -110,6 +113,11 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'dnssec', label: 'DNS Security (RPZ/DNSSEC)', icon: Globe, badge: 'DoH', tooltip: 'Filtragem de DNS malicioso, Response Policy Zones (RPZ) e validação DNSSEC' },
     { id: 'waf', label: 'WAF (ModSecurity CRS)', icon: ShieldCheck, badge: 'OWASP', tooltip: 'Web Application Firewall com simulador de ataques em tempo real e regras CRS' },
     { id: 'sdwan', label: 'SD-WAN (Fabric & Steering)', icon: Network, badge: 'Overlay', tooltip: 'Malha de túneis IPsec e roteamento inteligente por SLA de latência/jitter' },
+    { id: 'headers', label: 'Security Headers (CSP)', icon: Lock, badge: 'OWASP', tooltip: 'Auditoria de cabeçalhos de resposta HTTP, conformidade OWASP e gerador de Content-Security-Policy (CSP)' },
+    { id: 'containerscan', label: 'Container (Trivy/CIS)', icon: Container, badge: 'CIS', tooltip: 'Varredura de Dockerfiles contra benchmarks CIS Docker, execução não-root e vulnerabilidades de base' },
+    { id: 'cloudiam', label: 'Cloud IAM / CSPM', icon: Key, badge: 'IAM', tooltip: 'Auditoria de privilégio mínimo em políticas AWS IAM, escalada de privilégio e exposição pública' },
+    { id: 'jwtinspector', label: 'JWT & Token Forensics', icon: KeyRound, badge: 'RFC7519', tooltip: 'Decodificador e inspetor forense de tokens JWT, detecção de alg: none e senhas HMAC fracas' },
+    { id: 'ssrfvalidator', label: 'SSRF & Webhook Validator', icon: Globe, badge: 'SSRF', tooltip: 'Validador de requisições de saída contra SSRF, proteção de metadados de nuvem e evasões de IP' },
     { id: 'rules', label: 'Regras Regex', icon: SlidersHorizontal, tooltip: 'Editor e testador interativo de expressões regulares corporativas customizadas' },
     { id: 'cli', label: 'Terminal CLI', icon: Terminal, tooltip: 'Emulador de console para testar comandos do bin/secscan.js e flags de quality gate' },
     { id: 'cicd', label: 'CI/CD & Cloud', icon: CloudCog, tooltip: 'Gerador de pipelines de automação para GitHub Actions, GitLab CI com SARIF 2.1.0' },

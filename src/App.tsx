@@ -61,6 +61,11 @@ import { EntropySecretsView } from './components/EntropySecretsView';
 import { ThreatModelingView } from './components/ThreatModelingView';
 import { AutoRemediationView } from './components/AutoRemediationView';
 import { ComplianceAuditView } from './components/ComplianceAuditView';
+import { SecurityHeadersView } from './components/SecurityHeadersView';
+import { ContainerSecurityView } from './components/ContainerSecurityView';
+import { CloudIamSecurityView } from './components/CloudIamSecurityView';
+import { JwtTokenInspectorView } from './components/JwtTokenInspectorView';
+import { SsrfValidatorView } from './components/SsrfValidatorView';
 import { ToolGuideModal } from './components/ToolGuideModal';
 import { GitignoreAuditModal } from './components/GitignoreAuditModal';
 import { auditGitignoreSecurity } from './lib/gitignoreAuditor';
@@ -170,6 +175,26 @@ export default function App() {
 
   const handleRemoveFileFromWorkspace = useCallback((fileName: string) => {
     setFiles(prev => prev.filter(f => f.name !== fileName));
+  }, []);
+
+  const handleApplyHardenedDockerfileToWorkspace = useCallback((dockerfileContent: string) => {
+    setFiles(prev => {
+      const idx = prev.findIndex(f => f.name.toLowerCase() === 'dockerfile' || f.name.toLowerCase().endsWith('.dockerfile'));
+      const dockerFile: ScannedFile = {
+        name: 'Dockerfile',
+        path: 'Dockerfile',
+        content: dockerfileContent,
+        size: new Blob([dockerfileContent]).size,
+        extension: 'dockerfile',
+        lastModified: Date.now()
+      };
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = dockerFile;
+        return next;
+      }
+      return [dockerFile, ...prev];
+    });
   }, []);
 
   // Global SecScan configuration for dynamic remediationTime (MTTR) parameters
@@ -2135,6 +2160,40 @@ export default function App() {
             onNavigateToIdsIps={() => setActiveTab('idsips')}
             onNavigateToWaf={() => setActiveTab('waf')}
             onNavigateToDns={() => setActiveTab('dnssec')}
+          />
+        )}
+
+        {activeTab === 'headers' && (
+          <SecurityHeadersView
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onNavigateToEndpoints={() => setActiveTab('endpoints')}
+          />
+        )}
+
+        {activeTab === 'containerscan' && (
+          <ContainerSecurityView
+            files={files}
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onApplyHardenedDockerfile={handleApplyHardenedDockerfileToWorkspace}
+          />
+        )}
+
+        {activeTab === 'cloudiam' && (
+          <CloudIamSecurityView
+            onNavigateToScanner={() => setActiveTab('scanner')}
+          />
+        )}
+
+        {activeTab === 'jwtinspector' && (
+          <JwtTokenInspectorView
+            onNavigateToScanner={() => setActiveTab('scanner')}
+          />
+        )}
+
+        {activeTab === 'ssrfvalidator' && (
+          <SsrfValidatorView
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onNavigateToEndpoints={() => setActiveTab('endpoints')}
           />
         )}
 

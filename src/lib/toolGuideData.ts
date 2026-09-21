@@ -954,5 +954,165 @@ jobs:
       systemDetection: `O pipeline analisa todo o código em menos de 10 segundos e publica os alertas diretamente na interface de PR do GitHub.`,
       outputRemediation: `Qualquer tentativa de commitar segredos ou códigos inseguros bloqueia a fusão do Pull Request automaticamente.`
     }
+  },
+  headers: {
+    id: 'headers',
+    name: 'Security Headers & CSP Studio',
+    category: 'AppSec & SAST',
+    badge: 'OWASP Headers',
+    shortSummary: 'Auditoria de cabeçalhos HTTP defensivos (CSP, HSTS, X-Frame-Options, COOP, CORP) com nota OWASP e gerador multi-servidor.',
+    howItWorks: 'Avalia a presença e a conformidade dos cabeçalhos HTTP contra boas práticas OWASP, atribuindo nota de A+ a F e calculando score de conformidade.',
+    stepByStepGuide: [
+      {
+        step: 1,
+        action: 'Escolha um Preset ou Cole os Headers',
+        description: 'Selecione um preset de exemplo ou cole os cabeçalhos de resposta HTTP do seu servidor na caixa de texto.'
+      },
+      {
+        step: 2,
+        action: 'Analise a Nota e as Recomendações',
+        description: 'Veja a nota de segurança (A+ a F), o score numérico e as recomendações detalhadas por cabeçalho.'
+      },
+      {
+        step: 3,
+        action: 'Exporte para o seu Servidor Web',
+        description: 'Clique nas abas NGINX, Apache, Express ou Next.js e copie a configuração blindada com 1 clique.'
+      }
+    ],
+    example: {
+      title: 'Exemplo: Content-Security-Policy Estrita',
+      scenario: 'Prevenir Cross-Site Scripting (XSS) e Data Exfiltration restringindo origens permitidas.',
+      inputSnippet: `Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; frame-ancestors 'none';`,
+      systemDetection: `Configuração válida com nota A+ conforme OWASP Secure Headers Project.`,
+      outputRemediation: `Snippet NGINX gerado: add_header Content-Security-Policy "default-src 'self'; ..." always;`
+    }
+  },
+  containerscan: {
+    id: 'containerscan',
+    name: 'Trivy & Container Security Scanner',
+    category: 'Infraestrutura & DevSecOps',
+    badge: 'CIS Benchmark',
+    shortSummary: 'Auditoria estática de Dockerfiles contra CIS Docker Benchmarks, execução não-root e vulnerabilidades de base.',
+    howItWorks: 'Analisa instruções FROM, USER, RUN, COPY, ADD e HEALTHCHECK comparando com boas práticas CIS e Hadolint para gerar contêineres blindados.',
+    stepByStepGuide: [
+      {
+        step: 1,
+        action: 'Carregar ou Editar o Dockerfile',
+        description: 'O SecScan carrega o Dockerfile do workspace automaticamente ou você pode colar qualquer Dockerfile.'
+      },
+      {
+        step: 2,
+        action: 'Inspecionar Alertas de CIS Docker Benchmark',
+        description: 'Examine as violações mapeadas para regras Hadolint (DL3002, DL3008, DL3020) com linha e severidade.'
+      },
+      {
+        step: 3,
+        action: 'Aplicar Dockerfile Multi-Stage Hardened',
+        description: 'Copie ou salve no workspace o Dockerfile blindado multi-stage gerado com usuário não-root e healthcheck.'
+      }
+    ],
+    example: {
+      title: 'Exemplo: Execução Não-Root em Contêiner',
+      scenario: 'Evitar que uma falha de RCE no aplicativo comprometa o host do Kubernetes ou Docker.',
+      inputSnippet: `USER root\nENTRYPOINT ["node", "server.js"]`,
+      systemDetection: `Alerta Crítico DL3002: Contêiner executa como root sem drop de privilégios.`,
+      outputRemediation: `Adicionar usuário não-privilegiado: RUN adduser -D appuser && USER appuser`
+    }
+  },
+  cloudiam: {
+    id: 'cloudiam',
+    name: 'Cloud IAM & CSPM Least-Privilege Auditor',
+    category: 'Infraestrutura & DevSecOps',
+    badge: 'AWS IAM / CSPM',
+    shortSummary: 'Auditoria de políticas AWS IAM, vetores de escalada de privilégios e exposição pública.',
+    howItWorks: 'Mapeia políticas JSON para identificar privilégios excessivos (wildcards *), vetores de escalada de privilégio (PassRole + Lambda/EC2) e ausência de TLS.',
+    stepByStepGuide: [
+      {
+        step: 1,
+        action: 'Selecionar Cenário ou Colar Política JSON',
+        description: 'Escolha uma amostra (Administrador Wildcard, PassRole Privilege Escalation, S3 Público) ou cole seu JSON.'
+      },
+      {
+        step: 2,
+        action: 'Verificar Alertas de Risco e Escalada',
+        description: 'O auditor detecta vetores MITRE ATT&CK T1078 e T1548 e exibe o Posture Score de conformidade.'
+      },
+      {
+        step: 3,
+        action: 'Copiar Política de Privilégio Mínimo',
+        description: 'Utilize a política corrigida gerada com escopo estrito de ARNs e imposição de TLS obrigatório.'
+      }
+    ],
+    example: {
+      title: 'Exemplo: Detecção de Wildcard Total (Action: "*")',
+      scenario: 'Política com permissões irrestritas de Administrador concedida indevidamente.',
+      inputSnippet: `{"Effect": "Allow", "Action": "*", "Resource": "*"}`,
+      systemDetection: `Alerta Crítico: Violação direta do princípio de menor privilégio NIST 800-53 AC-6.`,
+      outputRemediation: `Substituição por ações delimitadas e condições estritas de aws:SecureTransport.`
+    }
+  },
+  jwtinspector: {
+    id: 'jwtinspector',
+    name: 'JWT & API Token Forensic Inspector',
+    category: 'AppSec & SAST',
+    badge: 'RFC 7519',
+    shortSummary: 'Decodificador e inspetor forense de tokens JWT, detecção de alg: none, senhas fracas e dados confidenciais expostos.',
+    howItWorks: 'Decodifica Header, Payload e Assinatura, valida claims canônicas (exp, iss, aud, nbf) e testa vetores como CVE-2015-9235 (alg: none) e quebra de HMAC fraco.',
+    stepByStepGuide: [
+      {
+        step: 1,
+        action: 'Colar o Token JWT',
+        description: 'Insira o token recebido no header Authorization para decodificar as 3 partes (Header, Payload, Assinatura).'
+      },
+      {
+        step: 2,
+        action: 'Auditar Claims Canônicas e Vulnerabilidades',
+        description: 'Verifique se o token possui expiração válida, emissor (iss), audiência (aud) e se o segredo é robusto.'
+      },
+      {
+        step: 3,
+        action: 'Testar Simulação de Forja alg: none',
+        description: 'Gere um exploit com role modificada para validar se seu backend rejeita tokens desprovidos de assinatura.'
+      }
+    ],
+    example: {
+      title: 'Exemplo: Detecção de Chave HMAC Fraca ("secret")',
+      scenario: 'Token assinado com segredo trivial sujeito a ataque de força bruta instantâneo.',
+      inputSnippet: `eyJhbGciOiJIUzI1NiJ9... [Assinado com segredo "secret"]`,
+      systemDetection: `Alerta Crítico CWE-521: Chave trivial adivinhada com sucesso em dicionário.`,
+      outputRemediation: `Utilizar segredos de 256 bits gerados criptograficamente ou migrar para chaves assimétricas RS256/EdDSA.`
+    }
+  },
+  ssrfvalidator: {
+    id: 'ssrfvalidator',
+    name: 'SSRF & Webhook Safety Validator',
+    category: 'Defesa & Runtime',
+    badge: 'SSRF Defense',
+    shortSummary: 'Validação de URLs de saída e webhooks para prevenção de Server-Side Request Forgery e proteção de metadados de nuvem.',
+    howItWorks: 'Inspeciona esquema, hostname, IP canônico, portas e formatos de evasão (decimal, hex) para prevenir acesso a 169.254.169.254 e redes internas RFC 1918.',
+    stepByStepGuide: [
+      {
+        step: 1,
+        action: 'Inserir a URL de Destino',
+        description: 'Digite a URL fornecida pelo usuário ou escolha uma amostra de teste (AWS IMDS, GCP, Decimal IP).'
+      },
+      {
+        step: 2,
+        action: 'Visualizar Diagnóstico e Classificação',
+        description: 'Confira se a URL atinge recursos locais, portas internas ou metadados de nuvem sensíveis.'
+      },
+      {
+        step: 3,
+        action: 'Copiar o Cliente HTTP Blindado',
+        description: 'Integre o exemplo de código com pré-resolução de DNS e bloqueio determinístico no seu backend Node.js.'
+      }
+    ],
+    example: {
+      title: 'Exemplo: Tentativa de Acesso ao Metadados AWS IMDSv1',
+      scenario: 'Invasor fornece URL para ler chaves temporárias da instância EC2.',
+      inputSnippet: `http://169.254.169.254/latest/meta-data/iam/security-credentials/`,
+      systemDetection: `Bloqueio Crítico: Endpoint de Metadados de Nuvem (MITRE ATT&CK T1552.005).`,
+      outputRemediation: `Rejeitar imediatamente no gateway e configurar o cliente HTTP com filtro de faixas privadas.`
+    }
   }
 };
