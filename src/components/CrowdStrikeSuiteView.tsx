@@ -190,27 +190,7 @@ export const CrowdStrikeSuiteView: React.FC<CrowdStrikeSuiteViewProps> = ({
   const detections: CrowdStrikeDetection[] = useMemo(() => {
     const findings = report.findings.slice(0, 10);
     if (findings.length === 0) {
-      return [
-        {
-          id: 'DET-1001',
-          title: 'Credencial AWS IAM Detectada com Privilégios de Administração',
-          tactic: 'Credential Access',
-          techniqueId: 'T1552.001',
-          techniqueName: 'Credentials In Files',
-          severity: 'CRITICAL',
-          processTree: [
-            { name: 'git.exe', pid: 4820, cmd: 'git commit -m "update config"', action: 'PARENT' },
-            { name: 'node.exe', pid: 5124, cmd: 'node dist/server.cjs', action: 'SUSPICIOUS' },
-            { name: 'aws-sdk-client', pid: 6192, cmd: 'sts:GetCallerIdentity --key AKIA...', action: 'BLOCKED' }
-          ],
-          sourceFile: 'src/config/aws.ts',
-          line: 14,
-          iocs: ['DEMO_AWS_AKID_IOC_KEY', '10.240.12.8', 'sts.amazonaws.com'],
-          suggestedAction: 'Isolar endpoint da rede imediatamente e revogar credencial no AWS IAM.',
-          status: 'NEW',
-          timestamp: '2026-09-17 07:22:15'
-        }
-      ];
+      return [];
     }
 
     return findings.map((f, idx) => {
@@ -649,6 +629,15 @@ Código de saída: 0 (OK). Telemetria transmitida para a nuvem Falcon Threat Gra
       {/* 2. INDICATORS OF ATTACK (IOA DETECTIONS & PROCESS TREES)            */}
       {/* =================================================================== */}
       {activeTab === 'IOA_DETECTIONS' && (
+        detections.length === 0 ? (
+          <div className="p-12 rounded-xl bg-[#0d0f12] border border-white/10 text-center space-y-3">
+            <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
+            <h3 className="text-base font-bold text-white">Nenhum Indicador de Ataque (IOA) Ativo</h3>
+            <p className="text-xs text-zinc-400 max-w-md mx-auto">
+              O workspace está limpo ou não possui achados de segurança ativos no momento. Os sensores Falcon OverWatch permanecem em prontidão.
+            </p>
+          </div>
+        ) : selectedDetection ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* IOA Detection List */}
           <div className="lg:col-span-5 space-y-3">
@@ -800,6 +789,7 @@ Código de saída: 0 (OK). Telemetria transmitida para a nuvem Falcon Threat Gra
             </div>
           </div>
         </div>
+        ) : null
       )}
 
       {/* =================================================================== */}

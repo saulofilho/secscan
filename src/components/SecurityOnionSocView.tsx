@@ -456,18 +456,11 @@ rule SecScan_${cleanName}_Detection {
   const [selectedEndpointIndex, setSelectedEndpointIndex] = useState<number>(0);
   const [pcapViewMode, setPcapViewMode] = useState<'STREAM' | 'HEX' | 'HEADERS'>('STREAM');
 
-  const activeEndpoint = report.apiEndpoints[selectedEndpointIndex] || {
-    id: 'ep-mock',
-    method: 'POST',
-    path: '/api/v1/auth/login',
-    file: 'src/api/routes.ts',
-    line: 42,
-    snippet: 'router.post("/api/v1/auth/login", handleLogin);',
-    isInternalOrAdmin: false
-  };
+  const activeEndpoint = report.apiEndpoints[selectedEndpointIndex] || report.apiEndpoints[0] || null;
 
   // Simulated raw hex dump for the inspected network packet / payload
   const simulatedHexDump = useMemo(() => {
+    if (!activeEndpoint) return [];
     const rawPayload = `POST ${activeEndpoint.path} HTTP/1.1\r\nHost: api.secscan.internal\r\nUser-Agent: SecScan-Sensor/4.2 (OnionEngine)\r\nAuthorization: Bearer DEMO_JWT_SESSION_TOKEN_SAMPLE...\r\nContent-Type: application/json\r\nContent-Length: 54\r\n\r\n{"username":"admin","client_nonce":"f8e91024bcda"}`;
 
     const lines: { offset: string; hex: string; ascii: string }[] = [];
@@ -1320,6 +1313,15 @@ rule SecScan_${cleanName}_Detection {
       {/* 4. PCAP & STREAM ARTIFACT INSPECTOR VIEW                            */}
       {/* =================================================================== */}
       {activeTool === 'PCAP' && (
+        report.apiEndpoints.length === 0 ? (
+          <div className="p-12 rounded-xl bg-black/40 border border-white/10 text-center space-y-3">
+            <ShieldCheck className="w-10 h-10 text-emerald-400 mx-auto" />
+            <h3 className="text-base font-bold text-white">Nenhum Endpoint ou Tráfego de API no Workspace</h3>
+            <p className="text-xs text-zinc-400 max-w-md mx-auto">
+              Nenhum endpoint de API foi identificado nos arquivos atuais. Adicione arquivos com rotas ou endpoints para inspecionar tráfego de rede e pacotes PCAP.
+            </p>
+          </div>
+        ) : activeEndpoint ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* Endpoint / Stream Selector */}
           <div className="lg:col-span-4 space-y-3">
@@ -1442,6 +1444,7 @@ rule SecScan_${cleanName}_Detection {
             </div>
           </div>
         </div>
+        ) : null
       )}
 
       {/* =================================================================== */}
