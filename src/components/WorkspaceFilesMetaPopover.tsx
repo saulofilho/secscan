@@ -29,7 +29,8 @@ import {
   Minus,
   Activity,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  ShieldAlert
 } from 'lucide-react';
 import { ScannedFile } from '../types';
 import { safeGetItem, safeSetItem } from '../lib/storage';
@@ -72,6 +73,7 @@ interface WorkspaceFilesMetaPopoverProps {
   onBatchQuickIgnore?: (filePaths: string[]) => void;
   onBatchDeleteFiles?: (filePaths: string[]) => void;
   previousWorkspaceSize?: number;
+  onOpenGitignoreAudit?: () => void;
 }
 
 export interface FileMetadataItem {
@@ -590,7 +592,8 @@ export const WorkspaceFilesMetaPopover: React.FC<WorkspaceFilesMetaPopoverProps>
   onSelectFile,
   onBatchQuickIgnore,
   onBatchDeleteFiles,
-  previousWorkspaceSize
+  previousWorkspaceSize,
+  onOpenGitignoreAudit
 }) => {
   const [viewMode, setViewMode] = useState<PopoverViewMode>('TREE');
   const [sortOrder, setSortOrder] = useState<SortOrder>('SIZE_DESC');
@@ -1119,6 +1122,20 @@ export const WorkspaceFilesMetaPopover: React.FC<WorkspaceFilesMetaPopoverProps>
         </div>
 
         <div className="flex items-center gap-1.5">
+          {onOpenGitignoreAudit && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenGitignoreAudit();
+              }}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 hover:text-emerald-100 text-[10px] transition-colors cursor-pointer border border-emerald-500/30 shadow-sm"
+              title="Auditar arquivos do workspace contra o .gitignore e boas práticas de segurança"
+            >
+              <ShieldAlert className="w-3 h-3 text-emerald-400" />
+              <span>Auditar .gitignore</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={handleCopyAllMeta}

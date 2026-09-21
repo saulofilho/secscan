@@ -55,6 +55,7 @@ interface HeaderProps {
   onOpenCommandPalette?: () => void;
   onOpenShortcuts?: () => void;
   onOpenToolGuide?: (toolId?: string) => void;
+  onOpenGitignoreAudit?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -73,7 +74,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenGlossary,
   onOpenCommandPalette,
   onOpenShortcuts,
-  onOpenToolGuide
+  onOpenToolGuide,
+  onOpenGitignoreAudit
 }) => {
   const isMac = useMemo(() => {
     return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -321,6 +323,19 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <BookOpen className="w-3.5 h-3.5 text-[#FF3E00] shrink-0" />
                 <span className="hidden xl:inline">Glossário</span>
+              </button>
+            )}
+
+            {/* Gitignore Security Audit Button */}
+            {onOpenGitignoreAudit && (
+              <button
+                id="btn-header-open-gitignore-audit"
+                onClick={onOpenGitignoreAudit}
+                className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-emerald-300 hover:text-white bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/40 hover:border-emerald-400 transition-all cursor-pointer shadow-xs"
+                title="Auditoria de .gitignore & Práticas de Segurança: Verifique se o repositório possui .gitignore e arquivos sensíveis desprotegidos"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="hidden sm:inline">.gitignore</span>
               </button>
             )}
 

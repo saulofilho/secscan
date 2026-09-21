@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { 
   AlertTriangle, 
   ShieldAlert, 
+  ShieldCheck,
   CheckCircle2, 
   X,
   Loader2,
@@ -61,6 +62,8 @@ import { ThreatModelingView } from './components/ThreatModelingView';
 import { AutoRemediationView } from './components/AutoRemediationView';
 import { ComplianceAuditView } from './components/ComplianceAuditView';
 import { ToolGuideModal } from './components/ToolGuideModal';
+import { GitignoreAuditModal } from './components/GitignoreAuditModal';
+import { auditGitignoreSecurity } from './lib/gitignoreAuditor';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -137,7 +140,37 @@ export default function App() {
   const [showMttrConfigModal, setShowMttrConfigModal] = useState<boolean>(false);
   const [showToolGuideModal, setShowToolGuideModal] = useState<boolean>(false);
   const [toolGuideTargetTab, setToolGuideTargetTab] = useState<string>('compliance');
+  const [showGitignoreModal, setShowGitignoreModal] = useState<boolean>(false);
   const [shortcutToast, setShortcutToast] = useState<{ message: string; key?: string } | null>(null);
+
+  // Quick summary of .gitignore security compliance for badge & UI indicators
+  const gitignoreAuditSummary = useMemo(() => {
+    return auditGitignoreSecurity({ files, source: 'WORKSPACE' });
+  }, [files]);
+
+  const handleApplyGitignoreToWorkspace = useCallback((gitignoreContent: string) => {
+    setFiles(prev => {
+      const idx = prev.findIndex(f => f.name === '.gitignore');
+      const gitignoreFile: ScannedFile = {
+        name: '.gitignore',
+        path: '.gitignore',
+        content: gitignoreContent,
+        size: new Blob([gitignoreContent]).size,
+        extension: 'gitignore',
+        lastModified: Date.now()
+      };
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = gitignoreFile;
+        return next;
+      }
+      return [gitignoreFile, ...prev];
+    });
+  }, []);
+
+  const handleRemoveFileFromWorkspace = useCallback((fileName: string) => {
+    setFiles(prev => prev.filter(f => f.name !== fileName));
+  }, []);
 
   // Global SecScan configuration for dynamic remediationTime (MTTR) parameters
   const [secScanConfig, setSecScanConfig] = useState<SecScanGlobalConfig>(() => getSecScanConfig());
@@ -1226,6 +1259,7 @@ export default function App() {
           setToolGuideTargetTab(tabId || activeTab);
           setShowToolGuideModal(true);
         }}
+        onOpenGitignoreAudit={() => setShowGitignoreModal(true)}
       />
 
       {/* Main Container Content */}
@@ -1362,9 +1396,25 @@ export default function App() {
                               onBatchQuickIgnore={handleBatchQuickIgnore}
                               onBatchDeleteFiles={handleBatchDeleteFiles}
                               previousWorkspaceSize={previousWorkspaceSize}
+                              onOpenGitignoreAudit={() => setShowGitignoreModal(true)}
                             />
                           )}
                         </div>
+                        <button
+                          id="btn-drawer-gitignore-audit"
+                          type="button"
+                          onClick={() => setShowGitignoreModal(true)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 hover:text-emerald-100 text-[10px] normal-case transition-colors cursor-pointer border border-emerald-500/30 shadow-sm"
+                          title="Auditar conformidade do .gitignore e verificar arquivos sensíveis no workspace"
+                        >
+                          <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                          <span>.gitignore</span>
+                          {gitignoreAuditSummary.stats.unprotectedExposedCount > 0 && (
+                            <span className="px-1 py-0.1 rounded bg-rose-500 text-white text-[8.5px] font-bold">
+                              {gitignoreAuditSummary.stats.unprotectedExposedCount}
+                            </span>
+                          )}
+                        </button>
                         <button
                           id="btn-drawer-copy-log"
                           type="button"
@@ -1747,8 +1797,31 @@ export default function App() {
                   onBatchQuickIgnore={handleBatchQuickIgnore}
                   onBatchDeleteFiles={handleBatchDeleteFiles}
                   previousWorkspaceSize={previousWorkspaceSize}
+                  onOpenGitignoreAudit={() => setShowGitignoreModal(true)}
                 />
               </div>
+
+              <button
+                id="btn-validation-gitignore-audit"
+                type="button"
+                onClick={() => setShowGitignoreModal(true)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-[11px] font-semibold transition-colors cursor-pointer border shadow-sm ${
+                  gitignoreAuditSummary.stats.unprotectedExposedCount > 0
+                    ? 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 hover:text-rose-100 border-rose-500/40 hover:border-rose-500/60'
+                    : gitignoreAuditSummary.status === 'VALID'
+                    ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 hover:text-emerald-100 border-emerald-500/30 hover:border-emerald-500/50'
+                    : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 hover:text-amber-100 border-amber-500/30 hover:border-amber-500/50'
+                }`}
+                title="Auditar arquivo .gitignore e verificar arquivos sensíveis no diretório de trabalho"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>.gitignore Audit</span>
+                {gitignoreAuditSummary.stats.unprotectedExposedCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded bg-rose-500 text-white text-[9.5px] font-bold animate-pulse">
+                    {gitignoreAuditSummary.stats.unprotectedExposedCount} risco(s)
+                  </span>
+                )}
+              </button>
 
               <button
                 id="btn-validation-copy-log"
@@ -2193,6 +2266,7 @@ export default function App() {
         onResetWorkspace={handleResetWorkspace}
         onClearWorkspace={handleClearAllFilesAndValidation}
         onOpenShortcuts={() => setShowShortcutsModal(true)}
+        onOpenGitignoreAudit={() => setShowGitignoreModal(true)}
         files={files}
         onSelectFile={(f) => {
           setSelectedFile(f);
@@ -2230,6 +2304,15 @@ export default function App() {
           setActiveTab(tabId);
           setShowToolGuideModal(false);
         }}
+      />
+
+      {/* Gitignore & Security Best Practices Audit Modal */}
+      <GitignoreAuditModal
+        isOpen={showGitignoreModal}
+        onClose={() => setShowGitignoreModal(false)}
+        files={files}
+        onApplyGitignoreToWorkspace={handleApplyGitignoreToWorkspace}
+        onRemoveFileFromWorkspace={handleRemoveFileFromWorkspace}
       />
 
       {/* Non-intrusive Shortcut Toast Feedback */}

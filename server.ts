@@ -1,8 +1,10 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
+import { auditGitignoreSecurity } from './src/lib/gitignoreAuditor';
 
 dotenv.config();
 
@@ -897,6 +899,82 @@ Responda ESTRITAMENTE em formato JSON com o seguinte formato, sem markdown ou fe
       });
     } catch (err: any) {
       return res.status(500).json({ error: 'Erro ao correlacionar achados com feeds OSINT: ' + String(err) });
+    }
+  });
+
+  // Helper to safely list working files from disk repository
+  function getRepositoryWorkingFiles(dir: string, baseDir: string = dir, maxFiles = 300): Array<{ name: string; path: string; size: number }> {
+    const results: Array<{ name: string; path: string; size: number }> = [];
+    
+    function scan(current: string) {
+      if (results.length >= maxFiles) return;
+      try {
+        const entries = fs.readdirSync(current, { withFileTypes: true });
+        for (const entry of entries) {
+          if (results.length >= maxFiles) break;
+          const fullPath = path.join(current, entry.name);
+          const relPath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
+          
+          if (entry.isDirectory()) {
+            if (entry.name === '.git' || entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '.cache') {
+              results.push({ name: entry.name, path: relPath + '/', size: 0 });
+              continue;
+            }
+            scan(fullPath);
+          } else if (entry.isFile()) {
+            try {
+              const stat = fs.statSync(fullPath);
+              results.push({ name: entry.name, path: relPath, size: stat.size });
+            } catch {
+              results.push({ name: entry.name, path: relPath, size: 0 });
+            }
+          }
+        }
+      } catch {
+        // Continue scanning even if single directory read fails
+      }
+    }
+
+    scan(dir);
+    return results;
+  }
+
+  // Audit Gitignore and Working Directory Security (Disk repository)
+  app.get('/api/gitignore/audit', (req, res) => {
+    try {
+      const repoRoot = process.cwd();
+      const gitignorePath = path.join(repoRoot, '.gitignore');
+      let gitignoreContent = '';
+      if (fs.existsSync(gitignorePath)) {
+        gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+      }
+
+      const files = getRepositoryWorkingFiles(repoRoot, repoRoot);
+      const auditResult = auditGitignoreSecurity({
+        gitignoreContent,
+        files,
+        source: 'DISK_REPOSITORY'
+      });
+
+      return res.json(auditResult);
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Erro ao auditar .gitignore do repositório: ' + String(err) });
+    }
+  });
+
+  // Audit Gitignore for custom or workspace files
+  app.post('/api/gitignore/audit', (req, res) => {
+    try {
+      const { gitignoreContent, files } = req.body || {};
+      const auditResult = auditGitignoreSecurity({
+        gitignoreContent: typeof gitignoreContent === 'string' ? gitignoreContent : undefined,
+        files: Array.isArray(files) ? files : [],
+        source: 'WORKSPACE'
+      });
+
+      return res.json(auditResult);
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Erro na auditoria de .gitignore: ' + String(err) });
     }
   });
 

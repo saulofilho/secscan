@@ -67,6 +67,7 @@ interface CommandPaletteModalProps {
   onResetWorkspace: () => void;
   onClearWorkspace?: () => void;
   onOpenShortcuts: () => void;
+  onOpenGitignoreAudit?: () => void;
   files: ScannedFile[];
   onSelectFile: (file: ScannedFile) => void;
   rules: RegexRule[];
@@ -88,6 +89,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   onResetWorkspace,
   onClearWorkspace,
   onOpenShortcuts,
+  onOpenGitignoreAudit,
   files,
   onSelectFile,
   rules,
@@ -200,6 +202,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         },
         keywords: ['atalhos', 'shortcuts', 'teclado', 'keyboard', 'hotkeys', 'ajuda']
       },
+      ...(onOpenGitignoreAudit ? [{
+        id: 'cmd-audit-gitignore',
+        title: 'Auditar .gitignore & Segurança do Diretório',
+        subtitle: 'Verificar se o repositório possui .gitignore e detectar arquivos sensíveis desprotegidos',
+        category: 'Ações Rápidas' as const,
+        icon: ShieldCheck,
+        badge: 'Higiene Git',
+        badgeColor: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+        action: () => {
+          onClose();
+          onOpenGitignoreAudit();
+        },
+        keywords: ['gitignore', 'git', 'auditoria', 'chaves', 'secrets', 'env', 'credenciais', 'seguranca', 'diretorio', 'ignore']
+      }] : []),
       {
         id: 'cmd-open-tour',
         title: 'Iniciar Tutorial Guiado do SecScan',
