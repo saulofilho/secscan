@@ -105,6 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'sbom', label: 'SBOM Generator', icon: FileSpreadsheet, badge: 'CycloneDX', tooltip: 'Geração de inventário SBOM nos padrões oficiais OWASP CycloneDX v1.5 e SPDX v2.3' },
     { id: 'entropy', label: 'Entropia & Segredos Git', icon: Binary, badge: 'Entropy', tooltip: 'Cálculo de Entropia de Shannon (H) para segredos e varredura forense no histórico Git' },
     { id: 'threatmodel', label: 'Modelagem STRIDE & CVSS', icon: Target, badge: 'STRIDE', tooltip: 'Matriz STRIDE da Microsoft, checklist OWASP ASVS v4 e calculadora oficial CVSS v3.1' },
+    { id: 'ctihub', label: 'Threat Intel (CTI)', icon: Globe, badge: 'OTX', tooltip: 'Cyber Threat Intelligence Hub: feeds AlienVault OTX, CISA KEV e correlação com Threat Actors' },
     { id: 'autoremediation', label: 'Auto-Remediação (Patches)', icon: Wrench, badge: '1-Click', tooltip: 'Geração automática de Git Unified Diffs e aplicação direta de patches corretivos no código' },
     { id: 'refactoring', label: 'Refactoring Assistant', icon: Sparkles, badge: 'Modernize', tooltip: 'Sugestões guiadas de refatoração para vulnerabilidades comuns (ex: crypto legada) com preview comparativo antes/depois' },
     { id: 'compliance', label: 'Auditoria Compliance (SOC2/ISO/HIPAA)', icon: Scale, badge: 'SOC2', tooltip: 'Score de prontidão determinístico e mapeamento formal para SOC 2 Type II, ISO 27001 e HIPAA' },

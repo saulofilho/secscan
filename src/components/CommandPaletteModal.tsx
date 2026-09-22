@@ -306,21 +306,17 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       },
       {
         id: 'nav-threat-intel',
-        title: 'Módulo: Threat Intelligence & Feeds OSINT',
-        subtitle: 'AlienVault OTX, Abuse.ch URLhaus, ThreatFox, Feodo e CISA KEV com correlação em tempo real',
+        title: 'Módulo: Cyber Threat Intelligence (CTI) Hub',
+        subtitle: 'AlienVault OTX, CISA KEV, MISP e correlação automática com Threat Actors (Scattered Spider, Lazarus, etc.)',
         category: 'Navegação',
-        icon: Radio,
-        badge: 'OSINT Live',
+        icon: Globe,
+        badge: 'CTI Live',
         badgeColor: 'bg-[#00FF41]/15 text-[#00FF41] border-[#00FF41]/30',
         action: () => {
           onClose();
-          setActiveTab('dashboard');
-          setTimeout(() => {
-            const el = document.getElementById('threat-intel-section');
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
+          setActiveTab('ctihub');
         },
-        keywords: ['threat', 'intelligence', 'osint', 'alienvault', 'otx', 'abuse.ch', 'urlhaus', 'threatfox', 'feodo', 'cisa', 'ioc', 'c2']
+        keywords: ['threat', 'intelligence', 'cti', 'alienvault', 'otx', 'cisa', 'kev', 'threat actors', 'scattered spider', 'lazarus', 'iocs', 'misp']
       },
       {
         id: 'nav-scan-history',

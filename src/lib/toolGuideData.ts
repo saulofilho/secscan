@@ -1287,5 +1287,42 @@ jobs:
       systemDetection: `Achado atribuído ao estágio Pre-commit com política de bloqueio imediato (Fail on HIGH).`,
       outputRemediation: `Pipeline interrompe o commit no git hook pre-commit antes de alcançar o repositório remoto.`
     }
+  },
+  ctihub: {
+    id: 'ctihub',
+    name: 'Cyber Threat Intelligence (CTI) Hub',
+    category: 'Defesa & Runtime',
+    badge: 'OTX / CISA KEV',
+    shortSummary: 'Hub de inteligência de ameaças cibernéticas com ingestão contínua de feeds públicos (AlienVault OTX, CISA KEV, MISP e AbuseIPDB). Correlaciona automaticamente achados do código-fonte a atores hostis conhecidos e IOCs ativos.',
+    howItWorks: 'O motor CTI analisa as categorias, regras e snippets de achados locais (credenciais AWS, tokens JWT, conexões de banco de dados, injeções SQL e SSRF) e os mapeia para perfis de adversários ativos (Scattered Spider, Lazarus Group, Volt Typhoon, FIN7, LockBit 3.0 e TeamTNT). Aplica multiplicadores de risco baseados em exploração comprovada no mundo real (CISA KEV) e gera pacotes STIX 2.1 padronizados.',
+    stepByStepGuide: [
+      {
+        step: 1,
+        action: 'Acessar a aba "Threat Intel (CTI)"',
+        description: 'Visualize o status dos feeds conectados (AlienVault OTX, CISA KEV, MISP CIRCL, AbuseIPDB) e a taxa de pulses em tempo real.'
+      },
+      {
+        step: 2,
+        action: 'Verificar Achados Correlacionados & Urgência',
+        description: 'Examine as tags de atores de ameaça atribuídas aos seus arquivos locais, incluindo TTPs do MITRE ATT&CK e alertas de CISA KEV.'
+      },
+      {
+        step: 3,
+        action: 'Aplicar Tags aos Achados',
+        description: 'Clique em "Aplicar Tags aos Achados" para enriquecer o relatório principal com multiplicadores de risco e metadados CTI.'
+      },
+      {
+        step: 4,
+        action: 'Consultar Indicadores ou Exportar STIX 2.1',
+        description: 'Utilize o buscador rápido de IOCs para testar IPs/hashes ou exporte o bundle completo de inteligência para SIEM e OpenCTI.'
+      }
+    ],
+    example: {
+      title: 'Exemplo: Correlação de Chave AWS com Campanha Scattered Spider',
+      scenario: 'Uma chave estática AKIA foi detectada em código de infraestrutura de nuvem.',
+      inputSnippet: `AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE"`,
+      systemDetection: `Correlacionado ao grupo Scattered Spider (UNC3944), pulse AlienVault OTX #9042 e técnica T1552.001 (Credentials in Files).`,
+      outputRemediation: `Amplificador de risco de 1.75x aplicado e recomendação de revogação imediata via AWS IAM com rotação de segredo.`
+    }
   }
 };

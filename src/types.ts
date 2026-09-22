@@ -137,6 +137,7 @@ export interface ScanFinding {
     assignedSeverity: SeverityLevel;
     factors: string[];
   };
+  threatIntelTag?: FindingThreatIntelTag;
 }
 
 export interface ApiEndpointFinding {
@@ -1059,6 +1060,124 @@ export interface SecurityRefactoringRecipe {
   defaultTargetFileName?: string;
   tags: string[];
 }
+
+// ==========================================
+// CYBER THREAT INTELLIGENCE (CTI) HUB TYPES
+// ==========================================
+
+export type ThreatIntelFeedId = 
+  | 'ALIENVAULT_OTX' 
+  | 'CISA_KEV' 
+  | 'MISP_CIRCL' 
+  | 'ABUSE_IPDB' 
+  | 'URLHAUS' 
+  | 'MITRE_CTI';
+
+export interface ThreatIntelFeedStatus {
+  id: ThreatIntelFeedId;
+  name: string;
+  provider: string;
+  status: 'LIVE' | 'CONNECTED' | 'SYNCING' | 'RATE_LIMITED' | 'ERROR';
+  pulseCount: number;
+  iocCount: number;
+  lastSyncTimestamp: string;
+  apiEndpoint: string;
+  isRealtimeEnabled: boolean;
+  reliabilityScore: number; // 0 - 100
+  badge: string;
+}
+
+export interface ThreatActorProfile {
+  id: string;
+  name: string;
+  codeName: string;
+  aliases: string[];
+  origin: string;
+  motivation: 'FINANCIAL' | 'ESPIONAGE' | 'SABOTAGE' | 'RANSOMWARE' | 'EXTORTION';
+  activeSectors: string[];
+  associatedMalware: string[];
+  targetedTechnologies: string[];
+  ttps: {
+    techniqueId: string;
+    name: string;
+    tactic: string;
+  }[];
+  threatScore: number; // 0 - 100
+  activeCampaigns: string[];
+  recentIocSignatures: string[];
+  description: string;
+  firstObserved: string;
+  lastActive: string;
+}
+
+export type ThreatIocType = 
+  | 'IPv4' 
+  | 'domain' 
+  | 'URL' 
+  | 'hash_sha256' 
+  | 'hash_md5' 
+  | 'cve' 
+  | 'api_key_pattern' 
+  | 'email';
+
+export interface ThreatIocItem {
+  id: string;
+  type: ThreatIocType;
+  indicator: string;
+  title?: string;
+  confidence: number; // 0 - 100
+  severity: SeverityLevel;
+  firstSeen: string;
+  lastSeen: string;
+  sourceFeed: ThreatIntelFeedId;
+  threatActor?: string;
+  maliciousContext: string;
+  relatedPulses?: string[];
+}
+
+export interface OtxPulse {
+  id: string;
+  name: string;
+  author: string;
+  description: string;
+  created: string;
+  modified: string;
+  tlp: 'WHITE' | 'GREEN' | 'AMBER' | 'RED';
+  tags: string[];
+  adversary?: string;
+  targetedCountries?: string[];
+  malwareFamilies?: string[];
+  subscriberCount: number;
+  iocs: ThreatIocItem[];
+  cves?: string[];
+  referenceUrl?: string;
+}
+
+export interface FindingThreatIntelTag {
+  findingId: string;
+  threatActor?: ThreatActorProfile;
+  matchingPulses: OtxPulse[];
+  matchingIocs: ThreatIocItem[];
+  campaigns: string[];
+  cisaKevExploited: boolean;
+  cisaKevDueDate?: string;
+  cisaKevRansomwareCampaign?: boolean;
+  threatActorTtp?: string;
+  riskScoreAmplifier: number; // e.g. 1.5 multiplier
+  threatSummary: string;
+  remediationUrgency: 'IMMEDIATE_ACTION' | 'HIGH_PRIORITY' | 'MONITOR';
+  detectedAt: string;
+}
+
+export interface CtiFilterOptions {
+  search: string;
+  feedId: ThreatIntelFeedId | 'ALL';
+  threatActor: string | 'ALL';
+  iocType: ThreatIocType | 'ALL';
+  cisaKevOnly: boolean;
+  minConfidence: number;
+}
+
 
 
 

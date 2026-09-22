@@ -65,6 +65,7 @@ import { ThreatModelingView } from './components/ThreatModelingView';
 import { AutoRemediationView } from './components/AutoRemediationView';
 import { SecurityRefactoringAssistantView } from './components/SecurityRefactoringAssistantView';
 import { PipelineFlowArchitectView } from './components/PipelineFlowArchitectView';
+import { CyberThreatIntelHubView } from './components/CyberThreatIntelHubView';
 import { ComplianceAuditView } from './components/ComplianceAuditView';
 import { SecurityHeadersView } from './components/SecurityHeadersView';
 import { ContainerSecurityView } from './components/ContainerSecurityView';
@@ -2124,6 +2125,23 @@ export default function App() {
             report={report}
             onSelectFinding={handleSelectFinding}
             onNavigateToScanner={() => setActiveTab('scanner')}
+          />
+        )}
+
+        {activeTab === 'ctihub' && (
+          <CyberThreatIntelHubView
+            findings={report.findings}
+            onUpdateFindings={(updatedFindings) => {
+              setReport(prev => ({
+                ...prev,
+                findings: updatedFindings
+              }));
+            }}
+            onSelectFinding={handleSelectFinding}
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onLogAudit={(event) => {
+              setAuditLogs(prev => [event, ...prev].slice(0, 80));
+            }}
           />
         )}
 
