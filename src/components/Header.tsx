@@ -96,6 +96,8 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'iast', label: 'IAST (Runtime Hooks)', icon: Activity, badge: report.iastReport?.findings.length ? `${report.iastReport.findings.length} hooks` : 'IAST', tooltip: 'Testes de segurança interativos em tempo de execução com ganchos em sinks dinâmicos' },
     { id: 'sca', label: 'SCA (Dependências & CVEs)', icon: Package, badge: 'SCA', tooltip: 'Auditoria de dependências open-source contra base de CVEs/NVD e risco de licença copyleft' },
     { id: 'iac', label: 'IaC Security (Docker/K8s)', icon: Container, badge: 'IaC', tooltip: 'Análise estática de infraestrutura: Dockerfile root, pods K8s privilegiados e workflows CI/CD' },
+    { id: 'apisecurity', label: 'API Security (BOLA/OWASP)', icon: Route, badge: 'OWASP', tooltip: 'Auditoria especializada de APIs: BOLA/IDOR, Mass Assignment, BFLA e Rate Limiting' },
+    { id: 'asocsla', label: 'ASOC & SLA Manager', icon: Clock, badge: 'SLA', tooltip: 'Gestão de Débito Técnico e cumprimento de SLAs de remediação corporativos (P0/P1/P2)' },
     { id: 'dast', label: 'DAST (Fuzzer & Headers)', icon: Crosshair, badge: 'DAST', tooltip: 'Fuzzer de injeção em APIs (SQLi/XSS), auditoria de headers HTTP (CSP/HSTS) e comandos cURL' },
     { id: 'sbom', label: 'SBOM Generator', icon: FileSpreadsheet, badge: 'CycloneDX', tooltip: 'Geração de inventário SBOM nos padrões oficiais OWASP CycloneDX v1.5 e SPDX v2.3' },
     { id: 'entropy', label: 'Entropia & Segredos Git', icon: Binary, badge: 'Entropy', tooltip: 'Cálculo de Entropia de Shannon (H) para segredos e varredura forense no histórico Git' },

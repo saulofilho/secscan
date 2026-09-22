@@ -74,7 +74,7 @@ export const IacSecurityView: React.FC<IacSecurityViewProps> = ({ files, onNavig
       </div>
 
       {/* Summary Tech Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 font-mono">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono">
         <button
           onClick={() => setSelectedCategory('DOCKER')}
           className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
@@ -102,6 +102,19 @@ export const IacSecurityView: React.FC<IacSecurityViewProps> = ({ files, onNavig
         </button>
 
         <button
+          onClick={() => setSelectedCategory('TERRAFORM')}
+          className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+            selectedCategory === 'TERRAFORM' ? 'bg-[#181818] border-orange-500 shadow' : 'bg-[#0A0A0A] border-[#222] hover:border-[#333]'
+          }`}
+        >
+          <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">Terraform</span>
+          <div className="flex items-baseline gap-2 mt-1">
+            <span className="text-xl font-bold text-white">{report.summaryByTech.TERRAFORM.count}</span>
+            <span className="text-[10px] text-rose-400 font-semibold">{report.summaryByTech.TERRAFORM.critical} crít.</span>
+          </div>
+        </button>
+
+        <button
           onClick={() => setSelectedCategory('COMPOSE')}
           className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
             selectedCategory === 'COMPOSE' ? 'bg-[#181818] border-orange-500 shadow' : 'bg-[#0A0A0A] border-[#222] hover:border-[#333]'
@@ -120,7 +133,7 @@ export const IacSecurityView: React.FC<IacSecurityViewProps> = ({ files, onNavig
             selectedCategory === 'CICD' ? 'bg-[#181818] border-orange-500 shadow' : 'bg-[#0A0A0A] border-[#222] hover:border-[#333]'
           }`}
         >
-          <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">CI/CD Workflows</span>
+          <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">CI/CD</span>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-xl font-bold text-white">{report.summaryByTech.CICD.count}</span>
             <span className="text-[10px] text-rose-400 font-semibold">{report.summaryByTech.CICD.critical} crít.</span>
@@ -133,7 +146,7 @@ export const IacSecurityView: React.FC<IacSecurityViewProps> = ({ files, onNavig
             selectedCategory === 'ALL' ? 'bg-[#181818] border-orange-500 shadow' : 'bg-[#0A0A0A] border-[#222] hover:border-[#333]'
           }`}
         >
-          <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">Todas Categorias</span>
+          <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">Todas</span>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-xl font-bold text-white">{report.findings.length}</span>
             <span className="text-[10px] text-zinc-500">desvios</span>

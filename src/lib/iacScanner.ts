@@ -289,27 +289,84 @@ export function scanInfrastructureAsCode(files: ScannedFile[]): IacReport {
     }
 
     // ==========================================
-    // 5. Terraform Audits
+    // 5. Terraform & CloudFormation Audits
     // ==========================================
-    if (fileName.endsWith('.tf') || fileName.endsWith('.tfvars')) {
+    if (fileName.endsWith('.tf') || fileName.endsWith('.tfvars') || fileName.endsWith('.tf.json')) {
       totalFilesScanned++;
+      const tfContent = file.content;
+
       lines.forEach((line, idx) => {
         const trimmed = line.trim();
         const lineNum = idx + 1;
 
-        if (trimmed.includes('cidr_blocks = ["0.0.0.0/0"]') && (file.content.includes('22') || file.content.includes('3389'))) {
+        // TF Rule 1: Ingress 0.0.0.0/0 on sensitive ports
+        if (trimmed.includes('cidr_blocks = ["0.0.0.0/0"]') && (tfContent.includes('22') || tfContent.includes('3389') || tfContent.includes('5432'))) {
           findings.push({
             id: `iac-tf-sg-${idx}`,
             ruleId: 'IAC-TF-001',
-            title: 'Security Group Permite Acesso SSH/RDP de Qualquer IP (0.0.0.0/0)',
+            title: 'Security Group Permite Acesso SSH/RDP/DB de Qualquer IP (0.0.0.0/0)',
             category: 'TERRAFORM',
-            severity: 'HIGH',
+            severity: 'CRITICAL',
             file: file.path,
             line: lineNum,
             snippet: line,
-            description: 'Permitir entrada irrestrita na porta 22 ou 3389 a partir de toda a internet expõe a infraestrutura a ataques de força bruta e exploração zero-day.',
+            description: 'Permitir entrada irrestrita na porta 22, 3389 ou banco de dados a partir de toda a internet expõe a infraestrutura a ataques de força bruta e exploração zero-day.',
             remediation: 'Restrinja o acesso ao CIDR da VPN corporativa ou use AWS SSM / Cloudflare Tunnels.',
-            compliance: { cisBenchmark: 'CIS AWS Foundations 4.1' }
+            compliance: { cisBenchmark: 'CIS AWS Foundations 4.1', nist: 'NIST SP 800-53 SC-7' }
+          });
+        }
+
+        // TF Rule 2: S3 Bucket ACL Public or Missing KMS Encryption
+        if (trimmed.includes('resource "aws_s3_bucket"') || trimmed.includes('resource "google_storage_bucket"')) {
+          if (!tfContent.includes('server_side_encryption_configuration') && !tfContent.includes('kms_key_id')) {
+            findings.push({
+              id: `iac-tf-s3-kms-${idx}`,
+              ruleId: 'IAC-TF-002',
+              title: 'Bucket S3 / GCS sem Criptografia em Repouso (KMS ausente)',
+              category: 'TERRAFORM',
+              severity: 'HIGH',
+              file: file.path,
+              line: lineNum,
+              snippet: line,
+              description: 'O bucket foi provisionado sem a configuração obrigatória de criptografia gerenciada por chave do cliente (SSE-KMS / CMEK).',
+              remediation: 'Declare o bloco `server_side_encryption_configuration` com `apply_server_side_encryption_by_default { sse_algorithm = "aws:kms" }`.',
+              compliance: { cisBenchmark: 'CIS AWS 2.1.1', nist: 'NIST SP 800-53 SC-28' }
+            });
+          }
+        }
+
+        // TF Rule 3: RDS Instance Publicly Accessible
+        if (trimmed.includes('publicly_accessible = true')) {
+          findings.push({
+            id: `iac-tf-rds-public-${idx}`,
+            ruleId: 'IAC-TF-003',
+            title: 'Banco de Dados RDS com Endereço IP Público Habilitado',
+            category: 'TERRAFORM',
+            severity: 'CRITICAL',
+            file: file.path,
+            line: lineNum,
+            snippet: line,
+            description: 'A instância de banco relacional RDS possui `publicly_accessible = true`, expondo suas credenciais e dados diretamente à internet.',
+            remediation: 'Altere para `publicly_accessible = false` e coloque o banco dentro de subnets privadas protegidas por NAT.',
+            compliance: { cisBenchmark: 'CIS AWS 2.3.1', nist: 'NIST SP 800-53 AC-3' },
+            suggestedPatch: line.replace('publicly_accessible = true', 'publicly_accessible = false')
+          });
+        }
+
+        // TF Rule 4: S3 Bucket Versioning Disabled
+        if (trimmed.includes('versioning {') && tfContent.includes('enabled = false')) {
+          findings.push({
+            id: `iac-tf-s3-vers-${idx}`,
+            ruleId: 'IAC-TF-004',
+            title: 'Versionamento de Objetos S3 Desabilitado (Risco de Ransomware)',
+            category: 'TERRAFORM',
+            severity: 'MEDIUM',
+            file: file.path,
+            line: lineNum,
+            snippet: line,
+            description: 'Sem versionamento ativo e bloqueio de exclusão (MFA Delete), dados podem ser permanentemente destruídos por operadores maliciosos ou ransomware.',
+            remediation: 'Configure `versioning { enabled = true }` e habilite Object Lock.',
+            compliance: { cisBenchmark: 'CIS AWS 2.1.2' }
           });
         }
       });

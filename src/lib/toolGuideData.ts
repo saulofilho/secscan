@@ -1114,5 +1114,72 @@ jobs:
       systemDetection: `Bloqueio Crítico: Endpoint de Metadados de Nuvem (MITRE ATT&CK T1552.005).`,
       outputRemediation: `Rejeitar imediatamente no gateway e configurar o cliente HTTP com filtro de faixas privadas.`
     }
+  },
+  apisecurity: {
+    id: 'apisecurity',
+    name: 'API Security & BOLA/IDOR Inspector',
+    category: 'AppSec & SAST',
+    badge: 'OWASP API 2023',
+    shortSummary: 'Auditoria estática e de contratos para APIs REST e GraphQL baseada no OWASP API Security Top 10, com foco em BOLA/IDOR, Mass Assignment e Rate Limiting.',
+    howItWorks: 'Analisa arquivos de rotas e controllers identificando passagem direta de identificadores de objeto (:id, :userId), injeção desprotegida de req.body em bancos e rotas sem limitação de taxa.',
+    stepByStepGuide: [
+      {
+        step: 1,
+        action: 'Acessar o Módulo "API Security (BOLA/OWASP)"',
+        description: 'Visualize todas as rotas mapeadas no workspace e suas vulnerabilidades em relação ao OWASP API Top 10.'
+      },
+      {
+        step: 2,
+        action: 'Inspecionar Falhas e Provas de Conceito (PoC)',
+        description: 'Abra um card para visualizar o comando cURL de exploração demonstrativa e o impacto no negócio.'
+      },
+      {
+        step: 3,
+        action: 'Copiar o Padrão de Código Seguro',
+        description: 'Aplique as correções recomendadas utilizando schemas tipados (Zod/Joi) e verificação obrigatória de tenant/propriedade.'
+      }
+    ],
+    example: {
+      title: 'Exemplo: BOLA no Endpoint GET /api/v1/users/:userId/financial-statement',
+      scenario: 'Atacante autenticado altera o parâmetro :userId para visualizar extratos bancários de outras contas.',
+      inputSnippet: `router.get('/api/v1/users/:userId/financial-statement', async (req, res) => {
+  const statement = await db.statements.findOne({ userId: req.params.userId });
+  return res.json(statement);
+});`,
+      systemDetection: `[API1:2023_BOLA] Broken Object Level Authorization (CWE-639) - Severidade Crítica`,
+      outputRemediation: `Adicionar verificação de autorização: WHERE userId = req.user.id AND tenantId = req.user.tenantId.`
+    }
+  },
+  asocsla: {
+    id: 'asocsla',
+    name: 'ASOC & Vulnerability SLA Manager',
+    category: 'Conformidade & Governança',
+    badge: 'SLA Engine',
+    shortSummary: 'Gestão contínua de ciclo de vida de vulnerabilidades, monitoramento de prazos de remediação corporativos (P0/P1/P2) e cálculo de Débito Técnico de Segurança.',
+    howItWorks: 'Correlaciona achados das ferramentas de segurança (SAST, SCA, IaC, APIs), aplica políticas de SLA por severidade (48h para Crítico, 7 dias para Alto) e mede MTTR e taxa de conformidade por time.',
+    stepByStepGuide: [
+      {
+        step: 1,
+        action: 'Acessar a aba "ASOC & SLA Manager"',
+        description: 'Analise o painel executivo com SLA Compliance Rate, Débito Técnico e métricas por equipe.'
+      },
+      {
+        step: 2,
+        action: 'Filtrar por Status de SLA ou Time Responsável',
+        description: 'Isole vulnerabilidades "SLA Estourado (Breached)" ou "Próximo de Estourar" para priorização ágil.'
+      },
+      {
+        step: 3,
+        action: 'Acompanhar Resoluções e MTTR',
+        description: 'Marque itens como remediados para atualizar a taxa de conformidade corporativa.'
+      }
+    ],
+    example: {
+      title: 'Exemplo: Violação de SLA P0 (Chave Privada Exposta há 52 Horas)',
+      scenario: 'Uma credencial Stripe foi detectada em código de produção e o prazo corporativo de 48 horas foi ultrapassado.',
+      inputSnippet: `Finding: Hardcoded Stripe Secret Key | Descoberto há 52h | SLA Máximo: 48h`,
+      systemDetection: `Alerta ASOC: SLA Breached! Multa de conformidade e risco iminente de exfiltração financeira.`,
+      outputRemediation: `Revogar a chave no painel da Stripe imediatamente e aprovar PR de contingência do time Backend.`
+    }
   }
 };

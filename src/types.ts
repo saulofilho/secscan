@@ -899,6 +899,98 @@ export interface ThreatIntelFeedSummary {
   }[];
 }
 
+// ==========================================
+// API Security & BOLA/IDOR Inspector Types
+// ==========================================
+export type OwaspApiCategory =
+  | 'API1:2023_BOLA'
+  | 'API2:2023_BROKEN_AUTH'
+  | 'API3:2023_BOPLA'
+  | 'API4:2023_UNRESTRICTED_RESOURCE'
+  | 'API5:2023_BFLA'
+  | 'API6:2023_SSRF'
+  | 'API7:2023_SECURITY_MISCONFIG'
+  | 'API8:2023_LACK_PROTECTION'
+  | 'API9:2023_IMPROPER_INVENTORY'
+  | 'API10:2023_UNSAFE_CONSUMPTION';
+
+export interface ApiSecurityFinding {
+  id: string;
+  endpoint: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  category: OwaspApiCategory;
+  categoryTitle: string;
+  severity: SeverityLevel;
+  vulnerabilityTitle: string;
+  description: string;
+  impact: string;
+  cwe: string;
+  remediation: string;
+  sampleExploitCurl: string;
+  securedCodeSnippet: string;
+  vulnerableParam?: string;
+  file?: string;
+  line?: number;
+}
+
+export interface ApiSecurityReport {
+  timestamp: string;
+  totalEndpointsAudited: number;
+  vulnerableEndpointsCount: number;
+  apiRiskScore: number;
+  findings: ApiSecurityFinding[];
+  summaryByCategory: Record<string, number>;
+  summaryBySeverity: Record<SeverityLevel, number>;
+}
+
+// ==========================================
+// ASOC & Vulnerability SLA Manager Types
+// ==========================================
+export type SlaStatus = 'WITHIN_SLA' | 'NEARING_BREACH' | 'BREACHED' | 'REMEDIATED' | 'ACCEPTED_EXCEPTION';
+
+export interface ManagedVulnerabilityItem {
+  id: string;
+  findingId?: string;
+  title: string;
+  severity: SeverityLevel;
+  category: string;
+  sourceFile: string;
+  line: number;
+  firstDiscovered: string; // ISO date
+  slaDeadline: string; // ISO date
+  remainingHours: number;
+  slaStatus: SlaStatus;
+  slaPolicyHours: number;
+  assignedOwner: string;
+  assignedTeam: 'AppSec' | 'Backend' | 'DevOps' | 'Frontend' | 'SecOps';
+  remediationCostHours: number;
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'EXCEPTION_APPROVED';
+  exceptionReason?: string;
+  exceptionExpiresAt?: string;
+  mitreTactic?: string;
+  cveOrCwe?: string;
+}
+
+export interface AsocSlaMetrics {
+  totalVulnerabilities: number;
+  openCount: number;
+  resolvedCount: number;
+  withinSlaCount: number;
+  nearingBreachCount: number;
+  breachedCount: number;
+  exceptionsCount: number;
+  mttrHours: number; // Mean Time To Remediate
+  slaCompliancePercentage: number;
+  securityDebtScore: number; // 0-100 debt level
+  teamPerformance: {
+    team: string;
+    open: number;
+    breached: number;
+    complianceRate: number;
+  }[];
+}
+
+
 
 
 

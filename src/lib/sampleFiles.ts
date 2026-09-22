@@ -401,5 +401,74 @@ jobs:
         run: |
           npm run build
           echo "Deployed successfully"`
+  },
+  {
+    name: 'main.tf',
+    path: 'terraform/main.tf',
+    extension: 'tf',
+    size: 1650,
+    lastModified: 1757158400000,
+    content: `# Infrastructure as Code - Cloud Production Stack
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = "us-east-1"
+}
+
+# Insecure Security Group: Open to all internet on SSH & DB
+resource "aws_security_group" "allow_all_ingress" {
+  name        = "production-web-sg"
+  description = "Security Group com regras de entrada irrestritas"
+
+  ingress {
+    description = "SSH from anywhere (RISK: CRITICAL)"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "PostgreSQL Database public access"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# Insecure S3 Bucket: Missing KMS Customer Encryption
+resource "aws_s3_bucket" "financial_reports" {
+  bucket = "corp-financial-vault-q3"
+  
+  versioning {
+    enabled = false
+  }
+
+  tags = {
+    Environment = "production"
+    DataClass   = "Confidential"
+  }
+}
+
+# Insecure RDS Database: Public IP exposed
+resource "aws_db_instance" "production_postgres" {
+  identifier          = "corp-finance-pg-cluster"
+  allocated_storage   = 100
+  engine              = "postgres"
+  engine_version      = "15.3"
+  instance_class      = "db.t4g.xlarge"
+  username            = "pgadmin"
+  password            = "temp_admin_pass_replace_me"
+  publicly_accessible = true
+  skip_final_snapshot = true
+}`
   }
 ];

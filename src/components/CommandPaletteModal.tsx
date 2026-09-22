@@ -40,7 +40,8 @@ import {
   Lock,
   Container,
   Key,
-  KeyRound
+  KeyRound,
+  Clock
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
 
@@ -425,6 +426,34 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           setActiveTab('frameworks');
         },
         keywords: ['frameworks', 'mitre', 'attack', 'd3fend', 'nist', 'csf', 'owasp', 'wstg', 'red team', 'purple team', 'auditoria', 'contramedidas']
+      },
+      {
+        id: 'nav-apisecurity',
+        title: 'Módulo: API Security & BOLA/IDOR Inspector',
+        subtitle: 'Auditoria especializada OWASP API Top 10 (2023), BOLA/IDOR, Mass Assignment e Rate Limiting',
+        category: 'Navegação',
+        icon: Route,
+        badge: 'OWASP API',
+        badgeColor: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('apisecurity');
+        },
+        keywords: ['api', 'bola', 'idor', 'owasp api', 'mass assignment', 'bfla', 'rate limit', 'rest', 'graphql', 'endpoints', 'json', 'postman']
+      },
+      {
+        id: 'nav-asocsla',
+        title: 'Módulo: ASOC & Vulnerability SLA Manager',
+        subtitle: 'Gestão de Débito Técnico e cumprimento de SLAs corporativos por criticidade (P0/P1/P2/P3)',
+        category: 'Navegação',
+        icon: Clock,
+        badge: 'SLA / ASOC',
+        badgeColor: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('asocsla');
+        },
+        keywords: ['asoc', 'sla', 'debito tecnico', 'vulnerabilidades', 'p0', 'p1', 'p2', 'breached', 'compliance', 'mttr', 'engineering', 'teams']
       },
       {
         id: 'nav-securityonion',

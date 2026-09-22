@@ -55,6 +55,8 @@ import { SdwanSuiteView } from './components/SdwanSuiteView';
 import { IastSuiteView } from './components/IastSuiteView';
 import { ScaSecurityView } from './components/ScaSecurityView';
 import { IacSecurityView } from './components/IacSecurityView';
+import { ApiSecurityView } from './components/ApiSecurityView';
+import { AsocSlaDashboard } from './components/AsocSlaDashboard';
 import { DastFuzzerView } from './components/DastFuzzerView';
 import { SbomGeneratorView } from './components/SbomGeneratorView';
 import { EntropySecretsView } from './components/EntropySecretsView';
@@ -1991,6 +1993,33 @@ export default function App() {
                 setActiveTab('scanner');
               }
             }}
+          />
+        )}
+
+        {activeTab === 'apisecurity' && (
+          <ApiSecurityView
+            files={files}
+            onNavigateToFile={(filePath, line) => {
+              const target = files.find(f => f.path === filePath || f.name === filePath);
+              if (target) {
+                setSelectedFile(target);
+                setActiveTab('scanner');
+              }
+            }}
+          />
+        )}
+
+        {activeTab === 'asocsla' && (
+          <AsocSlaDashboard
+            findings={report.findings}
+            onNavigateToFile={(filePath, line) => {
+              const target = files.find(f => f.path === filePath || f.name === filePath);
+              if (target) {
+                setSelectedFile(target);
+                setActiveTab('scanner');
+              }
+            }}
+            onNavigateToScanner={() => setActiveTab('scanner')}
           />
         )}
 
