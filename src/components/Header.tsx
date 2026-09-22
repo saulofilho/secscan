@@ -39,7 +39,8 @@ import {
   Key,
   KeyRound,
   Layers,
-  Sparkles
+  Sparkles,
+  Workflow
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
 
@@ -126,6 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'ssrfvalidator', label: 'SSRF & Webhook Validator', icon: Globe, badge: 'SSRF', tooltip: 'Validador de requisições de saída contra SSRF, proteção de metadados de nuvem e evasões de IP' },
     { id: 'rules', label: 'Regras Regex', icon: SlidersHorizontal, tooltip: 'Editor e testador interativo de expressões regulares corporativas customizadas' },
     { id: 'cli', label: 'Terminal CLI', icon: Terminal, tooltip: 'Emulador de console para testar comandos do bin/secscan.js e flags de quality gate' },
+    { id: 'pipelineflow', label: 'Pipeline Architect', icon: Workflow, badge: 'Flow', tooltip: 'Pipeline Flow Architect: mapeie achados locais para Pre-commit, Build e Deploy com drag-and-drop no GitHub Actions' },
     { id: 'cicd', label: 'CI/CD & Cloud', icon: CloudCog, tooltip: 'Gerador de pipelines de automação para GitHub Actions, GitLab CI com SARIF 2.1.0' },
   ];
 

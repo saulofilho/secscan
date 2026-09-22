@@ -1250,5 +1250,42 @@ jobs:
       systemDetection: `CWE-326 & CWE-327: Cifra obsoleta sem IV e modo ECB detectados em src/services/encryptionService.js.`,
       outputRemediation: `Refatorado para node:crypto.createCipheriv("aes-256-gcm") com IV aleatório de 12 bytes e tag de autenticação de 16 bytes.`
     }
+  },
+  pipelineflow: {
+    id: 'pipelineflow',
+    name: 'Pipeline Flow Architect',
+    category: 'Infraestrutura & DevSecOps',
+    badge: 'Shift-Left / YAML',
+    shortSummary: 'Arquiteto visual de esteira DevSecOps com suporte total a drag-and-drop. Permite mapear achados de varredura local para os estágios Pre-commit, Build e Deploy, ajustando limites de Quality Gate e gerando workflows para GitHub Actions.',
+    howItWorks: 'Categoriza automaticamente ou permite arrastar e soltar achados e passos de verificação de segurança entre 3 estágios (Pre-commit ➔ Build ➔ Deploy). Fornece simulador interativo de Quality Gate e produz arquivos declarativos `.github/workflows/secscan-pipeline.yml` com integração a SARIF, runners Linux/Windows/macOS e branch triggers.',
+    stepByStepGuide: [
+      {
+        step: 1,
+        action: 'Acessar a aba "Pipeline Architect"',
+        description: 'Visualize as 3 colunas conectadas (Pre-commit, Build e Deploy) com seus respectivos achados e ações ativas.'
+      },
+      {
+        step: 2,
+        action: 'Mapear Achados Locais via Drag & Drop',
+        description: 'Arraste achados da doca inferior ou entre os estágios para definir em qual fase a vulnerabilidade deve ser bloqueada.'
+      },
+      {
+        step: 3,
+        action: 'Reorganizar Passos e Ajustar Severidade do Gate',
+        description: 'Adicione novas verificações (DAST, SCA, CIS Docker, SBOM) e selecione o nível de severidade para falha (ex.: Fail on HIGH).'
+      },
+      {
+        step: 4,
+        action: 'Simular Execução e Salvar Workflow',
+        description: 'Clique em "Simular Execução" para testar o comportamento dos gates ou salve diretamente em .github/workflows/ no workspace.'
+      }
+    ],
+    example: {
+      title: 'Exemplo: Shift-Left de Chaves AWS e Tokens de Alta Entropia',
+      scenario: 'Uma chave estática de AWS foi detectada em src/config.js e vulnerabilidades SAST foram encontradas em controladores.',
+      inputSnippet: `aws_secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"`,
+      systemDetection: `Achado atribuído ao estágio Pre-commit com política de bloqueio imediato (Fail on HIGH).`,
+      outputRemediation: `Pipeline interrompe o commit no git hook pre-commit antes de alcançar o repositório remoto.`
+    }
   }
 };

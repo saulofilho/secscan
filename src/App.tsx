@@ -64,6 +64,7 @@ import { EntropySecretsView } from './components/EntropySecretsView';
 import { ThreatModelingView } from './components/ThreatModelingView';
 import { AutoRemediationView } from './components/AutoRemediationView';
 import { SecurityRefactoringAssistantView } from './components/SecurityRefactoringAssistantView';
+import { PipelineFlowArchitectView } from './components/PipelineFlowArchitectView';
 import { ComplianceAuditView } from './components/ComplianceAuditView';
 import { SecurityHeadersView } from './components/SecurityHeadersView';
 import { ContainerSecurityView } from './components/ContainerSecurityView';
@@ -2290,11 +2291,32 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'pipelineflow' && (
+          <PipelineFlowArchitectView
+            findings={report.findings}
+            files={files}
+            onUpdateFiles={(updated) => {
+              setFiles(updated);
+            }}
+            onNavigateToFile={(filePath, line) => {
+              const target = files.find(f => f.path === filePath || f.name === filePath);
+              if (target) {
+                setSelectedFile(target);
+                setActiveTab('scanner');
+              }
+            }}
+            onLogAudit={(event) => {
+              setAuditLogs(prev => [event, ...prev].slice(0, 80));
+            }}
+          />
+        )}
+
         {activeTab === 'cicd' && (
           <CiCdIntegrationView
             report={report}
             rules={rules}
             ignorePatterns={ignorePatterns}
+            onNavigateToPipelineFlow={() => setActiveTab('pipelineflow')}
           />
         )}
       </main>

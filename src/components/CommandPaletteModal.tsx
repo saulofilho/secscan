@@ -41,7 +41,8 @@ import {
   Container,
   Key,
   KeyRound,
-  Clock
+  Clock,
+  Workflow
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
 
@@ -468,6 +469,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           setActiveTab('refactoring');
         },
         keywords: ['refactoring', 'refatoracao', 'assistant', 'preview', 'crypto', 'md5', 'argon2', 'aes-256-gcm', 'diff', 'patch', 'antes depois', 'modernizacao']
+      },
+      {
+        id: 'nav-pipelineflow',
+        title: 'Módulo: Pipeline Flow Architect (DevSecOps Visualizer)',
+        subtitle: 'Mapeie achados de scan locais para Pre-commit, Build e Deploy com drag-and-drop para workflows GitHub Actions',
+        category: 'Navegação',
+        icon: Workflow,
+        badge: 'Flow CI/CD',
+        badgeColor: 'bg-[#00FF41]/15 text-[#00FF41] border-[#00FF41]/30',
+        action: () => {
+          onClose();
+          setActiveTab('pipelineflow');
+        },
+        keywords: ['pipeline', 'flow', 'architect', 'github actions', 'yaml', 'workflow', 'pre-commit', 'build', 'deploy', 'drag drop', 'shift-left', 'quality gate', 'ci/cd']
       },
       {
         id: 'nav-soccommand',

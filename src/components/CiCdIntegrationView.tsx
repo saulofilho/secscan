@@ -25,12 +25,14 @@ interface CiCdIntegrationViewProps {
   report: ScanReport;
   rules?: RegexRule[];
   ignorePatterns?: IgnorePatternItem[];
+  onNavigateToPipelineFlow?: () => void;
 }
 
 export const CiCdIntegrationView: React.FC<CiCdIntegrationViewProps> = ({ 
   report,
   rules = [],
-  ignorePatterns = []
+  ignorePatterns = [],
+  onNavigateToPipelineFlow
 }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [webhookUrl, setWebhookUrl] = useState('');
@@ -151,15 +153,29 @@ export async function accessGoogleSecret(secretName: string): Promise<string> {
             <span>Snippet pronto para cópia com suporte a overrides de severidade e regras dinâmicas</span>
           </div>
 
-          <button
-            id="btn-open-secscan-workflow-modal"
-            type="button"
-            onClick={() => setIsWorkflowModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-mono font-black uppercase tracking-wider text-black bg-[#00FF41] hover:bg-[#00dd38] border border-[#00FF41] cursor-pointer transition-all shadow-md active:scale-95 shrink-0"
-          >
-            <Workflow className="w-4 h-4 text-black" />
-            <span>Gerar .github/workflows/secscan.yml</span>
-          </button>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {onNavigateToPipelineFlow && (
+              <button
+                id="btn-open-pipeline-flow-architect"
+                type="button"
+                onClick={onNavigateToPipelineFlow}
+                className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-mono font-bold uppercase tracking-wider text-[#00FF41] bg-[#141414] hover:bg-[#1E1E1E] border border-[#00FF41]/40 cursor-pointer transition-all shadow-md active:scale-95 shrink-0"
+              >
+                <Workflow className="w-4 h-4 text-[#00FF41]" />
+                <span>Pipeline Flow Architect (Drag & Drop)</span>
+              </button>
+            )}
+
+            <button
+              id="btn-open-secscan-workflow-modal"
+              type="button"
+              onClick={() => setIsWorkflowModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-mono font-black uppercase tracking-wider text-black bg-[#00FF41] hover:bg-[#00dd38] border border-[#00FF41] cursor-pointer transition-all shadow-md active:scale-95 shrink-0"
+            >
+              <Workflow className="w-4 h-4 text-black" />
+              <span>Gerar .github/workflows/secscan.yml</span>
+            </button>
+          </div>
         </div>
       </div>
 
