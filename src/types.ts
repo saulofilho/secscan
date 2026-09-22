@@ -250,6 +250,9 @@ export interface ScanReport {
   jsMiner?: JsMinerResults;
   dataFlowGraph?: DataFlowGraphData;
   iastReport?: import('./types/iast').IastExecutionReport;
+  iacReport?: import('./lib/iacScanner').IacReport;
+  apiSecurityReport?: import('./types').ApiSecurityReport;
+  scaReport?: import('./lib/scaScanner').ScaAnalysisReport;
   metrics: {
     criticalCount: number;
     highCount: number;
@@ -989,6 +992,74 @@ export interface AsocSlaMetrics {
     complianceRate: number;
   }[];
 }
+
+export type SocTimeFilterRange = '1H' | '6H' | '24H' | '7D' | '30D' | 'ALL';
+
+export interface SocTrendDataPoint {
+  timestamp: string;
+  label: string;
+  criticalAlerts: number;
+  highAlerts: number;
+  auditEvents: number;
+  mttrCurrentHours: number;
+  resolvedIncidents: number;
+}
+
+export interface SocCriticalAlert {
+  id: string;
+  timestamp: string;
+  title: string;
+  severity: SeverityLevel;
+  source: 'SAST' | 'SCA' | 'IaC' | 'API_SECURITY' | 'EDR' | 'WAF' | 'SECRETS';
+  status: 'NEW' | 'TRIAGED' | 'ACKNOWLEDGED' | 'RESOLVED' | 'SUPPRESSED';
+  targetResource: string;
+  cweOrMitre: string;
+  description: string;
+  mttrTargetHours: number;
+  elapsedHours: number;
+  remediationAdvice: string;
+  rawPayload?: Record<string, unknown>;
+}
+
+export type RefactoringCategory = 
+  | 'CRYPTOGRAPHY'
+  | 'AUTHENTICATION'
+  | 'INJECTION'
+  | 'SECRETS'
+  | 'DATA_VALIDATION'
+  | 'NETWORK_SSRF'
+  | 'FILE_SYSTEM'
+  | 'DESERIALIZATION';
+
+export interface SecurityRefactoringRecipe {
+  id: string;
+  title: string;
+  category: RefactoringCategory;
+  severity: SeverityLevel;
+  cwe: string;
+  cweUrl: string;
+  owasp: string;
+  owaspUrl: string;
+  cvssReduction: {
+    before: number;
+    after: number;
+  };
+  language: 'typescript' | 'javascript' | 'python' | 'go' | 'sql' | 'docker';
+  legacyLibraryOrPattern: string;
+  modernReplacement: string;
+  shortSummary: string;
+  vulnerabilityExplanation: string;
+  modernSolutionExplanation: string;
+  prerequisites: string[]; // e.g. ["npm install argon2", "node >= 18.0.0"]
+  breakingChangesWarning?: string;
+  beforeCode: string;
+  afterCode: string;
+  unifiedDiff: string;
+  fileMatchPatterns?: string[]; // regex or file patterns that match this vulnerability
+  defaultTargetFileName?: string;
+  tags: string[];
+}
+
 
 
 

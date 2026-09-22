@@ -456,6 +456,34 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         keywords: ['asoc', 'sla', 'debito tecnico', 'vulnerabilidades', 'p0', 'p1', 'p2', 'breached', 'compliance', 'mttr', 'engineering', 'teams']
       },
       {
+        id: 'nav-refactoring',
+        title: 'Módulo: Security Refactoring Assistant',
+        subtitle: 'Sugestões de refatoração para vulnerabilidades comuns (crypto legada -> moderna) com Preview comparativo antes/depois',
+        category: 'Navegação',
+        icon: Sparkles,
+        badge: 'Modernize',
+        badgeColor: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('refactoring');
+        },
+        keywords: ['refactoring', 'refatoracao', 'assistant', 'preview', 'crypto', 'md5', 'argon2', 'aes-256-gcm', 'diff', 'patch', 'antes depois', 'modernizacao']
+      },
+      {
+        id: 'nav-soccommand',
+        title: 'Módulo: SOC Command View & Real-Time Operations',
+        subtitle: 'Console unificado com streaming de logs de auditoria, curvas de MTTR e alertas críticos da suíte',
+        category: 'Navegação',
+        icon: Radio,
+        badge: 'SOC LIVE',
+        badgeColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+        action: () => {
+          onClose();
+          setActiveTab('soccommand');
+        },
+        keywords: ['soc', 'command view', 'mttr', 'audit logs', 'alertas', 'telemetria', 'operacoes', 'incidentes', 'tempo real', 'graficos', 'tendencia', 'siem']
+      },
+      {
         id: 'nav-securityonion',
         title: 'Módulo: Security Onion (SOC & Threat Hunting Suite)',
         subtitle: 'Caça a ameaças (Hunt), triagem de casos, gerador de regras (Sigma/Suricata/Zeek), PCAP e SOPs',

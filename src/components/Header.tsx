@@ -37,7 +37,9 @@ import {
   Scale,
   Lock,
   Key,
-  KeyRound
+  KeyRound,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
 
@@ -103,9 +105,11 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'entropy', label: 'Entropia & Segredos Git', icon: Binary, badge: 'Entropy', tooltip: 'Cálculo de Entropia de Shannon (H) para segredos e varredura forense no histórico Git' },
     { id: 'threatmodel', label: 'Modelagem STRIDE & CVSS', icon: Target, badge: 'STRIDE', tooltip: 'Matriz STRIDE da Microsoft, checklist OWASP ASVS v4 e calculadora oficial CVSS v3.1' },
     { id: 'autoremediation', label: 'Auto-Remediação (Patches)', icon: Wrench, badge: '1-Click', tooltip: 'Geração automática de Git Unified Diffs e aplicação direta de patches corretivos no código' },
+    { id: 'refactoring', label: 'Refactoring Assistant', icon: Sparkles, badge: 'Modernize', tooltip: 'Sugestões guiadas de refatoração para vulnerabilidades comuns (ex: crypto legada) com preview comparativo antes/depois' },
     { id: 'compliance', label: 'Auditoria Compliance (SOC2/ISO/HIPAA)', icon: Scale, badge: 'SOC2', tooltip: 'Score de prontidão determinístico e mapeamento formal para SOC 2 Type II, ISO 27001 e HIPAA' },
     { id: 'frameworks', label: 'Frameworks (MITRE/NIST/OWASP)', icon: ShieldCheck, tooltip: 'Mapeamento cruzado para MITRE ATT&CK, NIST CSF 2.0 e OWASP Web Security Testing Guide' },
-    { id: 'securityonion', label: 'Security Onion (SOC)', icon: Radio, badge: report.findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length, tooltip: 'Console de operações SOC e monitoramento de alertas de segurança' },
+    { id: 'soccommand', label: 'SOC Command View', icon: Radio, badge: 'LIVE', tooltip: 'Consolidação em tempo real de logs de auditoria, curvas de MTTR, telemetria e alertas críticos' },
+    { id: 'securityonion', label: 'Security Onion (SOC)', icon: Layers, badge: report.findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length, tooltip: 'Console de operações SOC e monitoramento de alertas de segurança' },
     { id: 'crowdstrike', label: 'CrowdStrike (EDR/IOA)', icon: Zap, badge: 3, tooltip: 'Indicadores de Ataque (IOA) comportamentais e inteligência de ameaças Falcon' },
     { id: 'edr', label: 'EDR (Detection & Response)', icon: Crosshair, badge: 'eBPF', tooltip: 'Sensor de endpoint com telemetria de processos, contenção Zero Trust e terminal RTR' },
     { id: 'nmap', label: 'Nmap (Network Suite)', icon: Globe, badge: 'Recon', tooltip: 'Varredura de portas de rede, serviços ativos e fingerprinting de SO' },

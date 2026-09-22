@@ -80,6 +80,42 @@ export class AuthService {
 }`
   },
   {
+    name: 'encryptionService.js',
+    path: 'src/services/encryptionService.js',
+    extension: 'js',
+    size: 1540,
+    lastModified: 1757138400000,
+    content: `/**
+ * Legacy Cryptography Service
+ * WARNING: Uses deprecated crypto libraries, MD5 hashing, and weak PRNG
+ */
+const crypto = require('crypto');
+
+// Insecure Hashing: MD5 for password storage (Vulnerable to rainbow tables & collisions)
+function hashUserPassword(password) {
+  return crypto.createHash('md5').update(password).digest('hex');
+}
+
+// Insecure Cipher: createCipher with ECB mode and no initialization vector (IV)
+function encryptSensitivePayload(plaintext, secretKey) {
+  const cipher = crypto.createCipher('aes-128-ecb', secretKey);
+  let crypted = cipher.update(plaintext, 'utf8', 'hex');
+  crypted += cipher.final('hex');
+  return crypted;
+}
+
+// Insecure PRNG: Math.random() for authentication tokens and reset pins
+function generateSessionResetToken() {
+  return Math.random().toString(36).substring(2) + Date.now().toString(36);
+}
+
+module.exports = {
+  hashUserPassword,
+  encryptSensitivePayload,
+  generateSessionResetToken
+};`
+  },
+  {
     name: 'cloudConfig.js',
     path: 'config/cloudConfig.js',
     extension: 'js',

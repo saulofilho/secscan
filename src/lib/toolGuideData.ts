@@ -1181,5 +1181,74 @@ jobs:
       systemDetection: `Alerta ASOC: SLA Breached! Multa de conformidade e risco iminente de exfiltração financeira.`,
       outputRemediation: `Revogar a chave no painel da Stripe imediatamente e aprovar PR de contingência do time Backend.`
     }
+  },
+  soccommand: {
+    id: 'soccommand',
+    name: 'Security Operations Center (SOC) Command View',
+    category: 'Defesa & Runtime',
+    badge: 'SOC LIVE',
+    shortSummary: 'Console operacional centralizado de operações de segurança: consolidação em tempo real de logs de auditoria, curvas analíticas de MTTR e alertas de segurança críticos da suíte.',
+    howItWorks: 'Ingere fluxos de telemetria e auditoria de todos os scanners (SAST, Secrets, IaC, OWASP API, SCA, EDR), mapeia curvas de tendência temporal (1h, 6h, 24h, 7d, 30d) e monitora MTTR versus metas de SLA.',
+    stepByStepGuide: [
+      {
+        step: 1,
+        action: 'Selecionar Janela Temporal (1H, 6H, 24H, 7D, 30D ou ALL)',
+        description: 'Filtre imediatamente a volumetria de eventos, incidentes e métricas de MTTR na janela selecionada.'
+      },
+      {
+        step: 2,
+        action: 'Analisar Curvas de Tendência e MTTR',
+        description: 'Verifique se o tempo médio de remediação está convergindo para a meta corporativa (≤ 2.0h) ou se há picos de incidentes.'
+      },
+      {
+        step: 3,
+        action: 'Inspecionar Stream de Logs e Triar Alertas Críticos',
+        description: 'Acompanhe logs de auditoria ao vivo e clique em qualquer alerta crítico para ver diagnóstico, tempo decorrido e plano de resposta.'
+      }
+    ],
+    example: {
+      title: 'Exemplo: Pico de Incidentes e Resposta Imediata no Console SOC',
+      scenario: 'Alerta crítico de vazamento de credencial AWS e falha BOLA simultânea reportados pelo pipeline.',
+      inputSnippet: `ALERT-SAST-1: Hardcoded AWS IAM Secret Key (P0) + ALERT-API-1: BOLA on /financial-statement (P0)`,
+      systemDetection: `Alerta SOC Unificado: 2 Incidentes P0 Ativos | MTTR Atual: 2.1h | Ingress: 142 ev/s`,
+      outputRemediation: `Despachar equipe SecOps via playbook automatizado e isolar chaves via console de remediação.`
+    }
+  },
+  refactoring: {
+    id: 'refactoring',
+    name: 'Security Refactoring Assistant',
+    category: 'AppSec & SAST',
+    badge: 'Modernize / Preview',
+    shortSummary: 'Assistente interativo de refatoração para vulnerabilidades comuns. Fornece snippets modernos para substituir bibliotecas legadas (como MD5, DES e createCipher por Argon2id e AES-256-GCM) com comparativo antes/depois.',
+    howItWorks: 'Varre o workspace em busca de padrões obsoletos (hashing fraco, cifras depreciadas, PRNG não criptográfico, injeção SQL direta, DOM XSS e segredos estáticos), sugere alternativas modernas alinhadas aos padrões FIPS 140-3 e OWASP, e oferece visualização comparativa (Preview) em modo lado a lado ou Git Diff unificado, com aplicação direta aos arquivos do projeto.',
+    stepByStepGuide: [
+      {
+        step: 1,
+        action: 'Navegar até a aba "Refactoring Assistant"',
+        description: 'Explore o catálogo de receitas de modernização ou clique no banner de padrões identificados no seu workspace.'
+      },
+      {
+        step: 2,
+        action: 'Clicar no botão "Preview Antes / Depois"',
+        description: 'Abra a janela comparativa para contrastar o código legado inseguro com a solução moderna segura em modo Lado a Lado ou Git Diff.'
+      },
+      {
+        step: 3,
+        action: 'Revisar Pré-requisitos e Instruções de Migração',
+        description: 'Consulte os comandos de instalação de pacotes (ex.: npm install argon2) e alertas de quebras de contrato (breaking changes).'
+      },
+      {
+        step: 4,
+        action: 'Aplicar a Modernização ao Arquivo ou Copiar o Trecho',
+        description: 'Aplique a refatoração diretamente ao arquivo do workspace com 1 clique (com suporte a reversão) ou copie o código moderno.'
+      }
+    ],
+    example: {
+      title: 'Exemplo: Substituição de MD5 e createCipher por Argon2id e AES-256-GCM',
+      scenario: 'Um serviço legado de criptografia armazena senhas com MD5 sem salt e encripta payloads com crypto.createCipher("aes-128-ecb").',
+      inputSnippet: `const cipher = crypto.createCipher('aes-128-ecb', secretKey); // Inseguro`,
+      systemDetection: `CWE-326 & CWE-327: Cifra obsoleta sem IV e modo ECB detectados em src/services/encryptionService.js.`,
+      outputRemediation: `Refatorado para node:crypto.createCipheriv("aes-256-gcm") com IV aleatório de 12 bytes e tag de autenticação de 16 bytes.`
+    }
   }
 };

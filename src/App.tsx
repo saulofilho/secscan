@@ -42,6 +42,7 @@ import { SeverityTooltip } from './components/Tooltip';
 import { SecScanMttrConfigModal } from './components/SecScanMttrConfigModal';
 import { MttrMiniTrendlineChart, parseRemediationHours } from './components/MttrMiniTrendlineChart';
 import { SecurityFrameworksHub } from './components/SecurityFrameworksHub';
+import { SocCommandCenterView } from './components/SocCommandCenterView';
 import { SecurityOnionSocView } from './components/SecurityOnionSocView';
 import { CrowdStrikeSuiteView } from './components/CrowdStrikeSuiteView';
 import { NmapNetworkSuiteView } from './components/NmapNetworkSuiteView';
@@ -62,6 +63,7 @@ import { SbomGeneratorView } from './components/SbomGeneratorView';
 import { EntropySecretsView } from './components/EntropySecretsView';
 import { ThreatModelingView } from './components/ThreatModelingView';
 import { AutoRemediationView } from './components/AutoRemediationView';
+import { SecurityRefactoringAssistantView } from './components/SecurityRefactoringAssistantView';
 import { ComplianceAuditView } from './components/ComplianceAuditView';
 import { SecurityHeadersView } from './components/SecurityHeadersView';
 import { ContainerSecurityView } from './components/ContainerSecurityView';
@@ -2079,6 +2081,29 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'refactoring' && (
+          <SecurityRefactoringAssistantView
+            files={files}
+            findings={report.findings}
+            onUpdateFiles={(updated) => {
+              setFiles(updated);
+            }}
+            onReScan={() => {
+              executeScan(files, rules, ignorePatterns);
+            }}
+            onNavigateToFile={(filePath) => {
+              const target = files.find(f => f.path === filePath || f.name === filePath);
+              if (target) {
+                setSelectedFile(target);
+                setActiveTab('scanner');
+              }
+            }}
+            onLogAudit={(event) => {
+              setAuditLogs(prev => [event, ...prev].slice(0, 80));
+            }}
+          />
+        )}
+
         {activeTab === 'compliance' && (
           <ComplianceAuditView
             findings={report.findings}
@@ -2098,6 +2123,23 @@ export default function App() {
             report={report}
             onSelectFinding={handleSelectFinding}
             onNavigateToScanner={() => setActiveTab('scanner')}
+          />
+        )}
+
+        {activeTab === 'soccommand' && (
+          <SocCommandCenterView
+            report={report}
+            auditLogs={auditLogs}
+            onNavigateToFile={(filePath, line) => {
+              const target = files.find(f => f.path === filePath || f.name === filePath);
+              if (target) {
+                setSelectedFile(target);
+                setActiveTab('scanner');
+              }
+            }}
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onNavigateToAsoc={() => setActiveTab('asocsla')}
+            onNavigateToAuditLog={() => setActiveTab('securityonion')}
           />
         )}
 
