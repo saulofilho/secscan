@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
+  Shield,
   ShieldCheck, 
   ShieldAlert, 
   Layers, 
@@ -139,6 +140,34 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfSuccess, setPdfSuccess] = useState(false);
   const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
+
+  // Sub-view mode within DashboardOverview: 'OVERVIEW' or 'HEATMAP'
+  const [dashboardView, setDashboardView] = useState<'OVERVIEW' | 'HEATMAP'>('OVERVIEW');
+
+  // Compute file concentration stats for the Vulnerability Heatmap view integration
+  const filesConcentrationStats = useMemo(() => {
+    const map = new Map<string, { total: number; critical: number; high: number; medium: number; low: number }>();
+    findings.forEach(f => {
+      const prev = map.get(f.file) || { total: 0, critical: 0, high: 0, medium: 0, low: 0 };
+      prev.total++;
+      if (f.severity === 'CRITICAL') prev.critical++;
+      else if (f.severity === 'HIGH') prev.high++;
+      else if (f.severity === 'MEDIUM') prev.medium++;
+      else if (f.severity === 'LOW') prev.low++;
+      map.set(f.file, prev);
+    });
+    const sorted = Array.from(map.entries()).sort((a, b) => b[1].total - a[1].total);
+    const top = sorted[0];
+    return {
+      uniqueFilesCount: map.size,
+      topFile: top ? {
+        path: top[0],
+        fileName: top[0].split('/').pop() || top[0],
+        ...top[1]
+      } : null,
+      criticalHotspotsCount: sorted.filter(([, s]) => s.critical > 0 || s.total >= 3).length
+    };
+  }, [findings]);
 
   // Critical Finding Threshold configuration state (persisted in safe storage)
   const DEFAULT_CRITICAL_THRESHOLD = 1;
@@ -460,6 +489,91 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       )}
 
+      {/* Sub-View Selector: Executive Overview vs. Vulnerability Heatmap */}
+      <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-[#0A0A0A] border border-[#262626]">
+        <div className="flex items-center gap-2">
+          <button
+            id="btn-dashboard-view-overview"
+            type="button"
+            onClick={() => setDashboardView('OVERVIEW')}
+            className={`px-4 py-2 text-xs font-mono font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+              dashboardView === 'OVERVIEW'
+                ? 'bg-white text-black shadow-md'
+                : 'text-[#888] hover:text-white hover:bg-[#161616]'
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>Visão Geral Executiva</span>
+          </button>
+
+          <button
+            id="btn-dashboard-view-heatmap"
+            type="button"
+            onClick={() => setDashboardView('HEATMAP')}
+            className={`px-4 py-2 text-xs font-mono font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+              dashboardView === 'HEATMAP'
+                ? 'bg-[#FF3E00] text-white shadow-[0_0_15px_rgba(255,62,0,0.5)]'
+                : 'text-[#888] hover:text-[#FF3E00] hover:bg-[#161616]'
+            }`}
+          >
+            <Flame className={`w-3.5 h-3.5 ${dashboardView === 'HEATMAP' ? 'text-white' : 'text-[#FF3E00]'}`} />
+            <span>Vulnerability Heatmap</span>
+            <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono ${
+              dashboardView === 'HEATMAP' ? 'bg-black text-[#FF3E00] font-black' : 'bg-[#FF3E00]/20 text-[#FF3E00] font-bold'
+            }`}>
+              {filesConcentrationStats.uniqueFilesCount} arquivos
+            </span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3 text-[11px] font-mono text-[#777]">
+          {filesConcentrationStats.topFile && (
+            <span className="hidden sm:inline-flex items-center gap-1.5">
+              <span className="text-[#FF7A00]">Top Concentração:</span>
+              <strong className="text-white truncate max-w-[220px]" title={filesConcentrationStats.topFile.path}>
+                {filesConcentrationStats.topFile.fileName}
+              </strong>
+              <span className="text-[#FF3E00] font-bold">({filesConcentrationStats.topFile.total} achados)</span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      {dashboardView === 'HEATMAP' ? (
+        /* ========================================================================= */
+        /* DEDICATED VULNERABILITY HEATMAP VIEW                                      */
+        /* ========================================================================= */
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#080808] border border-[#222]">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setDashboardView('OVERVIEW')}
+                className="text-xs font-mono text-[#AAA] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer bg-[#141414] px-3 py-1.5 border border-[#333] hover:border-white"
+              >
+                <span>&larr; Voltar para Visão Geral Executiva</span>
+              </button>
+              <span className="text-xs font-mono text-[#666] hidden md:inline">|</span>
+              <span className="text-xs font-mono text-[#888] hidden md:inline">
+                Visualização em Grid Térmico de Arquivos e Concentração de Achados
+              </span>
+            </div>
+            <div className="text-xs font-mono text-[#888] flex items-center gap-3">
+              <span>{filesConcentrationStats.uniqueFilesCount} arquivos analisados</span>
+              <span>•</span>
+              <span className="text-[#FF3E00] font-bold">{filesConcentrationStats.criticalHotspotsCount} hotspots críticos</span>
+            </div>
+          </div>
+
+          <VulnerabilityHeatmap
+            findings={findings}
+            onSelectFinding={onSelectFinding}
+            onNavigateToScanner={() => onNavigateToTab('scanner')}
+            onNavigateToFile={onNavigateToFile}
+          />
+        </div>
+      ) : (
+        <>
       {/* Top Threat Matrix Hero Banner */}
       <div className="bg-[#080808] border border-[#222] p-8 relative overflow-hidden flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div className="space-y-3">
@@ -493,6 +607,19 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             >
               <Activity className="w-3 h-3 text-[#00FF41]" />
               <span>TENDÊNCIA (5 SCANS) &darr;</span>
+            </button>
+            <button
+              id="dashboard-header-heatmap-btn"
+              type="button"
+              onClick={() => {
+                setDashboardView('HEATMAP');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="text-[10px] font-mono text-white hover:text-[#FF3E00] bg-[#141414] hover:bg-[#200500] px-2 py-0.5 border border-[#333] hover:border-[#FF3E00]/60 uppercase font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+              title="Abrir a visualização do Vulnerability Heatmap (Grid de Concentração e Severidade)"
+            >
+              <Flame className="w-3 h-3 text-[#FF3E00]" />
+              <span>VULNERABILITY HEATMAP ({filesConcentrationStats.uniqueFilesCount}) &rarr;</span>
             </button>
             <button
               id="dashboard-header-risk-matrix-btn"
@@ -661,15 +788,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </button>
           <button
             id="btn-nav-heatmap-hero"
+            type="button"
             onClick={() => {
-              const el = document.getElementById('vulnerability-heatmap-section');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
+              setDashboardView('HEATMAP');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="px-4 py-3.5 border border-[#333] hover:border-[#FF3E00] bg-[#0A0A0A] hover:bg-[#141414] text-white font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 group cursor-pointer"
-            title="Navegar para o Vulnerability Heatmap (Grid Densidade × Severidade)"
+            className="px-4 py-3.5 border border-[#FF3E00]/60 hover:border-[#FF3E00] bg-[#FF3E00]/15 hover:bg-[#FF3E00] text-white hover:text-black font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 group cursor-pointer shadow-[0_0_12px_rgba(255,62,0,0.2)]"
+            title="Abrir a visualização do Vulnerability Heatmap (Grid de Concentração e Severidade)"
           >
-            <Grid className="w-3.5 h-3.5 text-[#FF3E00] group-hover:scale-110 transition-transform" />
-            <span>Heatmap Grid</span>
+            <Flame className="w-3.5 h-3.5 text-[#FF3E00] group-hover:text-black group-hover:scale-110 transition-all" />
+            <span>Heatmap Grid ({filesConcentrationStats.uniqueFilesCount})</span>
           </button>
           <button
             id="btn-nav-d3-heatmap-hero"
@@ -2034,6 +2162,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* SecScan Workflow Modal for viewing and generating .github/workflows YAML */}
       <SecScanWorkflowModal
