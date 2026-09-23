@@ -2064,6 +2064,9 @@ export default function App() {
         {activeTab === 'dast' && (
           <DastFuzzerView
             endpoints={report.apiEndpoints}
+            onLogAudit={(event) => {
+              setAuditLogs(prev => [event, ...prev].slice(0, 80));
+            }}
           />
         )}
 
