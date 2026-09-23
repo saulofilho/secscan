@@ -45,14 +45,23 @@ export interface ScheduledScanExecutionRecord {
 }
 
 export const INTERVAL_PRESETS: { preset: ScheduleIntervalPreset; minutes: number; label: string; cronHint: string }[] = [
+  { preset: '1h', minutes: 60, label: 'Hourly (A cada 1 hora / 60m)', cronHint: '0 * * * *' },
+  { preset: '24h', minutes: 1440, label: 'Daily (Diário / A cada 24 horas)', cronHint: '0 0 * * *' },
   { preset: '5m', minutes: 5, label: 'A cada 5 minutos (Teste Rápido)', cronHint: '*/5 * * * *' },
   { preset: '15m', minutes: 15, label: 'A cada 15 minutos (Near Real-time)', cronHint: '*/15 * * * *' },
   { preset: '30m', minutes: 30, label: 'A cada 30 minutos', cronHint: '*/30 * * * *' },
-  { preset: '1h', minutes: 60, label: 'A cada 1 hora (Padrão)', cronHint: '0 * * * *' },
   { preset: '6h', minutes: 360, label: 'A cada 6 horas', cronHint: '0 */6 * * *' },
   { preset: '12h', minutes: 720, label: 'A cada 12 horas (Turno SOC)', cronHint: '0 */12 * * *' },
-  { preset: '24h', minutes: 1440, label: 'Diário (A cada 24 horas)', cronHint: '0 0 * * *' },
-  { preset: 'CRON', minutes: 60, label: 'Expressão Cron Customizada', cronHint: '0 2 * * *' }
+  { preset: 'CRON', minutes: 60, label: 'Expressão Cron Customizada (5 campos)', cronHint: '0 * * * *' }
+];
+
+export const COMMON_CRON_TEMPLATES = [
+  { label: 'Hourly (De hora em hora)', cron: '0 * * * *', desc: 'No minuto zero de cada hora' },
+  { label: 'Daily (Diário à meia-noite)', cron: '0 0 * * *', desc: 'Todos os dias às 00:00 UTC' },
+  { label: 'Daily at 03:00 (Madrugada)', cron: '0 3 * * *', desc: 'Ideal para varreduras pesadas fora do pico' },
+  { label: 'Every 6 Hours (4x ao dia)', cron: '0 */6 * * *', desc: 'Às 00:00, 06:00, 12:00 e 18:00' },
+  { label: 'Weekdays at 09:00 (Seg-Sex)', cron: '0 9 * * 1-5', desc: 'Início do expediente em dias úteis' },
+  { label: 'Weekly (Domingo 23:00)', cron: '0 23 * * 0', desc: 'Varredura semanal de encerramento' },
 ];
 
 export const DEFAULT_RECURRING_SCHEDULES: RecurringScanSchedule[] = [

@@ -148,18 +148,40 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   // Compute file concentration stats for the Vulnerability Heatmap view integration
   const filesConcentrationStats = useMemo(() => {
-    const map = new Map<string, { total: number; critical: number; high: number; medium: number; low: number }>();
+    const map = new Map<string, { total: number; critical: number; high: number; medium: number; low: number; findings: ScanFinding[] }>();
     findings.forEach(f => {
-      const prev = map.get(f.file) || { total: 0, critical: 0, high: 0, medium: 0, low: 0 };
+      const prev = map.get(f.file) || { total: 0, critical: 0, high: 0, medium: 0, low: 0, findings: [] };
       prev.total++;
+      prev.findings.push(f);
       if (f.severity === 'CRITICAL') prev.critical++;
       else if (f.severity === 'HIGH') prev.high++;
       else if (f.severity === 'MEDIUM') prev.medium++;
       else if (f.severity === 'LOW') prev.low++;
       map.set(f.file, prev);
     });
-    const sorted = Array.from(map.entries()).sort((a, b) => b[1].total - a[1].total);
+    const sorted = Array.from(map.entries()).sort((a, b) => {
+      if (b[1].critical !== a[1].critical) return b[1].critical - a[1].critical;
+      return b[1].total - a[1].total;
+    });
     const top = sorted[0];
+    const topFiles = sorted.slice(0, 8).map(([filePath, data]) => {
+      const parts = filePath.split('/');
+      const fileName = parts.pop() || filePath;
+      const directory = parts.join('/') || './';
+      let tier: 'HOTSPOT_CRITICAL' | 'HIGH_DENSITY' | 'MEDIUM_DENSITY' | 'LOW_DENSITY' = 'LOW_DENSITY';
+      if (data.critical >= 2 || data.total >= 8) tier = 'HOTSPOT_CRITICAL';
+      else if (data.critical >= 1 || data.total >= 4) tier = 'HIGH_DENSITY';
+      else if (data.total >= 2) tier = 'MEDIUM_DENSITY';
+
+      return {
+        path: filePath,
+        fileName,
+        directory,
+        tier,
+        ...data
+      };
+    });
+
     return {
       uniqueFilesCount: map.size,
       topFile: top ? {
@@ -167,6 +189,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         fileName: top[0].split('/').pop() || top[0],
         ...top[1]
       } : null,
+      topFiles,
       criticalHotspotsCount: sorted.filter(([, s]) => s.critical > 0 || s.total >= 3).length
     };
   }, [findings]);
@@ -1253,6 +1276,193 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <div className="mt-4 pt-3 border-t border-[#1A1A1A] text-[10px] font-mono text-[#00FF41]">
             CRYPTOGRAPHIC_RANDOMNESS
           </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* VULNERABILITY HEATMAP: FILE CONCENTRATION COLOR-CODED GRID PREVIEW CARD   */}
+      {/* ========================================================================= */}
+      <div 
+        id="vulnerability-heatmap-preview-card"
+        className="bg-[#080808] border-2 border-[#2A2A2A] hover:border-[#FF3E00]/60 p-6 lg:p-7 space-y-6 relative overflow-hidden transition-all shadow-[0_4px_24px_rgba(0,0,0,0.6)]"
+      >
+        <div className="absolute top-0 right-0 w-80 h-80 bg-[#FF3E00]/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-[#1A1A1A] relative z-10">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="text-[10px] font-mono text-[#FF3E00] bg-[#FF3E00]/10 px-2.5 py-0.5 border border-[#FF3E00]/40 uppercase font-black tracking-widest flex items-center gap-1.5">
+                <Flame className="w-3.5 h-3.5 text-[#FF3E00] animate-pulse" />
+                VULNERABILITY HEATMAP // COLOR-CODED GRID
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 border border-[#333] bg-[#111] text-white font-bold uppercase">
+                {filesConcentrationStats.uniqueFilesCount} Arquivos Afetados
+              </span>
+              {filesConcentrationStats.criticalHotspotsCount > 0 && (
+                <span className="text-[10px] font-mono px-2 py-0.5 border border-[#FF3E00] bg-[#FF3E00] text-black font-black uppercase shadow-[0_0_10px_rgba(255,62,0,0.4)]">
+                  {filesConcentrationStats.criticalHotspotsCount} Hotspot(s) Crítico(s)
+                </span>
+              )}
+            </div>
+
+            <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2.5">
+              <Grid className="w-5 h-5 text-[#FF3E00]" />
+              <span>Vulnerability Heatmap: Concentração por Arquivo</span>
+            </h3>
+            <p className="text-xs font-mono text-[#888] max-w-4xl leading-relaxed">
+              Mapeamento em grade color-coded dos arquivos com maior acúmulo de falhas de segurança. Cores identificam a severidade máxima e volume de risco para rápida priorização forense.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              id="btn-open-full-heatmap"
+              type="button"
+              onClick={() => setDashboardView('HEATMAP')}
+              className="px-4 py-2.5 bg-[#FF3E00] hover:bg-[#E03500] text-white font-mono font-black text-xs uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-[0_0_15px_rgba(255,62,0,0.4)]"
+            >
+              <Flame className="w-4 h-4 text-white" />
+              <span>Abrir Heatmap Completo &rarr;</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Color-Coded Grid of Top Files with Highest Concentration */}
+        {filesConcentrationStats.topFiles.length === 0 ? (
+          <div className="p-8 text-center bg-[#050505] border border-[#222] text-xs font-mono text-[#777]">
+            Nenhuma vulnerabilidade detectada nos arquivos analisados.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {filesConcentrationStats.topFiles.map((file, idx) => {
+              const isTop1 = idx === 0;
+              const isCrit = file.tier === 'HOTSPOT_CRITICAL';
+              const isHigh = file.tier === 'HIGH_DENSITY';
+              const isMed = file.tier === 'MEDIUM_DENSITY';
+
+              const cellStyle = isCrit
+                ? 'bg-[#180401] border-2 border-[#FF3E00] shadow-[0_0_15px_rgba(255,62,0,0.3)] hover:border-white'
+                : isHigh
+                ? 'bg-[#160701] border-2 border-[#FF7A00] shadow-[0_0_10px_rgba(255,122,0,0.2)] hover:border-white'
+                : isMed
+                ? 'bg-[#131100] border border-[#EAB308]/70 hover:border-white'
+                : 'bg-[#000E26] border border-[#3366FF]/50 hover:border-white';
+
+              return (
+                <div
+                  key={file.path}
+                  onClick={() => {
+                    if (file.findings.length > 0 && onSelectFinding) {
+                      onSelectFinding(file.findings[0]);
+                    }
+                  }}
+                  className={`p-3.5 transition-all flex flex-col justify-between gap-2.5 font-mono cursor-pointer group ${cellStyle}`}
+                  title={`Arquivo: ${file.path}\nTotal de achados: ${file.total}\nClique para inspecionar no Scanner`}
+                >
+                  <div className="flex items-start justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider border ${
+                        isCrit ? 'bg-[#FF3E00]/20 border-[#FF3E00]/60 text-[#FF3E00]' :
+                        isHigh ? 'bg-[#FF7A00]/20 border-[#FF7A00]/50 text-[#FF7A00]' :
+                        isMed ? 'bg-[#EAB308]/15 border-[#EAB308]/40 text-[#EAB308]' :
+                        'bg-[#3366FF]/15 border-[#3366FF]/30 text-[#3366FF]'
+                      }`}>
+                        {isCrit ? 'P0 HOTSPOT' : isHigh ? 'P1 ALTA' : isMed ? 'P2 MÉDIA' : 'P3 BAIXA'}
+                      </span>
+                      {isTop1 && (
+                        <span className="px-1.5 py-0.5 bg-[#FF3E00] text-black text-[8.5px] font-black uppercase">
+                          #1 CONCENTRAÇÃO
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-base font-black ${
+                        isCrit ? 'text-[#FF3E00]' : isHigh ? 'text-[#FF7A00]' : isMed ? 'text-[#EAB308]' : 'text-[#3366FF]'
+                      }`}>
+                        {file.total}
+                      </span>
+                      <span className="text-[8px] text-[#888] block">achados</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-0.5">
+                    <div className="text-xs font-bold text-white truncate group-hover:text-[#FF3E00] transition-colors">
+                      {file.fileName}
+                    </div>
+                    <div className="text-[9.5px] text-[#666] truncate">
+                      {file.directory}
+                    </div>
+                  </div>
+
+                  {/* Segmented Density Bar */}
+                  <div className="w-full bg-[#111] h-1.5 flex overflow-hidden border border-black">
+                    {file.critical > 0 && (
+                      <div style={{ width: `${(file.critical / file.total) * 100}%` }} className="bg-[#FF3E00] h-full" />
+                    )}
+                    {file.high > 0 && (
+                      <div style={{ width: `${(file.high / file.total) * 100}%` }} className="bg-[#FF7A00] h-full" />
+                    )}
+                    {file.medium > 0 && (
+                      <div style={{ width: `${(file.medium / file.total) * 100}%` }} className="bg-[#EAB308] h-full" />
+                    )}
+                    {file.low > 0 && (
+                      <div style={{ width: `${(file.low / file.total) * 100}%` }} className="bg-[#3366FF] h-full" />
+                    )}
+                  </div>
+
+                  {/* Badges footer */}
+                  <div className="flex items-center justify-between text-[9px] pt-1 border-t border-white/5 text-[#888]">
+                    <div className="flex items-center gap-1">
+                      {file.critical > 0 && <span className="text-[#FF3E00] font-bold">{file.critical}C</span>}
+                      {file.high > 0 && <span className="text-[#FF7A00] font-bold">{file.high}H</span>}
+                      {file.medium > 0 && <span className="text-[#EAB308] font-bold">{file.medium}M</span>}
+                      {file.low > 0 && <span className="text-[#3366FF] font-bold">{file.low}L</span>}
+                    </div>
+                    <span className="text-[#FF7A00] font-bold group-hover:underline">
+                      Inspecionar &rarr;
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Color-Coding Legend */}
+        <div className="pt-2 border-t border-[#1A1A1A] flex flex-wrap items-center justify-between gap-3 text-[10px] font-mono text-[#888]">
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="text-[#AAA] font-bold uppercase">Legenda de Cores (Densidade):</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#FF3E00] shadow-[0_0_6px_#FF3E00]" />
+              <span className="text-[#FF3E00] font-bold">Hotspot Crítico</span>
+              <span className="text-[#666]">(≥2 Crit ou ≥8 achados)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#FF7A00]" />
+              <span className="text-[#FF7A00] font-bold">Alta Densidade</span>
+              <span className="text-[#666]">(≥1 Crit ou 4-7 achados)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#EAB308]" />
+              <span className="text-[#EAB308] font-bold">Média Densidade</span>
+              <span className="text-[#666]">(2-3 achados)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#3366FF]" />
+              <span className="text-[#3366FF] font-bold">Baixa Densidade</span>
+              <span className="text-[#666]">(1 achado)</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setDashboardView('HEATMAP')}
+            className="text-[#FF3E00] hover:text-white font-bold flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <span>Ver Matriz Completa no Heatmap</span>
+            <ArrowRight className="w-3 h-3" />
+          </button>
         </div>
       </div>
 

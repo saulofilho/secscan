@@ -16,7 +16,9 @@ import {
   Download,
   ChevronDown,
   ChevronUp,
-  CheckCircle
+  CheckCircle,
+  Search,
+  Globe
 } from 'lucide-react';
 import { ApiEndpointFinding } from '../types';
 import { 
@@ -32,6 +34,7 @@ import {
   ScheduledScanExecutionRecord,
   ScheduleIntervalPreset,
   INTERVAL_PRESETS,
+  COMMON_CRON_TEMPLATES,
   DEFAULT_RECURRING_SCHEDULES,
   calculateNextRunTime,
   formatCountdown,
@@ -108,6 +111,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
   // New Schedule Form State
   const [newScheduleName, setNewScheduleName] = useState('');
   const [newTargetEndpoints, setNewTargetEndpoints] = useState<string[]>([]);
+  const [endpointFilterSearch, setEndpointFilterSearch] = useState('');
   const [customEndpointInput, setCustomEndpointInput] = useState('');
   const [newHttpMethods, setNewHttpMethods] = useState<('GET' | 'POST' | 'PUT' | 'DELETE')[]>(['GET', 'POST']);
   const [newAttackCategories, setNewAttackCategories] = useState<AttackCategory[]>([
@@ -443,6 +447,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
             <span>Fuzzer Manual</span>
           </button>
           <button
+            id="btn-dast-scan-scheduler"
             onClick={() => setActiveSubTab('SCHEDULER')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
               activeSubTab === 'SCHEDULER'
@@ -451,7 +456,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
             }`}
           >
             <Clock className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Agendador Recorrente</span>
+            <span>Scan Scheduler</span>
             <span className="text-[9px] px-1.5 py-0.2 bg-black/40 rounded text-cyan-300 font-bold">
               {schedules.length}
             </span>
@@ -775,17 +780,25 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
 
                 {/* Target Endpoints Selection */}
                 <div className="space-y-2 md:col-span-2 bg-black/40 border border-[#222] p-3 rounded-lg">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-                      Endpoints Alvo para Fuzzing Recorrente:
+                      Endpoints Alvo para Fuzzing Recorrente ({newTargetEndpoints.length} selecionados):
                     </label>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setNewTargetEndpoints(endpoints.map(e => e.path))}
-                        className="text-[10px] text-emerald-400 hover:underline cursor-pointer"
+                        onClick={() => {
+                          const allAvailable = (endpoints.length > 0 ? endpoints : [
+                            { path: '/api/v1/payments/charge', method: 'POST', riskScore: 88 },
+                            { path: '/api/v1/auth/login', method: 'POST', riskScore: 75 },
+                            { path: '/api/v1/users/profile', method: 'GET', riskScore: 40 },
+                            { path: '/api/v1/files/export', method: 'GET', riskScore: 82 }
+                          ]).map(e => e.path);
+                          setNewTargetEndpoints(Array.from(new Set([...newTargetEndpoints, ...allAvailable])));
+                        }}
+                        className="text-[10px] text-emerald-400 hover:underline cursor-pointer font-bold"
                       >
-                        Selecionar Todos ({endpoints.length})
+                        Selecionar Todos
                       </button>
                       <span className="text-zinc-600">|</span>
                       <button
@@ -793,19 +806,37 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                         onClick={() => setNewTargetEndpoints([])}
                         className="text-[10px] text-zinc-500 hover:underline cursor-pointer"
                       >
-                        Limpar
+                        Limpar Seleção
                       </button>
                     </div>
                   </div>
 
+                  {/* Search Filter for Registered Endpoints */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-2.5 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={endpointFilterSearch}
+                      onChange={(e) => setEndpointFilterSearch(e.target.value)}
+                      placeholder="Filtrar endpoints registrados (ex: /api/v1/payments, POST, login)..."
+                      className="w-full bg-black/60 border border-[#333] pl-8 pr-3 py-1.5 rounded text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
                   {/* Discovered Endpoints list */}
-                  <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+                  <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
                     {(endpoints.length > 0 ? endpoints : [
                       { path: '/api/v1/payments/charge', method: 'POST', riskScore: 88 },
                       { path: '/api/v1/auth/login', method: 'POST', riskScore: 75 },
                       { path: '/api/v1/users/profile', method: 'GET', riskScore: 40 },
                       { path: '/api/v1/files/export', method: 'GET', riskScore: 82 }
-                    ]).map((ep: any) => {
+                    ])
+                    .filter((ep: any) => {
+                      if (!endpointFilterSearch.trim()) return true;
+                      const q = endpointFilterSearch.toLowerCase();
+                      return ep.path.toLowerCase().includes(q) || (ep.method || '').toLowerCase().includes(q);
+                    })
+                    .map((ep: any) => {
                       const isSelected = newTargetEndpoints.includes(ep.path);
                       return (
                         <div
@@ -904,7 +935,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                 {/* Interval Preset Selector */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-                    Intervalo de Recorrência:
+                    Intervalo de Recorrência (Cron / Período):
                   </label>
                   <select
                     value={newIntervalPreset}
@@ -919,19 +950,59 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                   </select>
                 </div>
 
-                {/* Custom Cron Input if selected */}
+                {/* Custom Cron Input & Quick Template Chips */}
                 {newIntervalPreset === 'CRON' && (
-                  <div className="space-y-1 md:col-span-2">
-                    <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block">
-                      Expressão Cron Customizada (padrão 5 campos minuto/hora/dia/mês/dia-semana):
-                    </label>
+                  <div className="space-y-2 md:col-span-2 p-3.5 bg-cyan-950/20 border border-cyan-500/40 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block">
+                        Expressão Cron Customizada (5 campos POSIX: min hora dia mês dia-semana):
+                      </label>
+                      <span className="text-[9px] text-cyan-300 font-mono">
+                        Cron Engine
+                      </span>
+                    </div>
+
                     <input
                       type="text"
                       value={newCustomCron}
                       onChange={(e) => setNewCustomCron(e.target.value)}
-                      placeholder="0 */4 * * *"
-                      className="w-full bg-black border border-cyan-500/50 px-3 py-2 rounded-lg text-xs text-cyan-300 font-mono focus:outline-none"
+                      placeholder="0 * * * *"
+                      className="w-full bg-black border border-cyan-500/50 px-3 py-2 rounded-lg text-xs text-cyan-300 font-mono focus:outline-none focus:ring-1 focus:ring-cyan-400"
                     />
+
+                    {/* Quick Cron Preset Templates */}
+                    <div className="space-y-1 pt-1">
+                      <span className="text-[9px] text-zinc-400 block uppercase font-bold">
+                        Modelos Rápidos (Clique para aplicar):
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {COMMON_CRON_TEMPLATES.map((tmpl) => (
+                          <button
+                            key={tmpl.cron}
+                            type="button"
+                            onClick={() => setNewCustomCron(tmpl.cron)}
+                            className={`px-2 py-1 rounded text-[10px] font-mono border transition-all cursor-pointer ${
+                              newCustomCron === tmpl.cron
+                                ? 'bg-cyan-500 text-black border-cyan-400 font-bold shadow'
+                                : 'bg-black/60 text-zinc-300 border-zinc-700 hover:border-cyan-400 hover:text-white'
+                            }`}
+                            title={tmpl.desc}
+                          >
+                            <span>{tmpl.label}</span>
+                            <span className="text-[9px] opacity-70 ml-1">({tmpl.cron})</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 5-Field Syntax Hint */}
+                    <div className="text-[9.5px] text-zinc-400 bg-black/60 p-2 rounded border border-zinc-800 flex items-center justify-between flex-wrap gap-1">
+                      <span>┌── <strong>min</strong> (0-59)</span>
+                      <span>┌── <strong>hora</strong> (0-23)</span>
+                      <span>┌── <strong>dia</strong> (1-31)</span>
+                      <span>┌── <strong>mês</strong> (1-12)</span>
+                      <span>┌── <strong>dia-sem</strong> (0-6)</span>
+                    </div>
                   </div>
                 )}
 
