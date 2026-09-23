@@ -254,6 +254,7 @@ export interface ScanReport {
   iacReport?: import('./lib/iacScanner').IacReport;
   apiSecurityReport?: import('./types').ApiSecurityReport;
   scaReport?: import('./lib/scaScanner').ScaAnalysisReport;
+  opaCompliance?: OpaEvaluationSummary;
   metrics: {
     criticalCount: number;
     highCount: number;
@@ -1176,6 +1177,83 @@ export interface CtiFilterOptions {
   iocType: ThreatIocType | 'ALL';
   cisaKevOnly: boolean;
   minConfidence: number;
+}
+
+// ---------------------------------------------------------------------------
+// Open Policy Agent (OPA) / Rego Policy-as-Code Types
+// ---------------------------------------------------------------------------
+
+export type OpaPolicyStandard = 
+  | 'PCI_DSS_4_0' 
+  | 'SOC_2_TYPE_II' 
+  | 'NIST_SP_800_53' 
+  | 'CIS_BENCHMARK' 
+  | 'DEVSECOPS_GUARDRAIL' 
+  | 'ISO_27001' 
+  | 'OWASP_TOP_10' 
+  | 'HIPAA'
+  | 'CUSTOM';
+
+export type OpaEnforcementLevel = 'BLOCKING' | 'WARNING' | 'ADVISORY';
+
+export interface OpaRegoPolicy {
+  id: string;
+  name: string;
+  description: string;
+  standard: OpaPolicyStandard;
+  packageName: string;
+  regoCode: string;
+  enabled: boolean;
+  enforcementLevel: OpaEnforcementLevel;
+  tags: string[];
+  author?: string;
+  version?: string;
+  lastEvaluatedAt?: string;
+  isBuiltIn?: boolean;
+}
+
+export interface OpaPolicyViolation {
+  id: string;
+  policyId: string;
+  policyName: string;
+  standard: OpaPolicyStandard;
+  enforcementLevel: OpaEnforcementLevel;
+  severity: SeverityLevel;
+  message: string;
+  targetFindingId?: string;
+  targetFile?: string;
+  targetLine?: number;
+  remediation?: string;
+  ruleExpression?: string;
+}
+
+export interface OpaEvaluationResult {
+  policyId: string;
+  policyName: string;
+  standard: OpaPolicyStandard;
+  packageName: string;
+  enforcementLevel: OpaEnforcementLevel;
+  status: 'PASSED' | 'VIOLATED' | 'SKIPPED' | 'ERROR';
+  allow: boolean;
+  denyReasons: string[];
+  violations: OpaPolicyViolation[];
+  executionTimeMs: number;
+  errorMessage?: string;
+}
+
+export interface OpaEvaluationSummary {
+  timestamp: string;
+  totalPolicies: number;
+  enabledPolicies: number;
+  passedCount: number;
+  violatedCount: number;
+  blockingViolationsCount: number;
+  warningViolationsCount: number;
+  complianceScore: number; // 0 - 100 percentage
+  verdict: 'PASSED' | 'FAILED_BLOCKING' | 'WARNING';
+  policyResults: OpaEvaluationResult[];
+  allViolations: OpaPolicyViolation[];
+  totalExecutionTimeMs: number;
 }
 
 

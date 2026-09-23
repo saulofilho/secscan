@@ -42,7 +42,8 @@ import {
   Key,
   KeyRound,
   Clock,
-  Workflow
+  Workflow,
+  FileCheck
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
 
@@ -465,6 +466,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           setActiveTab('refactoring');
         },
         keywords: ['refactoring', 'refatoracao', 'assistant', 'preview', 'crypto', 'md5', 'argon2', 'aes-256-gcm', 'diff', 'patch', 'antes depois', 'modernizacao']
+      },
+      {
+        id: 'nav-policyascode',
+        title: 'Módulo: Policy-as-Code (OPA Rego)',
+        subtitle: 'Defina guardrails e avalie políticas declarativas OPA Rego contra conformidade corporativa em tempo real',
+        category: 'Navegação',
+        icon: FileCheck,
+        badge: 'Rego OPA',
+        badgeColor: 'bg-[#00FF41]/15 text-[#00FF41] border-[#00FF41]/30',
+        action: () => {
+          onClose();
+          setActiveTab('policyascode');
+        },
+        keywords: ['policy', 'opa', 'rego', 'compliance', 'guardrail', 'gate', 'pci', 'soc2', 'nist', 'cis', 'open policy agent', 'declarative']
       },
       {
         id: 'nav-pipelineflow',

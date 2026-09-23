@@ -24,6 +24,7 @@ import { analyzeWithJsMiner } from './jsMinerEngine';
 import { buildDataFlowGraph } from './dataFlowGraphEngine';
 import { getOfficialDocLinksForFinding } from './remediationWikiData';
 import { runIastRuntimeEmulation, INITIAL_IAST_HOOKS } from './iastEngine';
+import { DEFAULT_OPA_POLICIES, evaluateAllOpaPolicies } from './opaPolicyEngine';
 
 export const DEFAULT_GLOBAL_IGNORE_PATTERNS: IgnorePatternItem[] = [
   {
@@ -987,12 +988,36 @@ function assembleScanReport(
 
   const durationMs = Math.max(1, Math.round(performance.now() - startTime));
 
+  // Evaluate Policy-as-Code (Open Policy Agent - OPA Rego) against the scan dataset
+  const opaCompliance = evaluateAllOpaPolicies(DEFAULT_OPA_POLICIES, {
+    findings,
+    metrics: {
+      criticalCount,
+      highCount,
+      mediumCount,
+      lowCount,
+      infoCount,
+      securityScore,
+      securityImpactScore,
+      impactLevel,
+      riskScore: workspaceRisk.riskScore,
+      riskLevel: workspaceRisk.riskLevel,
+      totalWeightedRisk,
+      criticalityDistribution,
+      averageEntropy,
+      averageRiskScore,
+      maxRiskScore
+    },
+    apiEndpoints,
+    totalFiles: files.length
+  } as any);
+
   onLog?.({
     id: `log-${Date.now()}-end`,
     timestamp: new Date().toLocaleTimeString(),
     type: 'SCAN_COMPLETE',
     durationMs,
-    message: `Scan concluído em ${durationMs}ms. Workspace Risk Score: ${workspaceRisk.riskScore}/100 (${workspaceRisk.riskLevel}). Encontrados ${findings.length} achado(s) em ${scannedCount} arquivo(s) analisado(s).`
+    message: `Scan concluído em ${durationMs}ms. Workspace Risk Score: ${workspaceRisk.riskScore}/100 (${workspaceRisk.riskLevel}). OPA Compliance: ${opaCompliance.complianceScore}% [${opaCompliance.verdict}]. Encontrados ${findings.length} achado(s) em ${scannedCount} arquivo(s) analisado(s).`
   });
 
   return {
@@ -1007,6 +1032,7 @@ function assembleScanReport(
     jsMiner,
     dataFlowGraph,
     iastReport,
+    opaCompliance,
     metrics: {
       criticalCount,
       highCount,

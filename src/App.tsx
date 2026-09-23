@@ -66,6 +66,7 @@ import { AutoRemediationView } from './components/AutoRemediationView';
 import { SecurityRefactoringAssistantView } from './components/SecurityRefactoringAssistantView';
 import { PipelineFlowArchitectView } from './components/PipelineFlowArchitectView';
 import { CyberThreatIntelHubView } from './components/CyberThreatIntelHubView';
+import { PolicyAsCodeView } from './components/PolicyAsCodeView';
 import { ComplianceAuditView } from './components/ComplianceAuditView';
 import { SecurityHeadersView } from './components/SecurityHeadersView';
 import { ContainerSecurityView } from './components/ContainerSecurityView';
@@ -79,7 +80,8 @@ import { auditGitignoreSecurity } from './lib/gitignoreAuditor';
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
 import { scanSourceFiles, scanSourceFilesAsync, exportToJson, DEFAULT_GLOBAL_IGNORE_PATTERNS } from './lib/scanner';
-import { RegexRule, ScannedFile, ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem, ScanProgress, SecScanGlobalConfig, DataFlowGraphData } from './types';
+import { RegexRule, ScannedFile, ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem, ScanProgress, SecScanGlobalConfig, DataFlowGraphData, OpaRegoPolicy } from './types';
+import { DEFAULT_OPA_POLICIES, evaluateAllOpaPolicies } from './lib/opaPolicyEngine';
 import { SecurityGlossaryEntry } from './lib/securityGlossary';
 import { safeGetItem, safeSetItem } from './lib/storage';
 import { getSecScanConfig, calculateDynamicRemediationTime } from './lib/secscanConfig';
@@ -153,6 +155,34 @@ export default function App() {
   const [toolGuideTargetTab, setToolGuideTargetTab] = useState<string>('compliance');
   const [showGitignoreModal, setShowGitignoreModal] = useState<boolean>(false);
   const [shortcutToast, setShortcutToast] = useState<{ message: string; key?: string } | null>(null);
+
+  // Policy-as-Code (Open Policy Agent - OPA Rego) State
+  const [opaPolicies, setOpaPolicies] = useState<OpaRegoPolicy[]>(() => {
+    const saved = safeGetItem('secscan_opa_policies');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {
+        return DEFAULT_OPA_POLICIES;
+      }
+    }
+    return DEFAULT_OPA_POLICIES;
+  });
+
+  const opaPoliciesRef = useRef<OpaRegoPolicy[]>(opaPolicies);
+  useEffect(() => {
+    opaPoliciesRef.current = opaPolicies;
+  }, [opaPolicies]);
+
+  const handleUpdateOpaPolicies = useCallback((updated: OpaRegoPolicy[]) => {
+    setOpaPolicies(updated);
+    safeSetItem('secscan_opa_policies', JSON.stringify(updated));
+    setReport(prev => ({
+      ...prev,
+      opaCompliance: evaluateAllOpaPolicies(updated, prev)
+    }));
+  }, []);
 
   // Quick summary of .gitignore security compliance for badge & UI indicators
   const gitignoreAuditSummary = useMemo(() => {
@@ -512,6 +542,9 @@ export default function App() {
       );
 
       if (activeScanSequenceRef.current === currentSeq) {
+        // Evaluate Policy-as-Code against currently active OPA Rego policies
+        result.opaCompliance = evaluateAllOpaPolicies(opaPoliciesRef.current, result);
+
         setReport(prevReport => {
           if (prevReport?.dataFlowGraph && prevReport.dataFlowGraph.nodes && prevReport.dataFlowGraph.nodes.length > 0) {
             setPreviousDataFlowGraph(prevReport.dataFlowGraph);
@@ -2100,6 +2133,19 @@ export default function App() {
                 setActiveTab('scanner');
               }
             }}
+            onLogAudit={(event) => {
+              setAuditLogs(prev => [event, ...prev].slice(0, 80));
+            }}
+          />
+        )}
+
+        {activeTab === 'policyascode' && (
+          <PolicyAsCodeView
+            report={report}
+            policies={opaPolicies}
+            onUpdatePolicies={handleUpdateOpaPolicies}
+            onSelectFinding={handleSelectFinding}
+            onNavigateToScanner={() => setActiveTab('scanner')}
             onLogAudit={(event) => {
               setAuditLogs(prev => [event, ...prev].slice(0, 80));
             }}

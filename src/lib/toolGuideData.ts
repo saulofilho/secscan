@@ -1324,5 +1324,42 @@ jobs:
       systemDetection: `Correlacionado ao grupo Scattered Spider (UNC3944), pulse AlienVault OTX #9042 e técnica T1552.001 (Credentials in Files).`,
       outputRemediation: `Amplificador de risco de 1.75x aplicado e recomendação de revogação imediata via AWS IAM com rotação de segredo.`
     }
+  },
+  policyascode: {
+    id: 'policyascode',
+    name: 'Policy-as-Code Engine (OPA / Rego)',
+    category: 'Conformidade & Governança',
+    badge: 'OPA / Rego',
+    shortSummary: 'Governança de segurança declarativa com Open Policy Agent (OPA) e linguagem Rego para verificação contínua de guardrails organizacionais contra PCI-DSS, SOC 2, NIST e regras personalizadas.',
+    howItWorks: `O motor avalia o documento de entrada JSON gerado pela análise estática (achados, severidades, entropia, métricas de risco e endpoints de API) contra políticas declarativas escritas em Rego. Cada política avalia regras de 'deny' e 'allow', atribuindo níveis de enforcement (BLOCKING para quebra de build em CI/CD, WARNING para revisão ou ADVISORY para auditoria).`,
+    stepByStepGuide: [
+      {
+        step: 1,
+        action: 'Acessar a aba "Policy-as-Code (OPA)"',
+        description: 'Visualize o índice de conformidade OPA, status de aprovação de Quality Gate e políticas ativas.'
+      },
+      {
+        step: 2,
+        action: 'Ativar, Desativar ou Ajustar Nível de Enforcement',
+        description: 'Controle quais políticas quebram pipelines selecionando BLOCKING, WARNING ou ADVISORY nos cards.'
+      },
+      {
+        step: 3,
+        action: 'Editar ou Criar Regras no Editor Rego com Sandbox',
+        description: 'Utilize o Live IDE para escrever regras Rego, carregar templates prontos e testar em tempo real contra os achados do scan.'
+      },
+      {
+        step: 4,
+        action: 'Exportar Bundle .rego ou Executar no CI/CD',
+        description: 'Exporte o pacote consolidado de políticas ou utilize o snippet fornecido para GitHub Actions e GitLab CI.'
+      }
+    ],
+    example: {
+      title: 'Exemplo: Guardrail Bloqueante contra Segredos em Produção',
+      scenario: 'Uma política OPA impede commits que introduzam segredos estáticos ou credenciais em arquivos do repositório.',
+      inputSnippet: `package secscan.pci_dss.req6_5\ndefault allow = false\ndeny[msg] {\n  some finding in input.findings\n  finding.severity == "CRITICAL"\n  msg := sprintf("PCI-DSS 4.0 Req 6.5 Violado: %v em %v", [finding.ruleName, finding.file])\n}\nallow { count(deny) == 0 }`,
+      systemDetection: `Regra deny acionada: 2 achados críticos detectados, score de conformidade 75% e Quality Gate em estado FAILED_BLOCKING.`,
+      outputRemediation: `Pipeline CI/CD bloqueado até que os segredos sejam removidos e rotacionados conforme a política corporativa.`
+    }
   }
 };

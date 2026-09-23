@@ -42,7 +42,8 @@ import {
   Grid,
   Ticket,
   ListOrdered,
-  Radio
+  Radio,
+  FileCheck
 } from 'lucide-react';
 import { ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem } from '../types';
 import { ThreatIntelligenceDashboard } from './ThreatIntelligenceDashboard';
@@ -544,6 +545,19 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             >
               <Scale className="w-3 h-3 text-[#00F0FF]" />
               <span>COMPLIANCE (SOC2/HIPAA/OWASP) &darr;</span>
+            </button>
+            <button
+              id="dashboard-header-opa-policy-btn"
+              onClick={() => onNavigateToTab('policyascode')}
+              className={`text-[10px] font-mono px-2 py-0.5 border font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                report.opaCompliance?.verdict === 'FAILED_BLOCKING'
+                  ? 'bg-[#FF3E00]/15 text-[#FF3E00] border-[#FF3E00]/50 hover:bg-[#FF3E00] hover:text-white'
+                  : 'bg-[#00FF41]/10 text-[#00FF41] border-[#00FF41]/40 hover:bg-[#00FF41]/20'
+              }`}
+              title="Acessar o motor Policy-as-Code (Open Policy Agent Rego)"
+            >
+              <FileCheck className="w-3 h-3 text-[#00FF41]" />
+              <span>OPA REGO: {report.opaCompliance ? `${report.opaCompliance.complianceScore}% [${report.opaCompliance.verdict}]` : 'ATIVO'}</span>
             </button>
             <button
               id="dashboard-header-cicd-health-btn"
