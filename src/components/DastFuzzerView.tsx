@@ -18,7 +18,14 @@ import {
   ChevronUp,
   CheckCircle,
   Search,
-  Globe
+  Globe,
+  Edit3,
+  RefreshCw,
+  Upload,
+  AlertCircle,
+  Settings,
+  Zap,
+  CheckCircle2
 } from 'lucide-react';
 import { ApiEndpointFinding } from '../types';
 import { 
@@ -37,6 +44,8 @@ import {
   COMMON_CRON_TEMPLATES,
   DEFAULT_RECURRING_SCHEDULES,
   calculateNextRunTime,
+  calculateNextRunFromCron,
+  validateCronExpression,
   formatCountdown,
   executeScheduledScanJob,
   exportSchedulesToJson,
@@ -104,9 +113,27 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
   const [executingScheduleId, setExecutingScheduleId] = useState<string | null>(null);
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importJsonText, setImportJsonText] = useState('');
   const [copiedScheduleJson, setCopiedScheduleJson] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<'ALL' | 'VULNERABLE' | 'WARNING'>('ALL');
   const [toastNotification, setToastNotification] = useState<{ message: string; type: 'success' | 'alert' | 'info' } | null>(null);
+
+  // Fallback realistic registered API endpoints if scanner found none
+  const registeredEndpointsList = useMemo(() => {
+    if (endpoints && endpoints.length > 0) return endpoints;
+    return [
+      { id: 'ep-1', path: '/api/v1/payments/charge', method: 'POST' as const, riskScore: 92, params: ['amount', 'currency', 'card_token', 'customer_id'], file: 'routes/payment.ts', line: 42, isInternalOrAdmin: false, snippet: 'router.post("/api/v1/payments/charge")' },
+      { id: 'ep-2', path: '/api/v1/auth/login', method: 'POST' as const, riskScore: 85, params: ['username', 'password', 'mfa_token'], file: 'routes/auth.ts', line: 18, isInternalOrAdmin: false, snippet: 'router.post("/api/v1/auth/login")' },
+      { id: 'ep-3', path: '/api/v1/users/profile', method: 'GET' as const, riskScore: 65, params: ['userId', 'role', 'email'], file: 'routes/user.ts', line: 89, isInternalOrAdmin: false, snippet: 'router.get("/api/v1/users/profile")' },
+      { id: 'ep-4', path: '/api/v1/files/export', method: 'GET' as const, riskScore: 88, params: ['filePath', 'format', 'download'], file: 'controllers/fileExport.ts', line: 30, isInternalOrAdmin: false, snippet: 'router.get("/api/v1/files/export")' },
+      { id: 'ep-5', path: '/api/v1/proxy/download', method: 'GET' as const, riskScore: 90, params: ['targetUrl', 'timeout'], file: 'services/proxy.ts', line: 12, isInternalOrAdmin: true, snippet: 'router.get("/api/v1/proxy/download")' },
+      { id: 'ep-6', path: '/api/v1/admin/debug', method: 'GET' as const, riskScore: 95, params: ['cmd', 'secretKey'], file: 'routes/admin.ts', line: 104, isInternalOrAdmin: true, snippet: 'router.get("/api/v1/admin/debug")' },
+      { id: 'ep-7', path: '/api/v1/search', method: 'GET' as const, riskScore: 70, params: ['q', 'filter', 'sortBy'], file: 'routes/search.ts', line: 22, isInternalOrAdmin: false, snippet: 'router.get("/api/v1/search")' },
+      { id: 'ep-8', path: '/api/v1/catalog/items', method: 'GET' as const, riskScore: 45, params: ['category', 'page', 'limit'], file: 'routes/catalog.ts', line: 15, isInternalOrAdmin: false, snippet: 'router.get("/api/v1/catalog/items")' },
+    ];
+  }, [endpoints]);
 
   // New Schedule Form State
   const [newScheduleName, setNewScheduleName] = useState('');
@@ -126,6 +153,19 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
     'IN_APP', 
     'SLACK_WEBHOOK'
   ]);
+
+  // Live Cron Validation
+  const cronValidation = useMemo(() => {
+    if (newIntervalPreset !== 'CRON') {
+      const preset = INTERVAL_PRESETS.find(p => p.preset === newIntervalPreset);
+      return {
+        isValid: true,
+        description: preset ? preset.label : 'Intervalo pré-configurado',
+        estimatedMinutes: preset ? preset.minutes : 60
+      };
+    }
+    return validateCronExpression(newCustomCron);
+  }, [newIntervalPreset, newCustomCron]);
 
   // Sync with LocalStorage
   useEffect(() => {
@@ -238,56 +278,163 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
     showToast('Agendamento removido com sucesso.', 'info');
   };
 
-  // Create new schedule submission
-  const handleCreateSchedule = () => {
+  // Start editing an existing schedule
+  const handleStartEditSchedule = (sched: RecurringScanSchedule) => {
+    setEditingScheduleId(sched.id);
+    setNewScheduleName(sched.name);
+    setNewTargetEndpoints([...sched.targetEndpoints]);
+    setNewHttpMethods([...sched.httpMethods]);
+    setNewAttackCategories([...sched.attackCategories]);
+    setNewIntervalPreset(sched.intervalPreset);
+    setNewCustomCron(sched.cronExpression || '0 */4 * * *');
+    setNewStopOnVuln(sched.stopOnCriticalVuln);
+    setNewAlertChannels([...sched.alertChannels]);
+    setIsCreateModalOpen(true);
+
+    setTimeout(() => {
+      const el = document.getElementById('scan-schedule-config-panel');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
+  // Reset and close schedule form
+  const handleCancelForm = () => {
+    setIsCreateModalOpen(false);
+    setEditingScheduleId(null);
+    setNewScheduleName('');
+    setNewTargetEndpoints([]);
+    setEndpointFilterSearch('');
+    setCustomEndpointInput('');
+  };
+
+  // Create or Update schedule submission
+  const handleSaveOrUpdateSchedule = () => {
     if (!newScheduleName.trim()) {
       showToast('Por favor, informe o nome do agendamento.', 'alert');
       return;
     }
 
+    if (newIntervalPreset === 'CRON' && !cronValidation.isValid) {
+      showToast(`Expressão Cron inválida: ${cronValidation.error}`, 'alert');
+      return;
+    }
+
     const selectedEndpoints = newTargetEndpoints.length > 0
       ? newTargetEndpoints
-      : endpoints.length > 0
-      ? [endpoints[0].path]
-      : ['/api/v1/resource'];
+      : registeredEndpointsList.length > 0
+      ? [registeredEndpointsList[0].path]
+      : ['/api/v1/payments/charge'];
 
     const presetConfig = INTERVAL_PRESETS.find(p => p.preset === newIntervalPreset) || INTERVAL_PRESETS[1];
-    const minutes = presetConfig.minutes;
+    const minutes = newIntervalPreset === 'CRON' ? cronValidation.estimatedMinutes : presetConfig.minutes;
+    const cronExpr = newIntervalPreset === 'CRON' ? newCustomCron.trim() : presetConfig.cronHint;
+    const intervalLabel = newIntervalPreset === 'CRON' ? `Cron (${newCustomCron.trim()})` : presetConfig.label;
 
-    const newSched: RecurringScanSchedule = {
-      id: `sched-${Date.now()}`,
-      name: newScheduleName.trim(),
-      enabled: true,
-      targetEndpoints: selectedEndpoints,
-      httpMethods: newHttpMethods.length > 0 ? newHttpMethods : ['GET', 'POST'],
-      attackCategories: newAttackCategories.length > 0 ? newAttackCategories : ['SQL_INJECTION'],
-      intervalPreset: newIntervalPreset,
-      intervalMinutes: minutes,
-      cronExpression: newIntervalPreset === 'CRON' ? newCustomCron : presetConfig.cronHint,
-      intervalLabel: newIntervalPreset === 'CRON' ? `Cron (${newCustomCron})` : presetConfig.label,
-      createdAt: new Date().toISOString(),
-      nextRunAt: calculateNextRunTime(minutes),
-      totalRuns: 0,
-      vulnerabilitiesDetected: 0,
-      stopOnCriticalVuln: newStopOnVuln,
-      alertChannels: newAlertChannels,
-      status: 'IDLE'
-    };
+    if (editingScheduleId) {
+      // Update existing schedule
+      setSchedules(prev => prev.map(s => {
+        if (s.id === editingScheduleId) {
+          const nextRunAt = s.enabled
+            ? (newIntervalPreset === 'CRON' ? calculateNextRunFromCron(cronExpr) : calculateNextRunTime(minutes))
+            : s.nextRunAt;
+          return {
+            ...s,
+            name: newScheduleName.trim(),
+            targetEndpoints: selectedEndpoints,
+            httpMethods: newHttpMethods.length > 0 ? newHttpMethods : ['GET', 'POST'],
+            attackCategories: newAttackCategories.length > 0 ? newAttackCategories : ['SQL_INJECTION'],
+            intervalPreset: newIntervalPreset,
+            intervalMinutes: minutes,
+            cronExpression: cronExpr,
+            intervalLabel,
+            stopOnCriticalVuln: newStopOnVuln,
+            alertChannels: newAlertChannels,
+            nextRunAt
+          };
+        }
+        return s;
+      }));
+      showToast(`Agendamento "${newScheduleName.trim()}" atualizado com sucesso!`, 'success');
 
-    setSchedules(prev => [newSched, ...prev]);
-    setIsCreateModalOpen(false);
-    setNewScheduleName('');
-    setNewTargetEndpoints([]);
-    showToast(`Agendamento "${newSched.name}" criado com sucesso! Próxima execução em ${minutes}m.`, 'success');
+      if (onLogAudit) {
+        onLogAudit({
+          id: `audit-sched-update-${Date.now()}`,
+          timestamp: new Date().toLocaleTimeString(),
+          action: `Agendador DAST atualizado: "${newScheduleName.trim()}" (${intervalLabel}, ${selectedEndpoints.length} endpoints).`,
+          user: 'SecOps-Operator',
+          status: 'SUCCESS'
+        });
+      }
+    } else {
+      // Create new schedule
+      const newSched: RecurringScanSchedule = {
+        id: `sched-${Date.now()}`,
+        name: newScheduleName.trim(),
+        enabled: true,
+        targetEndpoints: selectedEndpoints,
+        httpMethods: newHttpMethods.length > 0 ? newHttpMethods : ['GET', 'POST'],
+        attackCategories: newAttackCategories.length > 0 ? newAttackCategories : ['SQL_INJECTION'],
+        intervalPreset: newIntervalPreset,
+        intervalMinutes: minutes,
+        cronExpression: cronExpr,
+        intervalLabel,
+        createdAt: new Date().toISOString(),
+        nextRunAt: newIntervalPreset === 'CRON' ? calculateNextRunFromCron(cronExpr) : calculateNextRunTime(minutes),
+        totalRuns: 0,
+        vulnerabilitiesDetected: 0,
+        stopOnCriticalVuln: newStopOnVuln,
+        alertChannels: newAlertChannels,
+        status: 'IDLE'
+      };
 
-    if (onLogAudit) {
-      onLogAudit({
-        id: `audit-sched-create-${Date.now()}`,
-        timestamp: new Date().toLocaleTimeString(),
-        action: `Novo agendador DAST criado: "${newSched.name}" (${newSched.intervalLabel}).`,
-        user: 'SecOps-Operator',
-        status: 'SUCCESS'
-      });
+      setSchedules(prev => [newSched, ...prev]);
+      showToast(`Agendamento "${newSched.name}" criado com sucesso! Próxima execução estimada em ${minutes}m.`, 'success');
+
+      if (onLogAudit) {
+        onLogAudit({
+          id: `audit-sched-create-${Date.now()}`,
+          timestamp: new Date().toLocaleTimeString(),
+          action: `Novo agendador DAST criado: "${newSched.name}" (${newSched.intervalLabel}).`,
+          user: 'SecOps-Operator',
+          status: 'SUCCESS'
+        });
+      }
+    }
+
+    handleCancelForm();
+  };
+
+  // Restore default schedules
+  const handleRestoreDefaultSchedules = () => {
+    if (window.confirm('Deseja restaurar as rotinas padrão de agendamento DAST? Suas rotinas atuais serão substituídas.')) {
+      setSchedules(DEFAULT_RECURRING_SCHEDULES);
+      try {
+        localStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(DEFAULT_RECURRING_SCHEDULES));
+      } catch (e) {
+        // ignore
+      }
+      showToast('Agendamentos padrão restaurados com sucesso.', 'info');
+    }
+  };
+
+  // Import schedules from JSON text
+  const handleImportJson = (jsonString: string) => {
+    try {
+      const parsed = JSON.parse(jsonString);
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        throw new Error('O formato esperado é uma lista JSON contendo pelo menos um agendamento válido.');
+      }
+      setSchedules(parsed);
+      try {
+        localStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(parsed));
+      } catch (e) {
+        // ignore
+      }
+      setIsImportModalOpen(false);
+      setImportJsonText('');
+      showToast(`${parsed.length} rotina(s) de agendamento importada(s) com sucesso!`, 'success');
+    } catch (err: any) {
+      showToast(`Erro ao importar JSON: ${err.message}`, 'alert');
     }
   };
 
@@ -379,7 +526,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
   }, [executionRecords, historyFilter]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div id="dast-fuzzer-view" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Toast Alert Banner */}
       {toastNotification && (
         <div className={`p-4 rounded-xl border flex items-center justify-between font-mono text-xs transition-all shadow-lg animate-fadeIn ${
@@ -458,7 +605,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
             <Clock className="w-3.5 h-3.5 text-cyan-400" />
             <span>Scan Scheduler</span>
             <span className="text-[9px] px-1.5 py-0.2 bg-black/40 rounded text-cyan-300 font-bold">
-              {schedules.length}
+              {activeSchedulesCount}/{schedules.length}
             </span>
           </button>
           <button
@@ -480,6 +627,46 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
       {/* ========================================================================= */}
       {activeSubTab === 'FUZZER' && (
         <div className="space-y-6">
+          {/* Quick Scan Schedule Status Banner */}
+          <div id="scan-schedule-quick-bar" className="bg-[#0C120E] border border-emerald-900/60 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-mono text-xs">
+            <div className="flex items-center gap-3">
+              <span className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <Clock className="w-4 h-4" />
+              </span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-white">Scan Schedule de Fuzzing Automatizado</span>
+                  <span className={`px-2 py-0.2 rounded text-[10px] font-bold ${
+                    isSchedulerDaemonActive ? 'bg-emerald-950 text-emerald-300 border border-emerald-700/60' : 'bg-zinc-800 text-zinc-400'
+                  }`}>
+                    {isSchedulerDaemonActive ? 'DAEMON ATIVO' : 'PAUSADO'}
+                  </span>
+                </div>
+                <div className="text-zinc-400 text-[11px] mt-0.5">
+                  {activeSchedulesCount} rotina(s) ativa(s) nos endpoints da API &bull; Próxima execução programada:{' '}
+                  {soonestSchedule ? (
+                    <span className="text-emerald-300 font-bold">
+                      {formatCountdown(soonestSchedule.nextRunAt).formatted} ({soonestSchedule.name})
+                    </span>
+                  ) : (
+                    <span className="text-zinc-500">Nenhum agendamento ativo</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setActiveSubTab('SCHEDULER');
+                setIsCreateModalOpen(true);
+              }}
+              className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto cursor-pointer transition-colors shadow"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Painel Scan Schedule &rarr;</span>
+            </button>
+          </div>
+
           {/* Target Endpoint & Payload Selection Box */}
           <div className="bg-[#0C0C0C] border border-[#222] rounded-xl p-5 space-y-4 font-mono">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -649,17 +836,17 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
       {/* SUBTAB 2: RECURRING SCAN SCHEDULER                                        */}
       {/* ========================================================================= */}
       {activeSubTab === 'SCHEDULER' && (
-        <div className="space-y-6 font-mono">
+        <div id="scan-schedule-panel" className="space-y-6 font-mono">
           {/* Top Control Bar & Metrics */}
           <div className="bg-[#0C0C0C] border border-[#222] rounded-xl p-5 space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#222]">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="p-1.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
                     <Clock className="w-4 h-4" />
                   </span>
                   <h2 className="text-lg font-bold text-white uppercase">
-                    Motor de Agendamento Recorrente de DAST
+                    Scan Scheduler &amp; Fuzzing Recorrente
                   </h2>
                   <span className={`text-[10px] px-2 py-0.5 rounded font-bold border flex items-center gap-1.5 ${
                     isSchedulerDaemonActive
@@ -671,7 +858,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                   </span>
                 </div>
                 <p className="text-xs text-zinc-400 mt-1">
-                  Executa varreduras automatizadas nos intervalos configurados contra endpoints de produção e staging com emissão de alertas e trilha de auditoria.
+                  Agendamento automatizado de fuzzing DAST baseado em expressões Cron (POSIX 5 campos) ou intervalos pré-definidos para endpoints registrados da API.
                 </p>
               </div>
 
@@ -683,6 +870,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                       ? 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:text-white'
                       : 'bg-emerald-600 text-white border-emerald-500'
                   }`}
+                  title={isSchedulerDaemonActive ? 'Pausar daemon de execução automática' : 'Retomar daemon de execução automática'}
                 >
                   {isSchedulerDaemonActive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                   <span>{isSchedulerDaemonActive ? 'Pausar Daemon' : 'Iniciar Daemon'}</span>
@@ -691,13 +879,37 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                 <button
                   onClick={handleExportJson}
                   className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#1A1A1A] hover:bg-[#252525] border border-[#333] text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="Exportar todas as rotinas em formato JSON para backup ou automação"
                 >
                   {copiedScheduleJson ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>Exportar JSON</span>
+                  <span>Exportar</span>
                 </button>
 
                 <button
-                  onClick={() => setIsCreateModalOpen(true)}
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#1A1A1A] hover:bg-[#252525] border border-[#333] text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="Importar agendamentos a partir de JSON"
+                >
+                  <Upload className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Importar</span>
+                </button>
+
+                <button
+                  onClick={handleRestoreDefaultSchedules}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#1A1A1A] hover:bg-[#252525] border border-[#333] text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Restaurar rotinas padrão de fábrica"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Restaurar</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setEditingScheduleId(null);
+                    setNewScheduleName('');
+                    setNewTargetEndpoints(registeredEndpointsList.slice(0, 2).map(e => e.path));
+                    setIsCreateModalOpen(true);
+                  }}
                   className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -743,68 +955,116 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
             </div>
           </div>
 
-          {/* New Schedule Modal / Drawer */}
+          {/* Prompt banner when configuration panel is closed */}
+          {!isCreateModalOpen && (
+            <div className="bg-[#0C120E] border border-emerald-900/60 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-mono text-xs">
+              <div className="flex items-center gap-3">
+                <span className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
+                  <Calendar className="w-4 h-4" />
+                </span>
+                <div>
+                  <span className="font-bold text-white block">Painel de Configuração de Scan Schedule</span>
+                  <span className="text-zinc-400 text-[11px]">
+                    Defina intervalos de recorrência Cron personalizados (ex: a cada 5m, diário, semanal) para fuzzing contínuo dos endpoints da API.
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setEditingScheduleId(null);
+                  setNewScheduleName('');
+                  setNewTargetEndpoints(registeredEndpointsList.slice(0, 2).map(e => e.path));
+                  setIsCreateModalOpen(true);
+                }}
+                className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto cursor-pointer transition-colors shadow"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Abrir Painel de Agendamento</span>
+              </button>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* SCAN SCHEDULE CONFIGURATION PANEL                                         */}
+          {/* ========================================================================= */}
           {isCreateModalOpen && (
-            <div className="bg-[#0C0C0C] border-2 border-emerald-500/60 rounded-xl p-5 space-y-4 animate-fadeIn shadow-2xl">
+            <div 
+              id="scan-schedule-config-panel" 
+              className="bg-[#0C0C0C] border-2 border-emerald-500/80 rounded-xl p-5 space-y-5 animate-fadeIn shadow-2xl"
+            >
+              {/* Panel Header */}
               <div className="flex items-center justify-between pb-3 border-b border-[#222]">
                 <div className="flex items-center gap-2">
                   <span className="p-1.5 rounded bg-emerald-500/20 text-emerald-400">
-                    <Plus className="w-4 h-4" />
+                    {editingScheduleId ? <Edit3 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                   </span>
-                  <h3 className="text-base font-bold text-white uppercase">
-                    Configurar Novo Agendador de Varredura DAST
-                  </h3>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base font-bold text-white uppercase">
+                        {editingScheduleId ? 'Editar Agendamento DAST' : 'Configurar Novo Agendador de Varredura DAST'}
+                      </h3>
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
+                        editingScheduleId 
+                          ? 'bg-amber-950 text-amber-300 border border-amber-700/60'
+                          : 'bg-emerald-950 text-emerald-300 border border-emerald-700/60'
+                      }`}>
+                        {editingScheduleId ? 'Modo Edição' : 'Novo Scan Schedule'}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-zinc-400 block mt-0.5">
+                      Defina expressões de agendamento tipo Cron para automatizar testes dinâmicos de segurança e vulnerabilidade nos endpoints registrados.
+                    </span>
+                  </div>
                 </div>
                 <button
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="text-zinc-400 hover:text-white text-xs px-2 py-1 cursor-pointer"
+                  onClick={handleCancelForm}
+                  className="text-zinc-400 hover:text-white text-xs px-2.5 py-1 rounded bg-zinc-900 border border-zinc-700 cursor-pointer"
                 >
                   ✕ Fechar
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* Schedule Name */}
-                <div className="space-y-1 md:col-span-2">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-                    Nome da Rotina de Teste:
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider flex items-center justify-between">
+                    <span>Nome da Rotina de Varredura DAST:</span>
+                    <span className="text-zinc-500 text-[9px] font-normal">Identificador visível no log de auditoria</span>
                   </label>
                   <input
                     type="text"
                     value={newScheduleName}
                     onChange={(e) => setNewScheduleName(e.target.value)}
-                    placeholder="Ex: Auditoria Contínua de APIs de Pagamento & Checkout"
-                    className="w-full bg-black/70 border border-[#333] px-3 py-2 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                    placeholder="Ex: Auditoria Contínua de APIs de Pagamento & Checkout (Cron Diário)"
+                    className="w-full bg-black/70 border border-[#333] px-3.5 py-2.5 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                   />
                 </div>
 
-                {/* Target Endpoints Selection */}
-                <div className="space-y-2 md:col-span-2 bg-black/40 border border-[#222] p-3 rounded-lg">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-                      Endpoints Alvo para Fuzzing Recorrente ({newTargetEndpoints.length} selecionados):
-                    </label>
+                {/* Registered API Endpoints Selection Box */}
+                <div className="space-y-2 md:col-span-2 bg-[#080808] border border-[#222] p-4 rounded-xl">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-zinc-800">
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-emerald-400" />
+                      <label className="text-[11px] font-bold text-zinc-200 uppercase tracking-wider block">
+                        Endpoints Registrados para Fuzzing ({newTargetEndpoints.length} selecionados):
+                      </label>
+                    </div>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => {
-                          const allAvailable = (endpoints.length > 0 ? endpoints : [
-                            { path: '/api/v1/payments/charge', method: 'POST', riskScore: 88 },
-                            { path: '/api/v1/auth/login', method: 'POST', riskScore: 75 },
-                            { path: '/api/v1/users/profile', method: 'GET', riskScore: 40 },
-                            { path: '/api/v1/files/export', method: 'GET', riskScore: 82 }
-                          ]).map(e => e.path);
+                          const allAvailable = registeredEndpointsList.map(e => e.path);
                           setNewTargetEndpoints(Array.from(new Set([...newTargetEndpoints, ...allAvailable])));
                         }}
-                        className="text-[10px] text-emerald-400 hover:underline cursor-pointer font-bold"
+                        className="text-[10px] text-emerald-400 hover:text-emerald-300 cursor-pointer font-bold transition-colors"
                       >
-                        Selecionar Todos
+                        + Selecionar Todos ({registeredEndpointsList.length})
                       </button>
-                      <span className="text-zinc-600">|</span>
+                      <span className="text-zinc-700">|</span>
                       <button
                         type="button"
                         onClick={() => setNewTargetEndpoints([])}
-                        className="text-[10px] text-zinc-500 hover:underline cursor-pointer"
+                        className="text-[10px] text-zinc-500 hover:text-zinc-300 cursor-pointer transition-colors"
                       >
                         Limpar Seleção
                       </button>
@@ -818,60 +1078,78 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                       type="text"
                       value={endpointFilterSearch}
                       onChange={(e) => setEndpointFilterSearch(e.target.value)}
-                      placeholder="Filtrar endpoints registrados (ex: /api/v1/payments, POST, login)..."
-                      className="w-full bg-black/60 border border-[#333] pl-8 pr-3 py-1.5 rounded text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+                      placeholder="Filtrar endpoints registrados (ex: /payments, POST, auth, admin)..."
+                      className="w-full bg-black/70 border border-[#333] pl-8 pr-3 py-1.5 rounded text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
                     />
                   </div>
 
-                  {/* Discovered Endpoints list */}
-                  <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
-                    {(endpoints.length > 0 ? endpoints : [
-                      { path: '/api/v1/payments/charge', method: 'POST', riskScore: 88 },
-                      { path: '/api/v1/auth/login', method: 'POST', riskScore: 75 },
-                      { path: '/api/v1/users/profile', method: 'GET', riskScore: 40 },
-                      { path: '/api/v1/files/export', method: 'GET', riskScore: 82 }
-                    ])
-                    .filter((ep: any) => {
-                      if (!endpointFilterSearch.trim()) return true;
-                      const q = endpointFilterSearch.toLowerCase();
-                      return ep.path.toLowerCase().includes(q) || (ep.method || '').toLowerCase().includes(q);
-                    })
-                    .map((ep: any) => {
-                      const isSelected = newTargetEndpoints.includes(ep.path);
-                      return (
-                        <div
-                          key={ep.path}
-                          onClick={() => {
-                            if (isSelected) {
-                              setNewTargetEndpoints(newTargetEndpoints.filter(p => p !== ep.path));
-                            } else {
-                              setNewTargetEndpoints([...newTargetEndpoints, ep.path]);
-                            }
-                          }}
-                          className={`p-2 rounded border flex items-center justify-between text-xs cursor-pointer transition-colors ${
-                            isSelected
-                              ? 'bg-emerald-950/30 border-emerald-500 text-white'
-                              : 'bg-black/50 border-[#222] text-zinc-400 hover:text-zinc-200'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              readOnly
-                              className="rounded accent-emerald-500 cursor-pointer"
-                            />
-                            <span className="text-[10px] px-1.5 py-0.2 bg-zinc-800 rounded font-bold text-emerald-400">
-                              {ep.method || 'POST'}
-                            </span>
-                            <span className="font-mono text-zinc-200">{ep.path}</span>
+                  {/* Discovered / Registered Endpoints list */}
+                  <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+                    {registeredEndpointsList
+                      .filter((ep: any) => {
+                        if (!endpointFilterSearch.trim()) return true;
+                        const q = endpointFilterSearch.toLowerCase();
+                        return ep.path.toLowerCase().includes(q) || (ep.method || '').toLowerCase().includes(q);
+                      })
+                      .map((ep: any) => {
+                        const isSelected = newTargetEndpoints.includes(ep.path);
+                        return (
+                          <div
+                            key={ep.path}
+                            onClick={() => {
+                              if (isSelected) {
+                                setNewTargetEndpoints(newTargetEndpoints.filter(p => p !== ep.path));
+                              } else {
+                                setNewTargetEndpoints([...newTargetEndpoints, ep.path]);
+                              }
+                            }}
+                            className={`p-2.5 rounded-lg border flex items-center justify-between text-xs cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-emerald-950/40 border-emerald-500/70 text-white shadow-sm'
+                                : 'bg-black/60 border-[#222] text-zinc-400 hover:border-[#333] hover:text-zinc-200'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {}} // handled by parent div
+                                className="rounded accent-emerald-500 cursor-pointer shrink-0"
+                              />
+                              <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold shrink-0 ${
+                                ep.method === 'POST' ? 'bg-blue-950 text-blue-300 border border-blue-800' :
+                                ep.method === 'GET' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
+                                ep.method === 'PUT' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
+                                'bg-rose-950 text-rose-300 border border-rose-800'
+                              }`}>
+                                {ep.method || 'POST'}
+                              </span>
+                              <span className="font-mono text-zinc-200 truncate">{ep.path}</span>
+                              {ep.params && ep.params.length > 0 && (
+                                <span className="text-[10px] text-zinc-500 hidden sm:inline truncate">
+                                  ({ep.params.length} params)
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {ep.isInternalOrAdmin && (
+                                <span className="text-[9px] px-1 rounded bg-amber-950/80 text-amber-400 border border-amber-800/60 font-bold">
+                                  ADMIN
+                                </span>
+                              )}
+                              {ep.riskScore && (
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  ep.riskScore >= 80 ? 'bg-rose-950/60 text-rose-300 border border-rose-800/40' :
+                                  ep.riskScore >= 50 ? 'bg-amber-950/60 text-amber-300 border border-amber-800/40' :
+                                  'bg-zinc-800 text-zinc-400'
+                                }`}>
+                                  Risco: {ep.riskScore}/100
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          {ep.riskScore && (
-                            <span className="text-[10px] text-zinc-500">Risco: {ep.riskScore}/100</span>
-                          )}
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
 
                   {/* Add Custom Endpoint */}
@@ -880,8 +1158,8 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                       type="text"
                       value={customEndpointInput}
                       onChange={(e) => setCustomEndpointInput(e.target.value)}
-                      placeholder="/api/v1/custom-endpoint"
-                      className="flex-1 bg-black/60 border border-[#333] px-2.5 py-1.5 rounded text-xs text-white focus:outline-none focus:border-emerald-500"
+                      placeholder="/api/v1/custom-endpoint-or-webhook"
+                      className="flex-1 bg-black/60 border border-[#333] px-3 py-1.5 rounded text-xs text-white focus:outline-none focus:border-emerald-500"
                     />
                     <button
                       type="button"
@@ -891,19 +1169,40 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                           setCustomEndpointInput('');
                         }
                       }}
-                      className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs rounded font-bold cursor-pointer"
+                      className="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs rounded font-bold cursor-pointer transition-colors"
                     >
                       + Adicionar Alvo
                     </button>
                   </div>
                 </div>
 
-                {/* HTTP Methods */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-                    Métodos HTTP a Testar:
+                {/* Recurrence Interval Preset */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider block">
+                    Intervalo de Recorrência da Varredura:
                   </label>
-                  <div className="flex items-center gap-2">
+                  <select
+                    value={newIntervalPreset}
+                    onChange={(e) => setNewIntervalPreset(e.target.value as ScheduleIntervalPreset)}
+                    className="w-full bg-black/70 border border-[#333] px-3 py-2 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+                  >
+                    {INTERVAL_PRESETS.map(p => (
+                      <option key={p.preset} value={p.preset}>
+                        {p.label} (Cron: {p.cronHint})
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-[10px] text-zinc-500 block">
+                    Selecione &quot;Expressão Cron Personalizada&quot; para definir horários de produção, fins de semana ou intervalos customizados.
+                  </span>
+                </div>
+
+                {/* HTTP Methods */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider block">
+                    Métodos HTTP a Testar no Fuzzing:
+                  </label>
+                  <div className="flex items-center gap-2 pt-0.5">
                     {(['GET', 'POST', 'PUT', 'DELETE'] as const).map(method => {
                       const isSelected = newHttpMethods.includes(method);
                       return (
@@ -919,10 +1218,10 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                               setNewHttpMethods([...newHttpMethods, method]);
                             }
                           }}
-                          className={`px-3 py-1 rounded text-xs font-bold border transition-colors cursor-pointer ${
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
                             isSelected
-                              ? 'bg-emerald-600 text-white border-emerald-500'
-                              : 'bg-black/60 border-[#333] text-zinc-400'
+                              ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm'
+                              : 'bg-black/60 border-[#333] text-zinc-400 hover:text-white'
                           }`}
                         >
                           {method}
@@ -930,58 +1229,76 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                       );
                     })}
                   </div>
+                  <span className="text-[10px] text-zinc-500 block">
+                    Ao menos um método HTTP deve estar ativo para a rota.
+                  </span>
                 </div>
 
-                {/* Interval Preset Selector */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-                    Intervalo de Recorrência (Cron / Período):
-                  </label>
-                  <select
-                    value={newIntervalPreset}
-                    onChange={(e) => setNewIntervalPreset(e.target.value as ScheduleIntervalPreset)}
-                    className="w-full bg-black/70 border border-[#333] px-3 py-2 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
-                  >
-                    {INTERVAL_PRESETS.map(p => (
-                      <option key={p.preset} value={p.preset}>
-                        {p.label} (Cron: {p.cronHint})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Custom Cron Input & Quick Template Chips */}
+                {/* Custom Cron Input & Real-Time Validation Box */}
                 {newIntervalPreset === 'CRON' && (
-                  <div className="space-y-2 md:col-span-2 p-3.5 bg-cyan-950/20 border border-cyan-500/40 rounded-lg">
+                  <div className="space-y-3 md:col-span-2 p-4 bg-cyan-950/20 border-2 border-cyan-500/60 rounded-xl">
                     <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block">
-                        Expressão Cron Customizada (5 campos POSIX: min hora dia mês dia-semana):
-                      </label>
-                      <span className="text-[9px] text-cyan-300 font-mono">
-                        Cron Engine
+                      <div className="flex items-center gap-2">
+                        <span className="p-1 rounded bg-cyan-500/20 text-cyan-300">
+                          <Terminal className="w-3.5 h-3.5" />
+                        </span>
+                        <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider block">
+                          Expressão Cron Customizada (POSIX 5 Campos)
+                        </label>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-900/50 text-cyan-300 border border-cyan-700/60 font-mono font-bold">
+                        Cron Engine Active
                       </span>
                     </div>
 
-                    <input
-                      type="text"
-                      value={newCustomCron}
-                      onChange={(e) => setNewCustomCron(e.target.value)}
-                      placeholder="0 * * * *"
-                      className="w-full bg-black border border-cyan-500/50 px-3 py-2 rounded-lg text-xs text-cyan-300 font-mono focus:outline-none focus:ring-1 focus:ring-cyan-400"
-                    />
+                    <div className="space-y-1.5">
+                      <input
+                        type="text"
+                        value={newCustomCron}
+                        onChange={(e) => setNewCustomCron(e.target.value)}
+                        placeholder="Ex: 0 */4 * * *"
+                        className={`w-full bg-black border px-3.5 py-2.5 rounded-lg text-sm text-cyan-300 font-mono focus:outline-none ${
+                          cronValidation.isValid 
+                            ? 'border-cyan-500/70 focus:ring-1 focus:ring-cyan-400' 
+                            : 'border-rose-500 focus:ring-1 focus:ring-rose-500'
+                        }`}
+                      />
+
+                      {/* Real-time Cron Validation Status Box */}
+                      {cronValidation.isValid ? (
+                        <div className="p-2.5 rounded bg-emerald-950/40 border border-emerald-500/60 text-emerald-300 text-xs flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <div>
+                              <strong>Cron Válido:</strong> {cronValidation.description}
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-emerald-400/80 font-mono shrink-0">
+                            ~{cronValidation.estimatedMinutes}min de cadência
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 rounded bg-rose-950/50 border border-rose-500/60 text-rose-300 text-xs flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                          <div>
+                            <strong>Erro de Sintaxe Cron:</strong> {cronValidation.error}
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
                     {/* Quick Cron Preset Templates */}
-                    <div className="space-y-1 pt-1">
-                      <span className="text-[9px] text-zinc-400 block uppercase font-bold">
-                        Modelos Rápidos (Clique para aplicar):
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[9.5px] text-zinc-400 block uppercase font-bold">
+                        Modelos Rápidos Populares (Clique para preencher a expressão):
                       </span>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-2">
                         {COMMON_CRON_TEMPLATES.map((tmpl) => (
                           <button
                             key={tmpl.cron}
                             type="button"
                             onClick={() => setNewCustomCron(tmpl.cron)}
-                            className={`px-2 py-1 rounded text-[10px] font-mono border transition-all cursor-pointer ${
+                            className={`px-2.5 py-1 rounded text-[10.5px] font-mono border transition-all cursor-pointer ${
                               newCustomCron === tmpl.cron
                                 ? 'bg-cyan-500 text-black border-cyan-400 font-bold shadow'
                                 : 'bg-black/60 text-zinc-300 border-zinc-700 hover:border-cyan-400 hover:text-white'
@@ -989,27 +1306,27 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                             title={tmpl.desc}
                           >
                             <span>{tmpl.label}</span>
-                            <span className="text-[9px] opacity-70 ml-1">({tmpl.cron})</span>
+                            <span className="text-[9.5px] opacity-75 ml-1">({tmpl.cron})</span>
                           </button>
                         ))}
                       </div>
                     </div>
 
-                    {/* 5-Field Syntax Hint */}
-                    <div className="text-[9.5px] text-zinc-400 bg-black/60 p-2 rounded border border-zinc-800 flex items-center justify-between flex-wrap gap-1">
-                      <span>┌── <strong>min</strong> (0-59)</span>
-                      <span>┌── <strong>hora</strong> (0-23)</span>
-                      <span>┌── <strong>dia</strong> (1-31)</span>
-                      <span>┌── <strong>mês</strong> (1-12)</span>
-                      <span>┌── <strong>dia-sem</strong> (0-6)</span>
+                    {/* 5-Field Syntax Hint Graphic */}
+                    <div className="text-[10px] text-zinc-400 bg-black/70 p-2.5 rounded-lg border border-zinc-800 flex items-center justify-between flex-wrap gap-2 font-mono">
+                      <span>┌─ <strong>min</strong> (0-59)</span>
+                      <span>┌─ <strong>hora</strong> (0-23)</span>
+                      <span>┌─ <strong>dia do mês</strong> (1-31)</span>
+                      <span>┌─ <strong>mês</strong> (1-12)</span>
+                      <span>┌─ <strong>dia da semana</strong> (0-6)</span>
                     </div>
                   </div>
                 )}
 
                 {/* Attack Categories Multi-select */}
-                <div className="space-y-1 md:col-span-2">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-                    Suíte de Ataque Ativa:
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider block">
+                    Categorias de Ataque DAST a Injetar nas Execuções:
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {[
@@ -1034,13 +1351,13 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                               setNewAttackCategories([...newAttackCategories, cat.id as AttackCategory]);
                             }
                           }}
-                          className={`p-2 rounded border text-left text-xs transition-colors cursor-pointer ${
+                          className={`p-2.5 rounded-lg border text-left text-xs transition-colors cursor-pointer ${
                             isChecked
                               ? 'bg-emerald-950/40 border-emerald-500 text-white'
                               : 'bg-black/40 border-[#222] text-zinc-500 hover:text-zinc-300'
                           }`}
                         >
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-2">
                             <span className={`w-2 h-2 rounded-full ${isChecked ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
                             <span className="font-bold">{cat.label}</span>
                           </div>
@@ -1051,7 +1368,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                 </div>
 
                 {/* Advanced Options & Alert Channels */}
-                <div className="space-y-2 md:col-span-2 pt-2 border-t border-white/5">
+                <div className="space-y-3 md:col-span-2 pt-2 border-t border-white/5">
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -1061,13 +1378,13 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                       className="rounded accent-emerald-500 cursor-pointer"
                     />
                     <label htmlFor="stopOnVuln" className="text-xs text-zinc-300 cursor-pointer">
-                      Pausar agendador automaticamente se alguma vulnerabilidade crítica for confirmada
+                      Pausar agendador automaticamente se alguma vulnerabilidade de severidade crítica for confirmada
                     </label>
                   </div>
 
                   <div className="flex items-center gap-4 text-xs text-zinc-400 flex-wrap">
-                    <span className="text-zinc-500">Canais de Notificação:</span>
-                    <label className="flex items-center gap-1 cursor-pointer">
+                    <span className="text-zinc-500 font-bold">Canais de Alerta:</span>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={newAlertChannels.includes('IN_APP')}
@@ -1079,7 +1396,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                       />
                       <span>In-App Banner</span>
                     </label>
-                    <label className="flex items-center gap-1 cursor-pointer">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={newAlertChannels.includes('SLACK_WEBHOOK')}
@@ -1091,7 +1408,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                       />
                       <span>Webhook Slack</span>
                     </label>
-                    <label className="flex items-center gap-1 cursor-pointer">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={newAlertChannels.includes('SOAR_PLAYBOOK')}
@@ -1110,18 +1427,64 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
               {/* Submit Buttons */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#222]">
                 <button
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold cursor-pointer"
+                  type="button"
+                  onClick={handleCancelForm}
+                  className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
-                  onClick={handleCreateSchedule}
-                  className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow"
+                  type="button"
+                  onClick={handleSaveOrUpdateSchedule}
+                  className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow transition-colors"
                 >
                   <Check className="w-4 h-4" />
-                  <span>Salvar &amp; Iniciar Agendamento</span>
+                  <span>{editingScheduleId ? 'Salvar Alterações no Agendamento' : 'Salvar & Ativar Agendamento'}</span>
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Import JSON Modal */}
+          {isImportModalOpen && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-[#111] border border-cyan-500/60 rounded-xl p-5 max-w-xl w-full space-y-4 shadow-2xl font-mono">
+                <div className="flex items-center justify-between pb-2 border-b border-[#222]">
+                  <div className="flex items-center gap-2 text-cyan-400">
+                    <Upload className="w-4 h-4" />
+                    <h3 className="font-bold text-sm text-white uppercase">Importar Agendamentos DAST (JSON)</h3>
+                  </div>
+                  <button
+                    onClick={() => setIsImportModalOpen(false)}
+                    className="text-zinc-500 hover:text-white text-xs cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <p className="text-xs text-zinc-400">
+                  Cole uma lista JSON de agendamentos contendo campos como <code className="text-cyan-300">name</code>, <code className="text-cyan-300">intervalPreset</code>, <code className="text-cyan-300">cronExpression</code> e <code className="text-cyan-300">targetEndpoints</code>:
+                </p>
+                <textarea
+                  value={importJsonText}
+                  onChange={(e) => setImportJsonText(e.target.value)}
+                  placeholder="[{ &quot;id&quot;: &quot;sched-1&quot;, &quot;name&quot;: &quot;Scan Diário&quot;, &quot;cronExpression&quot;: &quot;0 2 * * *&quot;, ... }]"
+                  rows={8}
+                  className="w-full bg-black/80 border border-[#333] p-3 rounded-lg text-xs font-mono text-zinc-200 focus:outline-none focus:border-cyan-400"
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setIsImportModalOpen(false)}
+                    className="px-3 py-1.5 rounded bg-zinc-800 text-zinc-300 text-xs font-bold cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => handleImportJson(importJsonText)}
+                    className="px-4 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 text-black font-bold text-xs cursor-pointer"
+                  >
+                    Carregar Agendamentos
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1172,7 +1535,9 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                           </span>
 
                           {schedule.cronExpression && (
-                            <code className="text-[10px] text-zinc-500">cron: {schedule.cronExpression}</code>
+                            <code className="text-[10px] text-zinc-500 bg-black/50 px-1.5 py-0.2 rounded border border-zinc-800">
+                              cron: {schedule.cronExpression}
+                            </code>
                           )}
                         </div>
 
@@ -1219,9 +1584,18 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                             onClick={() => triggerScheduleExecution(schedule.id, false)}
                             disabled={isRunning}
                             className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow transition-colors"
+                            title="Disparar execução agora"
                           >
                             <Play className={`w-3.5 h-3.5 ${isRunning ? 'animate-spin' : ''}`} />
                             <span>{isRunning ? 'Executando...' : 'Executar Agora'}</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleStartEditSchedule(schedule)}
+                            className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white cursor-pointer transition-colors"
+                            title="Editar configuração do agendamento"
+                          >
+                            <Edit3 className="w-4 h-4" />
                           </button>
 
                           <button

@@ -128,7 +128,179 @@ export const DEFAULT_RECURRING_SCHEDULES: RecurringScanSchedule[] = [
 ];
 
 export function calculateNextRunTime(intervalMinutes: number): string {
-  const nextMs = Date.now() + intervalMinutes * 60 * 1000;
+  const nextMs = Date.now() + Math.max(1, intervalMinutes) * 60 * 1000;
+  return new Date(nextMs).toISOString();
+}
+
+/**
+ * Validates a 5-part POSIX cron expression and provides human-readable description and estimated interval
+ */
+export function validateCronExpression(cron: string): {
+  isValid: boolean;
+  error?: string;
+  description: string;
+  estimatedMinutes: number;
+} {
+  const trimmed = cron.trim();
+  if (!trimmed) {
+    return {
+      isValid: false,
+      error: 'A expressão Cron não pode ser vazia.',
+      description: 'Informe uma expressão de 5 campos (ex: */15 * * * *)',
+      estimatedMinutes: 60
+    };
+  }
+
+  const parts = trimmed.split(/\s+/);
+  if (parts.length !== 5) {
+    return {
+      isValid: false,
+      error: `Esperados 5 campos separados por espaço (min hora dia mês dia-sem), mas recebidos ${parts.length}.`,
+      description: 'Formato: <minuto> <hora> <dia-do-mês> <mês> <dia-da-semana>',
+      estimatedMinutes: 60
+    };
+  }
+
+  const [min, hour, dom, mon, dow] = parts;
+
+  // Validate minute (0-59, *, */n)
+  if (!isValidCronField(min, 0, 59)) {
+    return {
+      isValid: false,
+      error: `Campo 'minuto' inválido ("${min}"). Valores permitidos: 0-59, *, */N, N-M.`,
+      description: 'Erro no primeiro campo (minuto)',
+      estimatedMinutes: 60
+    };
+  }
+
+  // Validate hour (0-23, *, */n)
+  if (!isValidCronField(hour, 0, 23)) {
+    return {
+      isValid: false,
+      error: `Campo 'hora' inválido ("${hour}"). Valores permitidos: 0-23, *, */N, N-M.`,
+      description: 'Erro no segundo campo (hora)',
+      estimatedMinutes: 60
+    };
+  }
+
+  // Validate day of month (1-31, *, */n)
+  if (!isValidCronField(dom, 1, 31)) {
+    return {
+      isValid: false,
+      error: `Campo 'dia do mês' inválido ("${dom}"). Valores permitidos: 1-31, *, */N.`,
+      description: 'Erro no terceiro campo (dia do mês)',
+      estimatedMinutes: 1440
+    };
+  }
+
+  // Validate month (1-12, *, */n)
+  if (!isValidCronField(mon, 1, 12)) {
+    return {
+      isValid: false,
+      error: `Campo 'mês' inválido ("${mon}"). Valores permitidos: 1-12, *.`,
+      description: 'Erro no quarto campo (mês)',
+      estimatedMinutes: 43200
+    };
+  }
+
+  // Validate day of week (0-7, *, 1-5)
+  if (!isValidCronField(dow, 0, 7)) {
+    return {
+      isValid: false,
+      error: `Campo 'dia da semana' inválido ("${dow}"). Valores permitidos: 0-7 (0/7=Dom), *, N-M.`,
+      description: 'Erro no quinto campo (dia da semana)',
+      estimatedMinutes: 10080
+    };
+  }
+
+  // Calculate human description & estimated minutes
+  const description = describeCron(min, hour, dom, mon, dow);
+  const estimatedMinutes = estimateCronIntervalMinutes(min, hour, dom, dow);
+
+  return {
+    isValid: true,
+    description,
+    estimatedMinutes
+  };
+}
+
+function isValidCronField(field: string, min: number, max: number): boolean {
+  if (field === '*') return true;
+  if (/^\*\/(\d+)$/.test(field)) {
+    const step = parseInt(field.split('/')[1], 10);
+    return step > 0 && step <= max;
+  }
+  if (/^(\d+)-(\d+)$/.test(field)) {
+    const [start, end] = field.split('-').map(Number);
+    return start >= min && end <= max && start <= end;
+  }
+  if (/^(\d+,)+\d+$/.test(field)) {
+    const items = field.split(',').map(Number);
+    return items.every(n => n >= min && n <= max);
+  }
+  const val = Number(field);
+  return !isNaN(val) && val >= min && val <= max;
+}
+
+function describeCron(min: string, hour: string, dom: string, mon: string, dow: string): string {
+  if (min.startsWith('*/') && hour === '*' && dom === '*' && mon === '*' && dow === '*') {
+    const step = min.replace('*/', '');
+    return `Executa a cada ${step} minutos durante todo o dia`;
+  }
+  if (min === '0' && hour === '*' && dom === '*' && mon === '*' && dow === '*') {
+    return 'Executa de hora em hora no início da hora (:00)';
+  }
+  if (min === '0' && hour.startsWith('*/') && dom === '*' && mon === '*' && dow === '*') {
+    const step = hour.replace('*/', '');
+    return `Executa a cada ${step} horas no minuto :00`;
+  }
+  if (min === '0' && hour === '0' && dom === '*' && mon === '*' && dow === '*') {
+    return 'Executa diariamente à meia-noite (00:00 UTC)';
+  }
+  if (/^\d+$/.test(min) && /^\d+$/.test(hour) && dom === '*' && mon === '*' && dow === '*') {
+    const h = hour.padStart(2, '0');
+    const m = min.padStart(2, '0');
+    return `Executa diariamente às ${h}:${m}`;
+  }
+  if (/^\d+$/.test(min) && /^\d+$/.test(hour) && dom === '*' && mon === '*' && dow === '1-5') {
+    const h = hour.padStart(2, '0');
+    const m = min.padStart(2, '0');
+    return `Executa de segunda a sexta-feira às ${h}:${m}`;
+  }
+  if (/^\d+$/.test(min) && /^\d+$/.test(hour) && dom === '*' && mon === '*' && (dow === '0' || dow === '7')) {
+    const h = hour.padStart(2, '0');
+    const m = min.padStart(2, '0');
+    return `Executa semanalmente aos domingos às ${h}:${m}`;
+  }
+  return `Execução agendada: min[${min}] hora[${hour}] dia[${dom}] mês[${mon}] dia-sem[${dow}]`;
+}
+
+function estimateCronIntervalMinutes(min: string, hour: string, dom: string, dow: string): number {
+  if (min.startsWith('*/')) {
+    return Math.max(1, parseInt(min.replace('*/', ''), 10));
+  }
+  if (hour.startsWith('*/')) {
+    return Math.max(1, parseInt(hour.replace('*/', ''), 10)) * 60;
+  }
+  if (hour === '*' && min !== '*') {
+    return 60;
+  }
+  if (dom === '*' && dow === '1-5') {
+    return 1440;
+  }
+  if (dom === '*' && (dow === '0' || dow === '7')) {
+    return 10080;
+  }
+  if (dom === '*' && hour !== '*') {
+    return 1440;
+  }
+  return 60;
+}
+
+export function calculateNextRunFromCron(cronExpression: string, fromDate: Date = new Date()): string {
+  const validation = validateCronExpression(cronExpression);
+  const minutes = validation.isValid ? validation.estimatedMinutes : 60;
+  const nextMs = fromDate.getTime() + minutes * 60 * 1000;
   return new Date(nextMs).toISOString();
 }
 
@@ -207,7 +379,9 @@ export function executeScheduledScanJob(
     status
   };
 
-  const nextRunAt = calculateNextRunTime(schedule.intervalMinutes);
+  const nextRunAt = schedule.intervalPreset === 'CRON' && schedule.cronExpression
+    ? calculateNextRunFromCron(schedule.cronExpression)
+    : calculateNextRunTime(schedule.intervalMinutes);
   const updatedSchedule: RecurringScanSchedule = {
     ...schedule,
     lastRunAt: new Date().toISOString(),
