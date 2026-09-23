@@ -3,6 +3,7 @@ import {
   Shield,
   ShieldCheck, 
   ShieldAlert, 
+  Cpu,
   Layers, 
   Terminal, 
   Activity, 
@@ -50,6 +51,7 @@ import { ScanReport, AuditLogEvent, ScanFinding, IgnorePatternItem } from '../ty
 import { ThreatIntelligenceDashboard } from './ThreatIntelligenceDashboard';
 import { BreachHeatmap } from './BreachHeatmap';
 import { VulnerabilityHeatmap } from './VulnerabilityHeatmap';
+import { SecurityRiskCalculator } from './SecurityRiskCalculator';
 import { VulnerabilitySeverityPieChart } from './VulnerabilitySeverityPieChart';
 import { VulnerabilityTrendChart } from './VulnerabilityTrendChart';
 import { ScanTrendLineChart } from './ScanTrendLineChart';
@@ -141,8 +143,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const [pdfSuccess, setPdfSuccess] = useState(false);
   const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
 
-  // Sub-view mode within DashboardOverview: 'OVERVIEW' or 'HEATMAP'
-  const [dashboardView, setDashboardView] = useState<'OVERVIEW' | 'HEATMAP'>('OVERVIEW');
+  // Sub-view mode within DashboardOverview: 'OVERVIEW' | 'HEATMAP' | 'RISK_CALCULATOR'
+  const [dashboardView, setDashboardView] = useState<'OVERVIEW' | 'HEATMAP' | 'RISK_CALCULATOR'>('OVERVIEW');
 
   // Compute file concentration stats for the Vulnerability Heatmap view integration
   const filesConcentrationStats = useMemo(() => {
@@ -489,9 +491,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       )}
 
-      {/* Sub-View Selector: Executive Overview vs. Vulnerability Heatmap */}
+      {/* Sub-View Selector: Executive Overview vs. Risk Calculator vs. Vulnerability Heatmap */}
       <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-[#0A0A0A] border border-[#262626]">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             id="btn-dashboard-view-overview"
             type="button"
@@ -504,6 +506,25 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           >
             <Shield className="w-3.5 h-3.5" />
             <span>Visão Geral Executiva</span>
+          </button>
+
+          <button
+            id="btn-dashboard-view-calculator"
+            type="button"
+            onClick={() => setDashboardView('RISK_CALCULATOR')}
+            className={`px-4 py-2 text-xs font-mono font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+              dashboardView === 'RISK_CALCULATOR'
+                ? 'bg-[#FF3E00] text-white shadow-[0_0_15px_rgba(255,62,0,0.5)]'
+                : 'text-[#888] hover:text-[#FF3E00] hover:bg-[#161616]'
+            }`}
+          >
+            <Cpu className={`w-3.5 h-3.5 ${dashboardView === 'RISK_CALCULATOR' ? 'text-white' : 'text-[#FF3E00]'}`} />
+            <span>Security Risk Calculator</span>
+            <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono ${
+              dashboardView === 'RISK_CALCULATOR' ? 'bg-black text-[#FF3E00] font-black' : 'bg-[#FF3E00]/20 text-[#FF3E00] font-bold'
+            }`}>
+              Node/TS
+            </span>
           </button>
 
           <button
@@ -539,7 +560,40 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {dashboardView === 'HEATMAP' ? (
+      {dashboardView === 'RISK_CALCULATOR' ? (
+        /* ========================================================================= */
+        /* DEDICATED SECURITY RISK CALCULATOR VIEW                                   */
+        /* ========================================================================= */
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#080808] border border-[#222]">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setDashboardView('OVERVIEW')}
+                className="text-xs font-mono text-[#AAA] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer bg-[#141414] px-3 py-1.5 border border-[#333] hover:border-white"
+              >
+                <span>&larr; Voltar para Visão Geral Executiva</span>
+              </button>
+              <span className="text-xs font-mono text-[#666] hidden md:inline">|</span>
+              <span className="text-xs font-mono text-[#888] hidden md:inline">
+                Cálculo de Ameaça Contextual baseado em Stack Node/TS, Exposição e Achados
+              </span>
+            </div>
+            <div className="text-xs font-mono text-[#888] flex items-center gap-2">
+              <span className="text-[#00FF41] font-bold">Node.js / TypeScript</span>
+              <span>•</span>
+              <span>Análise Dinâmica</span>
+            </div>
+          </div>
+
+          <SecurityRiskCalculator
+            report={report}
+            findings={findings}
+            onNavigateToScanner={() => onNavigateToTab('scanner')}
+            onSelectFinding={onSelectFinding}
+          />
+        </div>
+      ) : dashboardView === 'HEATMAP' ? (
         /* ========================================================================= */
         /* DEDICATED VULNERABILITY HEATMAP VIEW                                      */
         /* ========================================================================= */
@@ -607,6 +661,23 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             >
               <Activity className="w-3 h-3 text-[#00FF41]" />
               <span>TENDÊNCIA (5 SCANS) &darr;</span>
+            </button>
+            <button
+              id="dashboard-header-calculator-btn"
+              type="button"
+              onClick={() => {
+                const el = document.getElementById('security-risk-calculator-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+                else {
+                  setDashboardView('RISK_CALCULATOR');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
+              className="text-[10px] font-mono text-white hover:text-[#00FF41] bg-[#141414] hover:bg-[#071F0C] px-2 py-0.5 border border-[#333] hover:border-[#00FF41]/60 uppercase font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+              title="Acessar a Calculadora de Risco Contextual (Node/TS & Exposição)"
+            >
+              <Cpu className="w-3 h-3 text-[#00FF41]" />
+              <span>RISK CALCULATOR (NODE/TS) &darr;</span>
             </button>
             <button
               id="dashboard-header-heatmap-btn"
@@ -785,6 +856,23 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           >
             <Sliders className="w-3.5 h-3.5 text-[#FF3E00]" />
             <span>Limite ({criticalThreshold})</span>
+          </button>
+          <button
+            id="btn-nav-calculator-hero"
+            type="button"
+            onClick={() => {
+              const el = document.getElementById('security-risk-calculator-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+              else {
+                setDashboardView('RISK_CALCULATOR');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }
+            }}
+            className="px-4 py-3.5 border border-[#00FF41]/60 hover:border-[#00FF41] bg-[#00FF41]/15 hover:bg-[#00FF41] text-white hover:text-black font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 group cursor-pointer shadow-[0_0_12px_rgba(0,255,65,0.2)]"
+            title="Abrir o Security Risk Calculator (Node/TS & Exposição Ambiental)"
+          >
+            <Cpu className="w-3.5 h-3.5 text-[#00FF41] group-hover:text-black group-hover:scale-110 transition-all" />
+            <span>Risk Calculator</span>
           </button>
           <button
             id="btn-nav-heatmap-hero"
@@ -1944,6 +2032,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         onSelectFinding={onSelectFinding}
         onNavigateToScanner={() => onNavigateToTab('scanner')}
         onNavigateToFile={onNavigateToFile}
+      />
+
+      {/* Contextual Security Risk Calculator (Node/TS Stack & Environment Exposure) */}
+      <SecurityRiskCalculator
+        report={report}
+        findings={findings}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+        onSelectFinding={onSelectFinding}
       />
 
       {/* Visual Execution Time Speedometer Gauge (Current Scan vs. Average Scan Time) */}
