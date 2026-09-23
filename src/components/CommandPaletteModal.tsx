@@ -482,6 +482,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         keywords: ['policy', 'opa', 'rego', 'compliance', 'guardrail', 'gate', 'pci', 'soc2', 'nist', 'cis', 'open policy agent', 'declarative']
       },
       {
+        id: 'nav-procyber',
+        title: 'Módulo: Pro Cyber Defense Suite (10 Ferramentas Pro)',
+        subtitle: 'SOAR Playbooks, BAS Purple Team, Sigma Transpiler, Malware Sandbox, KMS Vault, Supply Chain SLSA, EASM, Dark Web, CSPM e PKI',
+        category: 'Navegação',
+        icon: ShieldAlert,
+        badge: '10 PRO',
+        badgeColor: 'bg-[#00FF41]/15 text-[#00FF41] border-[#00FF41]/30',
+        action: () => {
+          onClose();
+          setActiveTab('procyber');
+        },
+        keywords: ['soar', 'playbook', 'bas', 'purple team', 'atomic red team', 'sigma', 'siem', 'splunk', 'elastic', 'sentinel', 'sandbox', 'malware', 'vault', 'kms', 'envelope', 'slsa', 'cosign', 'sigstore', 'supply chain', 'easm', 'osint', 'shodan', 'dark web', 'stealer', 'cspm', 'aws', 'pki', 'tls', 'ssl', 'cert']
+      },
+      {
         id: 'nav-pipelineflow',
         title: 'Módulo: Pipeline Flow Architect (DevSecOps Visualizer)',
         subtitle: 'Mapeie achados de scan locais para Pre-commit, Build e Deploy com drag-and-drop para workflows GitHub Actions',

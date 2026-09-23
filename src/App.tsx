@@ -67,6 +67,7 @@ import { SecurityRefactoringAssistantView } from './components/SecurityRefactori
 import { PipelineFlowArchitectView } from './components/PipelineFlowArchitectView';
 import { CyberThreatIntelHubView } from './components/CyberThreatIntelHubView';
 import { PolicyAsCodeView } from './components/PolicyAsCodeView';
+import { ProSecurityToolsView } from './components/ProSecurityToolsView';
 import { ComplianceAuditView } from './components/ComplianceAuditView';
 import { SecurityHeadersView } from './components/SecurityHeadersView';
 import { ContainerSecurityView } from './components/ContainerSecurityView';
@@ -2146,6 +2147,17 @@ export default function App() {
             onUpdatePolicies={handleUpdateOpaPolicies}
             onSelectFinding={handleSelectFinding}
             onNavigateToScanner={() => setActiveTab('scanner')}
+            onLogAudit={(event) => {
+              setAuditLogs(prev => [event, ...prev].slice(0, 80));
+            }}
+          />
+        )}
+
+        {activeTab === 'procyber' && (
+          <ProSecurityToolsView
+            report={report}
+            files={files}
+            onNavigateToTab={(tab) => setActiveTab(tab)}
             onLogAudit={(event) => {
               setAuditLogs(prev => [event, ...prev].slice(0, 80));
             }}

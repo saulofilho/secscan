@@ -1361,5 +1361,42 @@ jobs:
       systemDetection: `Regra deny acionada: 2 achados críticos detectados, score de conformidade 75% e Quality Gate em estado FAILED_BLOCKING.`,
       outputRemediation: `Pipeline CI/CD bloqueado até que os segredos sejam removidos e rotacionados conforme a política corporativa.`
     }
+  },
+  procyber: {
+    id: 'procyber',
+    name: 'Pro Cyber Defense Suite (10 Ferramentas Pro)',
+    category: 'Defesa & Runtime',
+    badge: '10 PRO TOOLS',
+    shortSummary: 'Cockpit enterprise integrando 10 capacidades avançadas de cibersegurança: SOAR Playbooks, BAS Purple Team, Sigma Rule Transpiler, Malware Sandbox, KMS Vault, SLSA Supply Chain, EASM OSINT, Dark Web Monitor, Multi-Cloud CSPM e PKI TLS Manager.',
+    howItWorks: `Uma suíte unificada que orquestra resposta a incidentes automatizada, simula violações em tempo real mapeadas no MITRE ATT&CK, transpila detecções universais Sigma para 6 formatos de SIEM, detona artefatos suspeitos em sandbox e gerencia a cadeia de confiança criptográfica (KMS, Cosign, PKI).`,
+    stepByStepGuide: [
+      {
+        step: 1,
+        action: 'Selecionar uma das 10 Ferramentas no Hub Superior',
+        description: 'Alterne rapidamente entre SOAR, BAS, Sigma, Sandbox, Vault, Supply Chain, EASM, Dark Web, CSPM ou PKI.'
+      },
+      {
+        step: 2,
+        action: 'Disparar Simulações ou Execuções Interativas',
+        description: 'Clique em "Disparar Playbook" no SOAR, "Disparar Simulação BAS" para testar o MITRE ATT&CK, ou detone payloads no Malware Sandbox.'
+      },
+      {
+        step: 3,
+        action: 'Exportar Regras e Atestados Oficiais',
+        description: 'Copie queries Splunk/Elastic/Sentinel do Sigma, atestados SLSA v1.0, comandos Cosign ou CSRs de certificados mTLS.'
+      },
+      {
+        step: 4,
+        action: 'Aplicar Remediações em Nuvem e Vault',
+        description: 'Utilize os comandos CLI do CSPM (AWS/Azure/GCP) ou emita segredos efêmeros com TTL no cofre KMS.'
+      }
+    ],
+    example: {
+      title: 'Exemplo: Contenção Automática de Credencial Leaked com SOAR & BAS',
+      scenario: 'Uma chave AWS vazada no código dispara playbook SOAR para revogação no IAM e validação de bloqueio no teste atômico BAS.',
+      inputSnippet: `playbook.execute("Contenção de Credencial de Nuvem Vazada", target="AWS_IAM")`,
+      systemDetection: `Gatilho validado: Credencial revogada em 42ms, ticket SEC-1049 criado no Jira e teste BAS T1552 validado como BLOCKED.`,
+      outputRemediation: `Risco neutralizado proativamente antes que o invasor pudesse utilizar o token.`
+    }
   }
 };
