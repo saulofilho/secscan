@@ -148,8 +148,8 @@ export function scanWorkspaceEntropy(
     });
   }
 
-  // 2. Simulated Git Commit History Digger: Detects "Ghost Secrets" in past git commits
-  const gitHistoryLeaks: GitCommitSecretLeak[] = [
+  // 2. Simulated Git Commit History Digger: Detects "Ghost Secrets" in past git commits (only if workspace has files)
+  const gitHistoryLeaks: GitCommitSecretLeak[] = files.length > 0 ? [
     {
       commitHash: '7c8a1e2',
       author: 'dev.junior@empresa.com.br',
@@ -186,7 +186,7 @@ export function scanWorkspaceEntropy(
       dangerLevel: 'HIGH',
       gitRemediationCommand: 'git filter-repo --replace-text replacements.txt'
     }
-  ];
+  ] : [];
 
   const averageFileEntropy = totalTokensScanned > 0 ? Number((totalEntropySum / totalTokensScanned).toFixed(2)) : 0;
 

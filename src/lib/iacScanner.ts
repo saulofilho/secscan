@@ -34,6 +34,23 @@ export interface IacReport {
 }
 
 export function scanInfrastructureAsCode(files: ScannedFile[]): IacReport {
+  if (!files || files.length === 0) {
+    return {
+      totalFilesScanned: 0,
+      passedChecks: 0,
+      failedChecks: 0,
+      iacPostureScore: 100,
+      findings: [],
+      summaryByTech: {
+        DOCKER: { count: 0, critical: 0, high: 0 },
+        KUBERNETES: { count: 0, critical: 0, high: 0 },
+        TERRAFORM: { count: 0, critical: 0, high: 0 },
+        COMPOSE: { count: 0, critical: 0, high: 0 },
+        CICD: { count: 0, critical: 0, high: 0 }
+      }
+    };
+  }
+
   const findings: IacFinding[] = [];
   let totalFilesScanned = 0;
 

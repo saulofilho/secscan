@@ -90,12 +90,18 @@ export const AutoRemediationView: React.FC<AutoRemediationViewProps> = ({
 
   // Initialize or update patches when findings/files change
   useEffect(() => {
+    if (!findings || findings.length === 0) {
+      setPatches({});
+      return;
+    }
+
     setPatches(prev => {
-      const next: Record<string, RemediationPatch> = { ...prev };
+      const next: Record<string, RemediationPatch> = {};
       findings.forEach(finding => {
         const patchId = `patch-${finding.id}`;
-        // If already exists and is not overwritten by new finding, keep it
-        if (!next[patchId]) {
+        if (prev[patchId]) {
+          next[patchId] = prev[patchId];
+        } else {
           const generated = generateRemediationPatchForFinding(finding, files);
           if (generated) {
             next[patchId] = generated;

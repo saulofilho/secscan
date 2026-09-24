@@ -69,7 +69,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
   const [activeSubTab, setActiveSubTab] = useState<'SCHEDULER' | 'FUZZER' | 'HEADERS'>('SCHEDULER');
   
   // Fuzzer State
-  const defaultEndpoint = endpoints.length > 0 ? endpoints[0].path : '/api/v1/payments/charge';
+  const defaultEndpoint = endpoints.length > 0 ? endpoints[0].path : '';
   const [targetEndpoint, setTargetEndpoint] = useState(defaultEndpoint);
   const [httpMethod, setHttpMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('POST');
   const [selectedCategory, setSelectedCategory] = useState<AttackCategory>('SQL_INJECTION');
@@ -130,19 +130,9 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
   const [historyFilter, setHistoryFilter] = useState<'ALL' | 'VULNERABLE' | 'WARNING'>('ALL');
   const [toastNotification, setToastNotification] = useState<{ message: string; type: 'success' | 'alert' | 'info' } | null>(null);
 
-  // Fallback realistic registered API endpoints if scanner found none
+  // Registered API endpoints from workspace scanner
   const registeredEndpointsList = useMemo(() => {
-    if (endpoints && endpoints.length > 0) return endpoints;
-    return [
-      { id: 'ep-1', path: '/api/v1/payments/charge', method: 'POST' as const, riskScore: 92, params: ['amount', 'currency', 'card_token', 'customer_id'], file: 'routes/payment.ts', line: 42, isInternalOrAdmin: false, snippet: 'router.post("/api/v1/payments/charge")' },
-      { id: 'ep-2', path: '/api/v1/auth/login', method: 'POST' as const, riskScore: 85, params: ['username', 'password', 'mfa_token'], file: 'routes/auth.ts', line: 18, isInternalOrAdmin: false, snippet: 'router.post("/api/v1/auth/login")' },
-      { id: 'ep-3', path: '/api/v1/users/profile', method: 'GET' as const, riskScore: 65, params: ['userId', 'role', 'email'], file: 'routes/user.ts', line: 89, isInternalOrAdmin: false, snippet: 'router.get("/api/v1/users/profile")' },
-      { id: 'ep-4', path: '/api/v1/files/export', method: 'GET' as const, riskScore: 88, params: ['filePath', 'format', 'download'], file: 'controllers/fileExport.ts', line: 30, isInternalOrAdmin: false, snippet: 'router.get("/api/v1/files/export")' },
-      { id: 'ep-5', path: '/api/v1/proxy/download', method: 'GET' as const, riskScore: 90, params: ['targetUrl', 'timeout'], file: 'services/proxy.ts', line: 12, isInternalOrAdmin: true, snippet: 'router.get("/api/v1/proxy/download")' },
-      { id: 'ep-6', path: '/api/v1/admin/debug', method: 'GET' as const, riskScore: 95, params: ['cmd', 'secretKey'], file: 'routes/admin.ts', line: 104, isInternalOrAdmin: true, snippet: 'router.get("/api/v1/admin/debug")' },
-      { id: 'ep-7', path: '/api/v1/search', method: 'GET' as const, riskScore: 70, params: ['q', 'filter', 'sortBy'], file: 'routes/search.ts', line: 22, isInternalOrAdmin: false, snippet: 'router.get("/api/v1/search")' },
-      { id: 'ep-8', path: '/api/v1/catalog/items', method: 'GET' as const, riskScore: 45, params: ['category', 'page', 'limit'], file: 'routes/catalog.ts', line: 15, isInternalOrAdmin: false, snippet: 'router.get("/api/v1/catalog/items")' },
-    ];
+    return endpoints || [];
   }, [endpoints]);
 
   // New Schedule Form State
@@ -150,8 +140,18 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
   const [newTargetEndpoints, setNewTargetEndpoints] = useState<string[]>(() => {
     return endpoints && endpoints.length > 0 
       ? endpoints.slice(0, 2).map(e => e.path) 
-      : ['/api/v1/payments/charge', '/api/v1/auth/login'];
+      : [];
   });
+
+  useEffect(() => {
+    if (endpoints && endpoints.length > 0) {
+      if (!targetEndpoint) setTargetEndpoint(endpoints[0].path);
+      setNewTargetEndpoints(endpoints.slice(0, 2).map(e => e.path));
+    } else {
+      setTargetEndpoint('');
+      setNewTargetEndpoints([]);
+    }
+  }, [endpoints]);
   const [endpointFilterSearch, setEndpointFilterSearch] = useState('');
   const [customEndpointInput, setCustomEndpointInput] = useState('');
   const [newHttpMethods, setNewHttpMethods] = useState<('GET' | 'POST' | 'PUT' | 'DELETE')[]>(['GET', 'POST']);
@@ -1133,13 +1133,18 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
 
                   {/* Discovered / Registered Endpoints list */}
                   <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
-                    {registeredEndpointsList
-                      .filter((ep: any) => {
-                        if (!endpointFilterSearch.trim()) return true;
-                        const q = endpointFilterSearch.toLowerCase();
-                        return ep.path.toLowerCase().includes(q) || (ep.method || '').toLowerCase().includes(q);
-                      })
-                      .map((ep: any) => {
+                    {registeredEndpointsList.length === 0 ? (
+                      <div className="p-4 text-center border border-dashed border-zinc-800 rounded-lg text-xs text-zinc-500">
+                        Nenhum endpoint descoberto nos arquivos do workspace. Digite um endpoint personalizado abaixo para testar ou carregue arquivos no workspace.
+                      </div>
+                    ) : (
+                      registeredEndpointsList
+                        .filter((ep: any) => {
+                          if (!endpointFilterSearch.trim()) return true;
+                          const q = endpointFilterSearch.toLowerCase();
+                          return ep.path.toLowerCase().includes(q) || (ep.method || '').toLowerCase().includes(q);
+                        })
+                        .map((ep: any) => {
                         const isSelected = newTargetEndpoints.includes(ep.path);
                         return (
                           <div
@@ -1197,7 +1202,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                             </div>
                           </div>
                         );
-                      })}
+                      }))}
                   </div>
 
                   {/* Add Custom Endpoint */}

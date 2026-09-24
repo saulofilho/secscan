@@ -73,6 +73,14 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
     return report.iastReport || runIastRuntimeEmulation(files, INITIAL_IAST_HOOKS);
   });
 
+  React.useEffect(() => {
+    if (report.iastReport) {
+      setIastReport(report.iastReport);
+    } else {
+      setIastReport(runIastRuntimeEmulation(files, hooks));
+    }
+  }, [report.iastReport, files]);
+
   const [selectedFindingId, setSelectedFindingId] = useState<string>(() => {
     return iastReport.findings[0]?.id || '';
   });
@@ -328,7 +336,16 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
             </div>
 
             <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
-              {filteredFindings.map(finding => {
+              {filteredFindings.length === 0 ? (
+                <div className="p-8 text-center bg-black/40 border border-dashed border-white/10 rounded-xl space-y-2">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
+                  <h3 className="text-sm font-bold text-white">Nenhuma vulnerabilidade em Runtime</h3>
+                  <p className="text-xs text-zinc-500">
+                    O workspace está limpo ou nenhum hook detectou propagação de taint insegura.
+                  </p>
+                </div>
+              ) : (
+                filteredFindings.map(finding => {
                 const isSelected = finding.id === selectedFinding?.id;
                 return (
                   <div
@@ -374,7 +391,7 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
                     </div>
                   </div>
                 );
-              })}
+              }))}
             </div>
           </div>
 

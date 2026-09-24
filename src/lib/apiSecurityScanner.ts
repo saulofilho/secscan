@@ -54,6 +54,18 @@ export const OWASP_API_DEFINITIONS: Record<string, { title: string; risk: string
 };
 
 export function auditApiSecurity(files: ScannedFile[]): ApiSecurityReport {
+  if (!files || files.length === 0) {
+    return {
+      timestamp: new Date().toISOString(),
+      totalEndpointsAudited: 0,
+      vulnerableEndpointsCount: 0,
+      apiRiskScore: 100,
+      findings: [],
+      summaryByCategory: {},
+      summaryBySeverity: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 }
+    };
+  }
+
   const findings: ApiSecurityFinding[] = [];
   let auditedEndpointsCount = 0;
 

@@ -223,7 +223,16 @@ export const EntropySecretsView: React.FC<EntropySecretsViewProps> = ({ files, o
           </div>
 
           <div className="space-y-3">
-            {report.gitHistoryLeaks.map((leak, idx) => (
+            {report.gitHistoryLeaks.length === 0 ? (
+              <div className="p-12 text-center bg-black/40 border border-dashed border-[#222] rounded-xl space-y-2">
+                <Check className="w-8 h-8 text-emerald-400 mx-auto" />
+                <h3 className="text-sm font-bold text-white">Nenhum segredo no histórico Git</h3>
+                <p className="text-xs text-zinc-500 max-w-md mx-auto">
+                  Nenhum commit com credenciais ou chaves residuais detectado. O repositório está limpo.
+                </p>
+              </div>
+            ) : (
+              report.gitHistoryLeaks.map((leak, idx) => (
               <div key={idx} className="p-4 bg-[#0A0A0A] border border-rose-900/40 rounded-xl space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
@@ -272,7 +281,7 @@ export const EntropySecretsView: React.FC<EntropySecretsViewProps> = ({ files, o
                   </code>
                 </div>
               </div>
-            ))}
+            )))}
           </div>
         </div>
       )}

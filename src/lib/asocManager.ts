@@ -23,28 +23,31 @@ export function buildAsocInventory(findings: ScanFinding[]): {
 } {
   const now = new Date();
 
-  // If no findings, generate realistic corporate baseline
-  const activeFindings = findings.length > 0 ? findings : [
-    {
-      id: 'mock-1',
-      ruleId: 'SEC-STRIPE-001',
-      ruleName: 'Hardcoded Stripe API Secret Key',
-      category: 'API_KEY',
-      severity: 'CRITICAL',
-      file: 'src/controllers/paymentController.js',
-      line: 32,
-      column: 1,
-      snippet: 'const STRIPE_SECRET_KEY = "sk_live_...";',
-      matchedSecret: 'sk_live_...',
-      maskedSecret: 'sk_live_***',
-      entropy: 4.8,
-      description: 'Chave privada Stripe exposta em código-fonte',
-      remediation: 'Mova para variável de ambiente',
-      timestamp: new Date(Date.now() - 36 * 3600 * 1000).toISOString()
-    } as ScanFinding
-  ];
+  if (!findings || findings.length === 0) {
+    return {
+      items: [],
+      metrics: {
+        totalVulnerabilities: 0,
+        openCount: 0,
+        resolvedCount: 0,
+        withinSlaCount: 0,
+        nearingBreachCount: 0,
+        breachedCount: 0,
+        exceptionsCount: 0,
+        mttrHours: 0,
+        slaCompliancePercentage: 100,
+        securityDebtScore: 0,
+        teamPerformance: ENGINEERING_TEAMS.map(team => ({
+          team,
+          open: 0,
+          breached: 0,
+          complianceRate: 100
+        }))
+      }
+    };
+  }
 
-  const items: ManagedVulnerabilityItem[] = activeFindings.map((finding, idx) => {
+  const items: ManagedVulnerabilityItem[] = findings.map((finding, idx) => {
     const policyHours = CORPORATE_SLA_POLICY[finding.severity] || 720;
     
     // Simulate staggered discovery timestamps

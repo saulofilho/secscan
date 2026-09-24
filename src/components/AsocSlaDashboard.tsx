@@ -39,6 +39,11 @@ export const AsocSlaDashboard: React.FC<AsocSlaDashboardProps> = ({
   }, [findings]);
 
   const [managedItems, setManagedItems] = useState<ManagedVulnerabilityItem[]>(initialItems);
+
+  React.useEffect(() => {
+    setManagedItems(initialItems);
+  }, [initialItems]);
+
   const [selectedTeam, setSelectedTeam] = useState<string>('ALL');
   const [selectedSlaStatus, setSelectedSlaStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -221,7 +226,16 @@ export const AsocSlaDashboard: React.FC<AsocSlaDashboardProps> = ({
 
       {/* Vulnerabilities Table / Cards */}
       <div className="space-y-3">
-        {filteredItems.map(item => {
+        {filteredItems.length === 0 ? (
+          <div className="p-12 rounded-xl bg-[#080E09] border border-dashed border-zinc-800 text-center space-y-2">
+            <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
+            <h3 className="text-sm font-bold text-white">Nenhuma pendência ou violação de SLA</h3>
+            <p className="text-xs text-zinc-500 max-w-md mx-auto">
+              Nenhuma vulnerabilidade ativa rastreada no momento. O workspace está limpo ou todos os itens filtrados foram remediados.
+            </p>
+          </div>
+        ) : (
+          filteredItems.map(item => {
           const isBreached = item.slaStatus === 'BREACHED';
           const isNearing = item.slaStatus === 'NEARING_BREACH';
           const isResolved = item.status === 'RESOLVED';
@@ -314,7 +328,7 @@ export const AsocSlaDashboard: React.FC<AsocSlaDashboardProps> = ({
               </div>
             </div>
           );
-        })}
+        }))}
       </div>
     </div>
   );

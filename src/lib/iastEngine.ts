@@ -463,6 +463,26 @@ export function runIastRuntimeEmulation(
   const sessionId = 'iast-session-' + Date.now();
   const timestamp = new Date().toLocaleTimeString();
 
+  // If no workspace files, return clean empty report
+  if (!files || files.length === 0) {
+    return {
+      sessionId,
+      timestamp,
+      status: 'IDLE',
+      totalEmulatedRequests: 0,
+      totalHooksTriggered: 0,
+      findings: [],
+      activeHooks,
+      coverageMetrics: {
+        endpointsInstrumented: 0,
+        sinksCovered: 0,
+        taintPropagationSuccessRate: 100,
+        falsePositiveReductionPercent: 100,
+        avgInspectionOverheadMs: 0
+      }
+    };
+  }
+
   // Filter findings based on active hooks
   const activeHookCategories = new Set(activeHooks.filter(h => h.active).map(h => h.category));
   

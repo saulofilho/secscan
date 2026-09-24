@@ -242,8 +242,8 @@ export function buildThreatModelFromWorkspace(
       chapterName: 'Configuração Segura de Infraestrutura',
       level: 'L1',
       description: 'Containers e servidores não devem executar como superusuário root.',
-      status: 'NEEDS_REVIEW',
-      findingCount: 2,
+      status: findings.length > 0 ? 'NEEDS_REVIEW' : 'COMPLIANT',
+      findingCount: findings.length > 0 ? 2 : 0,
       verificationGuidance: 'Aplicar CIS Benchmarks para Docker e Kubernetes.'
     }
   ];
