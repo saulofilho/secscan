@@ -25,7 +25,9 @@ import {
   AlertCircle,
   Settings,
   Zap,
-  CheckCircle2
+  CheckCircle2,
+  Activity,
+  RotateCcw
 } from 'lucide-react';
 import { ApiEndpointFinding } from '../types';
 import { 
@@ -43,6 +45,8 @@ import {
   INTERVAL_PRESETS,
   COMMON_CRON_TEMPLATES,
   DEFAULT_RECURRING_SCHEDULES,
+  MAX_RECENT_EXECUTION_LOGS,
+  DEFAULT_RECENT_EXECUTION_RECORDS,
   calculateNextRunTime,
   calculateNextRunFromCron,
   validateCronExpression,
@@ -59,9 +63,10 @@ interface DastFuzzerViewProps {
 
 const STORAGE_KEY_SCHEDULES = 'secscan_dast_schedules_v2';
 const STORAGE_KEY_RECORDS = 'secscan_dast_history_v2';
+const STORAGE_KEY_RECENT_LOGS = 'secscan_dast_recent_logs_v1';
 
 export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLogAudit }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'FUZZER' | 'SCHEDULER' | 'HEADERS'>('FUZZER');
+  const [activeSubTab, setActiveSubTab] = useState<'SCHEDULER' | 'FUZZER' | 'HEADERS'>('SCHEDULER');
   
   // Fuzzer State
   const defaultEndpoint = endpoints.length > 0 ? endpoints[0].path : '/api/v1/payments/charge';
@@ -98,21 +103,26 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
 
   const [executionRecords, setExecutionRecords] = useState<ScheduledScanExecutionRecord[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_RECORDS);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+      const savedRecent = localStorage.getItem(STORAGE_KEY_RECENT_LOGS);
+      if (savedRecent) {
+        const parsed = JSON.parse(savedRecent);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(0, MAX_RECENT_EXECUTION_LOGS);
+      }
+      const savedLegacy = localStorage.getItem(STORAGE_KEY_RECORDS);
+      if (savedLegacy) {
+        const parsed = JSON.parse(savedLegacy);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(0, MAX_RECENT_EXECUTION_LOGS);
       }
     } catch (e) {
       console.warn('Failed to load saved execution records', e);
     }
-    return [];
+    return DEFAULT_RECENT_EXECUTION_RECORDS.slice(0, MAX_RECENT_EXECUTION_LOGS);
   });
 
   const [isSchedulerDaemonActive, setIsSchedulerDaemonActive] = useState(true);
   const [executingScheduleId, setExecutingScheduleId] = useState<string | null>(null);
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(true);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importJsonText, setImportJsonText] = useState('');
@@ -136,8 +146,12 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
   }, [endpoints]);
 
   // New Schedule Form State
-  const [newScheduleName, setNewScheduleName] = useState('');
-  const [newTargetEndpoints, setNewTargetEndpoints] = useState<string[]>([]);
+  const [newScheduleName, setNewScheduleName] = useState('Rotina Recorrente de Fuzzing OWASP');
+  const [newTargetEndpoints, setNewTargetEndpoints] = useState<string[]>(() => {
+    return endpoints && endpoints.length > 0 
+      ? endpoints.slice(0, 2).map(e => e.path) 
+      : ['/api/v1/payments/charge', '/api/v1/auth/login'];
+  });
   const [endpointFilterSearch, setEndpointFilterSearch] = useState('');
   const [customEndpointInput, setCustomEndpointInput] = useState('');
   const [newHttpMethods, setNewHttpMethods] = useState<('GET' | 'POST' | 'PUT' | 'DELETE')[]>(['GET', 'POST']);
@@ -178,7 +192,9 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(executionRecords.slice(0, 50)));
+      const recordsToStore = executionRecords.slice(0, MAX_RECENT_EXECUTION_LOGS);
+      localStorage.setItem(STORAGE_KEY_RECENT_LOGS, JSON.stringify(recordsToStore));
+      localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(recordsToStore));
     } catch (e) {
       // ignore storage errors
     }
@@ -212,7 +228,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
     setTimeout(() => {
       const { record, updatedSchedule } = executeScheduledScanJob(targetSchedule, BUILTIN_FUZZING_PAYLOADS);
       
-      setExecutionRecords(prev => [record, ...prev].slice(0, 50));
+      setExecutionRecords(prev => [record, ...prev].slice(0, MAX_RECENT_EXECUTION_LOGS));
       setSchedules(prev => prev.map(s => s.id === scheduleId ? updatedSchedule : s));
       setExecutingScheduleId(null);
 
@@ -406,15 +422,13 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
 
   // Restore default schedules
   const handleRestoreDefaultSchedules = () => {
-    if (window.confirm('Deseja restaurar as rotinas padrão de agendamento DAST? Suas rotinas atuais serão substituídas.')) {
-      setSchedules(DEFAULT_RECURRING_SCHEDULES);
-      try {
-        localStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(DEFAULT_RECURRING_SCHEDULES));
-      } catch (e) {
-        // ignore
-      }
-      showToast('Agendamentos padrão restaurados com sucesso.', 'info');
+    setSchedules(DEFAULT_RECURRING_SCHEDULES);
+    try {
+      localStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(DEFAULT_RECURRING_SCHEDULES));
+    } catch (e) {
+      // ignore
     }
+    showToast('Agendamentos padrão restaurados com sucesso.', 'info');
   };
 
   // Import schedules from JSON text
@@ -448,16 +462,32 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
   };
 
   const handleExportCsv = () => {
-    const csv = exportScanHistoryToCsv(executionRecords);
+    const csv = exportScanHistoryToCsv(executionRecords.slice(0, MAX_RECENT_EXECUTION_LOGS));
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `dast-scheduled-scans-${Date.now()}.csv`);
+    link.setAttribute('download', `dast-recent-executions-${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('Histórico exportado em CSV.', 'success');
+    showToast('Histórico recente exportado em CSV.', 'success');
+  };
+
+  const handleClearExecutionLog = () => {
+    setExecutionRecords([]);
+    try {
+      localStorage.removeItem(STORAGE_KEY_RECENT_LOGS);
+      localStorage.removeItem(STORAGE_KEY_RECORDS);
+    } catch (e) {
+      // ignore
+    }
+    showToast('Recent Execution Log limpo com sucesso.', 'info');
+  };
+
+  const handleRestoreDefaultExecutionLogs = () => {
+    setExecutionRecords(DEFAULT_RECENT_EXECUTION_RECORDS.slice(0, MAX_RECENT_EXECUTION_LOGS));
+    showToast('Últimos 10 resultados padrão de varredura restaurados.', 'success');
   };
 
   // Computed summary metrics
@@ -514,16 +544,34 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  // Filtered records
-  const filteredExecutionRecords = useMemo(() => {
+  // Filtered recent execution records (persisted max 10 scan results)
+  const recentRecords = useMemo(() => {
+    return executionRecords.slice(0, MAX_RECENT_EXECUTION_LOGS);
+  }, [executionRecords]);
+
+  const filteredRecentRecords = useMemo(() => {
     if (historyFilter === 'VULNERABLE') {
-      return executionRecords.filter(r => r.vulnerabilitiesFound > 0);
+      return recentRecords.filter(r => r.vulnerabilitiesFound > 0);
     }
     if (historyFilter === 'WARNING') {
-      return executionRecords.filter(r => r.blockedByWafCount > 0 || r.vulnerabilitiesFound > 0);
+      return recentRecords.filter(r => r.blockedByWafCount > 0 || r.vulnerabilitiesFound > 0);
     }
-    return executionRecords;
-  }, [executionRecords, historyFilter]);
+    return recentRecords;
+  }, [recentRecords, historyFilter]);
+
+  const recentVulnCount = useMemo(() => {
+    return recentRecords.filter(r => r.vulnerabilitiesFound > 0).length;
+  }, [recentRecords]);
+
+  const recentWafCount = useMemo(() => {
+    return recentRecords.filter(r => r.blockedByWafCount > 0 && r.vulnerabilitiesFound === 0).length;
+  }, [recentRecords]);
+
+  const recentSafeCount = useMemo(() => {
+    return recentRecords.filter(r => r.vulnerabilitiesFound === 0 && r.blockedByWafCount === 0).length;
+  }, [recentRecords]);
+
+  const filteredExecutionRecords = filteredRecentRecords;
 
   return (
     <div id="dast-fuzzer-view" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -1489,8 +1537,234 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
             </div>
           )}
 
+          {/* ========================================================================= */}
+          {/* RECENT EXECUTION LOG (PERSISTED LAST 10 SCAN RESULTS FROM SCHEDULER)     */}
+          {/* ========================================================================= */}
+          <div id="recent-execution-log" className="space-y-4 pt-4 border-t border-[#222]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Terminal className="w-4 h-4 text-cyan-400" />
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                    Recent Execution Log
+                  </h3>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950/60 border border-cyan-700/60 text-cyan-300 font-mono">
+                    Últimas {filteredRecentRecords.length} de {recentRecords.length} (Max 10)
+                  </span>
+                  <span className="hidden md:inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    Persistido no LocalStorage
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-400">
+                  Histórico contínuo das últimas 10 execuções do agendador automático e manual de fuzzing DAST.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Filter Selector */}
+                <div className="flex items-center bg-black border border-[#333] rounded-lg p-0.5 text-xs">
+                  <button
+                    onClick={() => setHistoryFilter('ALL')}
+                    className={`px-2.5 py-1 rounded cursor-pointer transition-colors ${historyFilter === 'ALL' ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    Todos ({recentRecords.length})
+                  </button>
+                  <button
+                    onClick={() => setHistoryFilter('VULNERABLE')}
+                    className={`px-2.5 py-1 rounded cursor-pointer transition-colors ${historyFilter === 'VULNERABLE' ? 'bg-rose-950 text-rose-300 font-bold' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    Vulns ({recentVulnCount})
+                  </button>
+                  <button
+                    onClick={() => setHistoryFilter('WARNING')}
+                    className={`px-2.5 py-1 rounded cursor-pointer transition-colors ${historyFilter === 'WARNING' ? 'bg-amber-950 text-amber-300 font-bold' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    WAF / Alertas ({recentWafCount})
+                  </button>
+                </div>
+
+                <button
+                  onClick={handleExportCsv}
+                  disabled={recentRecords.length === 0}
+                  className="px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-[#333] text-zinc-300 hover:text-white rounded text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors"
+                  title="Exportar últimos 10 resultados para CSV"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>CSV</span>
+                </button>
+
+                <button
+                  onClick={handleClearExecutionLog}
+                  disabled={recentRecords.length === 0}
+                  className="px-2.5 py-1.5 bg-zinc-900 hover:bg-rose-950/80 border border-[#333] hover:border-rose-900/60 text-zinc-400 hover:text-rose-300 rounded text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors"
+                  title="Limpar registros salvos no Local Storage"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Limpar</span>
+                </button>
+
+                <button
+                  onClick={handleRestoreDefaultExecutionLogs}
+                  className="px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-[#333] text-zinc-400 hover:text-cyan-300 rounded text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="Restaurar as 10 amostras padrão de execução"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Amostras</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Summary Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+              <div className="p-2 rounded bg-black/60 border border-zinc-800/80 flex items-center justify-between">
+                <span className="text-zinc-500 text-[10px]">Capacidade:</span>
+                <span className="font-bold text-zinc-200">{recentRecords.length} / 10 scans</span>
+              </div>
+              <div className="p-2 rounded bg-black/60 border border-zinc-800/80 flex items-center justify-between">
+                <span className="text-zinc-500 text-[10px]">Vulneráveis:</span>
+                <span className={`font-bold ${recentVulnCount > 0 ? 'text-rose-400' : 'text-zinc-400'}`}>
+                  {recentVulnCount}
+                </span>
+              </div>
+              <div className="p-2 rounded bg-black/60 border border-zinc-800/80 flex items-center justify-between">
+                <span className="text-zinc-500 text-[10px]">WAF Blocks:</span>
+                <span className={`font-bold ${recentWafCount > 0 ? 'text-amber-400' : 'text-zinc-400'}`}>
+                  {recentWafCount}
+                </span>
+              </div>
+              <div className="p-2 rounded bg-black/60 border border-zinc-800/80 flex items-center justify-between">
+                <span className="text-zinc-500 text-[10px]">100% Seguros:</span>
+                <span className="font-bold text-emerald-400">{recentSafeCount}</span>
+              </div>
+            </div>
+
+            {/* Recent Execution Records List */}
+            {filteredRecentRecords.length === 0 ? (
+              <div className="p-8 text-center bg-[#0C0C0C] border border-[#222] rounded-xl text-xs text-zinc-500 space-y-3">
+                <p>Nenhuma execução recente encontrada para o filtro atual.</p>
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    onClick={handleRestoreDefaultExecutionLogs}
+                    className="px-3 py-1.5 rounded bg-cyan-950/60 border border-cyan-700/60 text-cyan-300 font-bold hover:bg-cyan-900/60 cursor-pointer text-xs"
+                  >
+                    Restaurar 10 Amostras Padrão
+                  </button>
+                  {schedules.length > 0 && (
+                    <button
+                      onClick={() => triggerScheduleExecution(schedules[0].id, false)}
+                      className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold cursor-pointer text-xs flex items-center gap-1.5"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      <span>Executar "{schedules[0].name}" Agora</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredRecentRecords.map((record, idx) => {
+                  const hasVuln = record.vulnerabilitiesFound > 0;
+                  const isExpanded = expandedRecordId === record.id;
+
+                  return (
+                    <div
+                      key={record.id}
+                      className={`rounded-xl border transition-all ${
+                        hasVuln
+                          ? 'bg-[#0F0708] border-rose-900/60 hover:border-rose-700'
+                          : record.blockedByWafCount > 0
+                          ? 'bg-[#0F0C07] border-amber-900/50 hover:border-amber-700'
+                          : 'bg-[#080E0A] border-emerald-950/60 hover:border-emerald-800'
+                      }`}
+                    >
+                      <div
+                        onClick={() => setExpandedRecordId(isExpanded ? null : record.id)}
+                        className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02]"
+                      >
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">
+                              #{idx + 1} {idx === 0 ? '(Mais Recente)' : ''}
+                            </span>
+                            <span className={`px-2 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider ${
+                              hasVuln
+                                ? 'bg-rose-600 text-white animate-pulse'
+                                : record.blockedByWafCount > 0
+                                ? 'bg-amber-600 text-white'
+                                : 'bg-emerald-600 text-white'
+                            }`}>
+                              {hasVuln ? `${record.vulnerabilitiesFound} VULN(S)` : record.blockedByWafCount > 0 ? 'WAF BLOCKED' : '100% SEGURO'}
+                            </span>
+                            <span className="text-xs font-bold text-white">{record.scheduleName}</span>
+                            <span className="text-[10px] text-zinc-500 font-mono">({record.durationMs}ms)</span>
+                          </div>
+
+                          <div className="text-[11px] text-zinc-400">
+                            Endpoints testados: <span className="text-zinc-200">{record.endpointsTestedCount}</span> &bull; Payloads enviados: <span className="text-zinc-200">{record.payloadsSentCount}</span> &bull; Seguro: <span className="text-emerald-400">{record.safeCount}</span> &bull; WAF: <span className="text-amber-400">{record.blockedByWafCount}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] text-zinc-500 font-mono flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-zinc-600" />
+                            {record.timestamp}
+                          </span>
+                          {isExpanded ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
+                        </div>
+                      </div>
+
+                      {/* Expanded Drilldown Results */}
+                      {isExpanded && (
+                        <div className="p-4 border-t border-white/5 space-y-3 bg-black/60">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-zinc-400 uppercase font-bold block">
+                              Detalhamento dos Testes Dinâmicos Executados:
+                            </span>
+                            <code className="text-[9.5px] text-zinc-500 font-mono">ID: {record.id}</code>
+                          </div>
+
+                          <div className="space-y-2">
+                            {record.results.map((res, resIdx) => (
+                              <div
+                                key={resIdx}
+                                className="p-2.5 rounded bg-black/80 border border-[#222] text-xs space-y-1"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                                      res.verdict === 'VULNERABLE' ? 'bg-rose-600 text-white' :
+                                      res.verdict === 'BLOCKED_BY_WAF' ? 'bg-amber-600 text-white' :
+                                      'bg-emerald-600 text-white'
+                                    }`}>
+                                      {res.verdict}
+                                    </span>
+                                    <span className="text-zinc-200 font-bold">{res.method} {res.endpoint}</span>
+                                    <span className="text-[10px] text-zinc-500">HTTP {res.simulatedStatus}</span>
+                                  </div>
+                                  <span className="text-[10px] text-zinc-500">{res.simulatedResponseTimeMs}ms</span>
+                                </div>
+                                <div className="text-[11px] text-zinc-400 font-mono">
+                                  <span className="text-zinc-500">Payload: </span>
+                                  <code className="text-emerald-300">{res.payload.payload}</code>
+                                </div>
+                                <div className="text-[10.5px] text-zinc-500 italic">
+                                  &rarr; {res.analysis}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* List of Recurring Schedules */}
-          <div className="space-y-3">
+          <div id="active-schedules-list" className="space-y-3 pt-6 border-t border-[#222]">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-emerald-400" />
@@ -1620,146 +1894,6 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
                 );
               })}
             </div>
-          </div>
-
-          {/* Execution History Stream */}
-          <div className="space-y-4 pt-4 border-t border-[#222]">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Terminal className="w-4 h-4 text-cyan-400" />
-                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
-                  Trilha de Execução do Agendador ({filteredExecutionRecords.length})
-                </h3>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {/* Filter Selector */}
-                <div className="flex items-center bg-black border border-[#333] rounded-lg p-0.5 text-xs">
-                  <button
-                    onClick={() => setHistoryFilter('ALL')}
-                    className={`px-2 py-0.5 rounded cursor-pointer ${historyFilter === 'ALL' ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-500'}`}
-                  >
-                    Todos
-                  </button>
-                  <button
-                    onClick={() => setHistoryFilter('VULNERABLE')}
-                    className={`px-2 py-0.5 rounded cursor-pointer ${historyFilter === 'VULNERABLE' ? 'bg-rose-950 text-rose-300 font-bold' : 'text-zinc-500'}`}
-                  >
-                    Apenas Vulns
-                  </button>
-                  <button
-                    onClick={() => setHistoryFilter('WARNING')}
-                    className={`px-2 py-0.5 rounded cursor-pointer ${historyFilter === 'WARNING' ? 'bg-amber-950 text-amber-300 font-bold' : 'text-zinc-500'}`}
-                  >
-                    WAF / Alertas
-                  </button>
-                </div>
-
-                <button
-                  onClick={handleExportCsv}
-                  disabled={executionRecords.length === 0}
-                  className="px-3 py-1 bg-zinc-900 hover:bg-zinc-800 border border-[#333] text-zinc-300 hover:text-white rounded text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>CSV</span>
-                </button>
-              </div>
-            </div>
-
-            {filteredExecutionRecords.length === 0 ? (
-              <div className="p-8 text-center bg-[#0C0C0C] border border-[#222] rounded-xl text-xs text-zinc-500">
-                Nenhuma execução registrada no histórico até o momento. As varreduras agendadas serão registradas aqui em tempo real.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredExecutionRecords.map(record => {
-                  const hasVuln = record.vulnerabilitiesFound > 0;
-                  const isExpanded = expandedRecordId === record.id;
-
-                  return (
-                    <div
-                      key={record.id}
-                      className={`rounded-xl border transition-all ${
-                        hasVuln
-                          ? 'bg-[#0F0708] border-rose-900/60'
-                          : record.blockedByWafCount > 0
-                          ? 'bg-[#0F0C07] border-amber-900/50'
-                          : 'bg-[#080E0A] border-emerald-950/60'
-                      }`}
-                    >
-                      <div
-                        onClick={() => setExpandedRecordId(isExpanded ? null : record.id)}
-                        className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02]"
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`px-2 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider ${
-                              hasVuln
-                                ? 'bg-rose-600 text-white animate-pulse'
-                                : record.blockedByWafCount > 0
-                                ? 'bg-amber-600 text-white'
-                                : 'bg-emerald-600 text-white'
-                            }`}>
-                              {hasVuln ? `${record.vulnerabilitiesFound} VULN(S)` : record.blockedByWafCount > 0 ? 'WAF BLOCKED' : '100% SEGURO'}
-                            </span>
-                            <span className="text-xs font-bold text-white">{record.scheduleName}</span>
-                            <span className="text-[10px] text-zinc-500">({record.durationMs}ms)</span>
-                          </div>
-
-                          <div className="text-[11px] text-zinc-400">
-                            Endpoints testados: <span className="text-zinc-200">{record.endpointsTestedCount}</span> &bull; Payloads enviados: <span className="text-zinc-200">{record.payloadsSentCount}</span> &bull; Seguro: <span className="text-emerald-400">{record.safeCount}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <span className="text-[10px] text-zinc-500">{record.timestamp}</span>
-                          {isExpanded ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
-                        </div>
-                      </div>
-
-                      {/* Expanded Drilldown Results */}
-                      {isExpanded && (
-                        <div className="p-4 border-t border-white/5 space-y-3 bg-black/60">
-                          <span className="text-[10px] text-zinc-400 uppercase font-bold block">
-                            Detalhamento dos Testes Dinâmicos Executados:
-                          </span>
-                          <div className="space-y-2">
-                            {record.results.map((res, idx) => (
-                              <div
-                                key={idx}
-                                className="p-2.5 rounded bg-black/80 border border-[#222] text-xs space-y-1"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
-                                      res.verdict === 'VULNERABLE' ? 'bg-rose-600 text-white' :
-                                      res.verdict === 'BLOCKED_BY_WAF' ? 'bg-amber-600 text-white' :
-                                      'bg-emerald-600 text-white'
-                                    }`}>
-                                      {res.verdict}
-                                    </span>
-                                    <span className="text-zinc-200 font-bold">{res.method} {res.endpoint}</span>
-                                    <span className="text-[10px] text-zinc-500">HTTP {res.simulatedStatus}</span>
-                                  </div>
-                                  <span className="text-[10px] text-zinc-500">{res.simulatedResponseTimeMs}ms</span>
-                                </div>
-                                <div className="text-[11px] text-zinc-400">
-                                  <span className="text-zinc-500">Payload: </span>
-                                  <code className="text-emerald-300">{res.payload.payload}</code>
-                                </div>
-                                <div className="text-[10.5px] text-zinc-500 italic">
-                                  &rarr; {res.analysis}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         </div>
       )}

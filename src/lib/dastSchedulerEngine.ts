@@ -414,3 +414,318 @@ export function exportScanHistoryToCsv(records: ScheduledScanExecutionRecord[]):
 
   return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
 }
+
+export const MAX_RECENT_EXECUTION_LOGS = 10;
+
+/**
+ * 10 realistic baseline scan execution records persisted for the Recent Execution Log
+ */
+export const DEFAULT_RECENT_EXECUTION_RECORDS: ScheduledScanExecutionRecord[] = [
+  {
+    id: 'exec-sched-010',
+    scheduleId: 'sched-payments-auth-15m',
+    scheduleName: 'Auditoria Contínua Checkout & Autenticação',
+    timestamp: '10:35:12',
+    durationMs: 342,
+    endpointsTestedCount: 3,
+    payloadsSentCount: 6,
+    vulnerabilitiesFound: 1,
+    blockedByWafCount: 2,
+    safeCount: 3,
+    status: 'ALERT_TRIGGERED',
+    results: [
+      {
+        id: 'res-10-1',
+        timestamp: '10:35:12',
+        endpoint: '/api/v1/payments/charge',
+        method: 'POST',
+        payload: BUILTIN_FUZZING_PAYLOADS[0],
+        verdict: 'VULNERABLE',
+        simulatedResponseTimeMs: 145,
+        simulatedStatus: 500,
+        responseSnippet: '{"error": "syntax error at or near \'\'\': SELECT * FROM payments WHERE..."}',
+        analysis: 'Possível SQLi: String literal unescaped gerou erro sintático no driver PostgreSQL.'
+      },
+      {
+        id: 'res-10-2',
+        timestamp: '10:35:12',
+        endpoint: '/api/v1/auth/login',
+        method: 'POST',
+        payload: BUILTIN_FUZZING_PAYLOADS[1],
+        verdict: 'BLOCKED_BY_WAF',
+        simulatedResponseTimeMs: 42,
+        simulatedStatus: 403,
+        responseSnippet: '{"statusCode": 403, "error": "Forbidden", "message": "WAF Rule 942100 Triggered"}',
+        analysis: 'Bloqueado por regra WAF OWASP CRS 942100 (SQLi Protection).'
+      },
+      {
+        id: 'res-10-3',
+        timestamp: '10:35:12',
+        endpoint: '/api/v1/users/profile',
+        method: 'GET',
+        payload: BUILTIN_FUZZING_PAYLOADS[2],
+        verdict: 'SAFE',
+        simulatedResponseTimeMs: 88,
+        simulatedStatus: 400,
+        responseSnippet: '{"error": "Validation failed: userId must be a valid UUID"}',
+        analysis: 'Parâmetro sanitizado corretamente pelo validador Zod; sem injeção.'
+      }
+    ]
+  },
+  {
+    id: 'exec-sched-009',
+    scheduleId: 'sched-deep-owasp-daily',
+    scheduleName: 'Varredura Noturna OWASP Top 10 API & Traversal',
+    timestamp: '10:20:05',
+    durationMs: 418,
+    endpointsTestedCount: 3,
+    payloadsSentCount: 8,
+    vulnerabilitiesFound: 1,
+    blockedByWafCount: 3,
+    safeCount: 4,
+    status: 'ALERT_TRIGGERED',
+    results: [
+      {
+        id: 'res-9-1',
+        timestamp: '10:20:05',
+        endpoint: '/api/v1/files/export',
+        method: 'GET',
+        payload: BUILTIN_FUZZING_PAYLOADS[3],
+        verdict: 'VULNERABLE',
+        simulatedResponseTimeMs: 190,
+        simulatedStatus: 200,
+        responseSnippet: 'root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin',
+        analysis: 'Path Traversal confirmado: Retorno detectado com cabeçalho "root:x:0:0" de /etc/passwd.'
+      },
+      {
+        id: 'res-9-2',
+        timestamp: '10:20:05',
+        endpoint: '/api/v1/proxy/download',
+        method: 'GET',
+        payload: BUILTIN_FUZZING_PAYLOADS[4],
+        verdict: 'BLOCKED_BY_WAF',
+        simulatedResponseTimeMs: 65,
+        simulatedStatus: 403,
+        responseSnippet: '{"error": "Connection refused to metadata IP 169.254.169.254"}',
+        analysis: 'SSRF mitigado: IP de loopback 169.254.169.254 bloqueado por egress firewall.'
+      }
+    ]
+  },
+  {
+    id: 'exec-sched-008',
+    scheduleId: 'sched-payments-auth-15m',
+    scheduleName: 'Auditoria Contínua Checkout & Autenticação',
+    timestamp: '10:05:40',
+    durationMs: 290,
+    endpointsTestedCount: 3,
+    payloadsSentCount: 6,
+    vulnerabilitiesFound: 0,
+    blockedByWafCount: 4,
+    safeCount: 2,
+    status: 'WARNING',
+    results: [
+      {
+        id: 'res-8-1',
+        timestamp: '10:05:40',
+        endpoint: '/api/v1/auth/login',
+        method: 'POST',
+        payload: BUILTIN_FUZZING_PAYLOADS[0],
+        verdict: 'BLOCKED_BY_WAF',
+        simulatedResponseTimeMs: 38,
+        simulatedStatus: 403,
+        responseSnippet: '<html><title>403 Forbidden - Cloudflare Security</title></html>',
+        analysis: 'Tentativa de Bypass de Autenticação interceptada pelo Cloudflare WAF.'
+      }
+    ]
+  },
+  {
+    id: 'exec-sched-007',
+    scheduleId: 'sched-search-sqli-1h',
+    scheduleName: 'Prober Recorrente SQLi em Parâmetros de Busca',
+    timestamp: '09:50:18',
+    durationMs: 215,
+    endpointsTestedCount: 2,
+    payloadsSentCount: 4,
+    vulnerabilitiesFound: 0,
+    blockedByWafCount: 1,
+    safeCount: 3,
+    status: 'SUCCESS',
+    results: [
+      {
+        id: 'res-7-1',
+        timestamp: '09:50:18',
+        endpoint: '/api/v1/search',
+        method: 'GET',
+        payload: BUILTIN_FUZZING_PAYLOADS[1],
+        verdict: 'SAFE',
+        simulatedResponseTimeMs: 62,
+        simulatedStatus: 200,
+        responseSnippet: '{"query": "\' OR 1=1", "results": []}',
+        analysis: 'Consulta parametrizada com ORM Prisma; caracteres especiais escapados.'
+      }
+    ]
+  },
+  {
+    id: 'exec-sched-006',
+    scheduleId: 'sched-payments-auth-15m',
+    scheduleName: 'Auditoria Contínua Checkout & Autenticação',
+    timestamp: '09:35:02',
+    durationMs: 310,
+    endpointsTestedCount: 3,
+    payloadsSentCount: 6,
+    vulnerabilitiesFound: 0,
+    blockedByWafCount: 2,
+    safeCount: 4,
+    status: 'SUCCESS',
+    results: [
+      {
+        id: 'res-6-1',
+        timestamp: '09:35:02',
+        endpoint: '/api/v1/payments/charge',
+        method: 'POST',
+        payload: BUILTIN_FUZZING_PAYLOADS[0],
+        verdict: 'SAFE',
+        simulatedResponseTimeMs: 112,
+        simulatedStatus: 422,
+        responseSnippet: '{"status": "error", "code": 422, "message": "Invalid payment payload"}',
+        analysis: 'Payload rejeitado com Unprocessable Entity na camada de validação schema.'
+      }
+    ]
+  },
+  {
+    id: 'exec-sched-005',
+    scheduleId: 'sched-payments-auth-15m',
+    scheduleName: 'Auditoria Contínua Checkout & Autenticação',
+    timestamp: '09:20:15',
+    durationMs: 275,
+    endpointsTestedCount: 3,
+    payloadsSentCount: 6,
+    vulnerabilitiesFound: 1,
+    blockedByWafCount: 1,
+    safeCount: 4,
+    status: 'ALERT_TRIGGERED',
+    results: [
+      {
+        id: 'res-5-1',
+        timestamp: '09:20:15',
+        endpoint: '/api/v1/users/profile',
+        method: 'GET',
+        payload: BUILTIN_FUZZING_PAYLOADS[2],
+        verdict: 'VULNERABLE',
+        simulatedResponseTimeMs: 95,
+        simulatedStatus: 200,
+        responseSnippet: '<div class="user-greeting">Welcome <script>alert(1)</script></div>',
+        analysis: 'Reflected XSS: Entrada `<script>alert(1)</script>` refletida sem html-entity encoding no cabeçalho.'
+      }
+    ]
+  },
+  {
+    id: 'exec-sched-004',
+    scheduleId: 'sched-deep-owasp-daily',
+    scheduleName: 'Varredura Noturna OWASP Top 10 API & Traversal',
+    timestamp: '09:00:11',
+    durationMs: 460,
+    endpointsTestedCount: 3,
+    payloadsSentCount: 9,
+    vulnerabilitiesFound: 0,
+    blockedByWafCount: 5,
+    safeCount: 4,
+    status: 'WARNING',
+    results: [
+      {
+        id: 'res-4-1',
+        timestamp: '09:00:11',
+        endpoint: '/api/v1/admin/debug',
+        method: 'GET',
+        payload: BUILTIN_FUZZING_PAYLOADS[5],
+        verdict: 'BLOCKED_BY_WAF',
+        simulatedResponseTimeMs: 50,
+        simulatedStatus: 401,
+        responseSnippet: '{"error": "Unauthorized: Admin mTLS client certificate required"}',
+        analysis: 'Acesso recusado: Endpoint restrito requer mTLS e Bearer Admin JWT.'
+      }
+    ]
+  },
+  {
+    id: 'exec-sched-003',
+    scheduleId: 'sched-payments-auth-15m',
+    scheduleName: 'Auditoria Contínua Checkout & Autenticação',
+    timestamp: '08:45:30',
+    durationMs: 295,
+    endpointsTestedCount: 3,
+    payloadsSentCount: 6,
+    vulnerabilitiesFound: 0,
+    blockedByWafCount: 3,
+    safeCount: 3,
+    status: 'SUCCESS',
+    results: [
+      {
+        id: 'res-3-1',
+        timestamp: '08:45:30',
+        endpoint: '/api/v1/auth/login',
+        method: 'POST',
+        payload: BUILTIN_FUZZING_PAYLOADS[1],
+        verdict: 'SAFE',
+        simulatedResponseTimeMs: 78,
+        simulatedStatus: 401,
+        responseSnippet: '{"error": "Invalid username or password"}',
+        analysis: 'Falha de credencial retornada de forma segura com tempo de resposta constante.'
+      }
+    ]
+  },
+  {
+    id: 'exec-sched-002',
+    scheduleId: 'sched-search-sqli-1h',
+    scheduleName: 'Prober Recorrente SQLi em Parâmetros de Busca',
+    timestamp: '08:30:44',
+    durationMs: 230,
+    endpointsTestedCount: 2,
+    payloadsSentCount: 4,
+    vulnerabilitiesFound: 0,
+    blockedByWafCount: 0,
+    safeCount: 4,
+    status: 'SUCCESS',
+    results: [
+      {
+        id: 'res-2-1',
+        timestamp: '08:30:44',
+        endpoint: '/api/v1/catalog/items',
+        method: 'GET',
+        payload: BUILTIN_FUZZING_PAYLOADS[0],
+        verdict: 'SAFE',
+        simulatedResponseTimeMs: 58,
+        simulatedStatus: 200,
+        responseSnippet: '{"items": [], "total": 0}',
+        analysis: 'Página retornou lista vazia de itens sem estourar stack trace do banco.'
+      }
+    ]
+  },
+  {
+    id: 'exec-sched-001',
+    scheduleId: 'sched-payments-auth-15m',
+    scheduleName: 'Auditoria Contínua Checkout & Autenticação',
+    timestamp: '08:15:00',
+    durationMs: 310,
+    endpointsTestedCount: 3,
+    payloadsSentCount: 6,
+    vulnerabilitiesFound: 0,
+    blockedByWafCount: 2,
+    safeCount: 4,
+    status: 'SUCCESS',
+    results: [
+      {
+        id: 'res-1-1',
+        timestamp: '08:15:00',
+        endpoint: '/api/v1/payments/charge',
+        method: 'POST',
+        payload: BUILTIN_FUZZING_PAYLOADS[0],
+        verdict: 'SAFE',
+        simulatedResponseTimeMs: 82,
+        simulatedStatus: 400,
+        responseSnippet: '{"error": "Card number format invalid"}',
+        analysis: 'Validação de cartão de crédito bloqueou formato inválido antes da query SQL.'
+      }
+    ]
+  }
+];
+
