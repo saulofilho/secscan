@@ -293,6 +293,16 @@ New-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run
                     <p className="text-xs font-mono text-[#888] mt-0.5">{activePlaybook.description}</p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {onNavigateToTab && (
+                      <button
+                        onClick={() => onNavigateToTab('soarbuilder')}
+                        className="px-3 py-2 bg-[#00FF41]/10 hover:bg-[#00FF41]/20 border border-[#00FF41]/40 text-[#00FF41] text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                        title="Abrir o Construtor Visual com nós editáveis e drag-and-drop"
+                      >
+                        <Workflow className="w-3.5 h-3.5 text-[#00FF41]" />
+                        <span>Visual Studio</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => copyToClipboard(exportPlaybookToYaml(activePlaybook), 'soar-yaml')}
                       className="px-3 py-2 bg-[#1A1A1A] hover:bg-[#252525] border border-[#333] text-white text-xs font-mono font-bold flex items-center gap-1.5 transition-all"

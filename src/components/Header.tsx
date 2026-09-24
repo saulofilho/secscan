@@ -41,7 +41,8 @@ import {
   Layers,
   Sparkles,
   Workflow,
-  FileCheck
+  FileCheck,
+  Cpu
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
 
@@ -109,6 +110,8 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'ctihub', label: 'Threat Intel (CTI)', icon: Globe, badge: 'OTX', tooltip: 'Cyber Threat Intelligence Hub: feeds AlienVault OTX, CISA KEV e correlação com Threat Actors' },
     { id: 'autoremediation', label: 'Auto-Remediação (Patches)', icon: Wrench, badge: '1-Click', tooltip: 'Geração automática de Git Unified Diffs e aplicação direta de patches corretivos no código' },
     { id: 'refactoring', label: 'Refactoring Assistant', icon: Sparkles, badge: 'Modernize', tooltip: 'Sugestões guiadas de refatoração para vulnerabilidades comuns (ex: crypto legada) com preview comparativo antes/depois' },
+    { id: 'soarbuilder', label: 'SOAR Visual Studio', icon: Workflow, badge: 'Flow', tooltip: 'Construtor visual drag-and-drop de playbooks SOAR com simulação em tempo real e orquestração de resposta' },
+    { id: 'llmsecurity', label: 'AI & LLM Security (OWASP)', icon: Cpu, badge: 'OWASP LLM', tooltip: 'Auditoria de segurança para modelos de IA Generativa, fuzzer de prompt injection e guardrails NeMo/Llama' },
     { id: 'procyber', label: 'Pro Cyber Suite', icon: ShieldAlert, badge: '10 PRO', tooltip: 'Suíte profissional com SOAR Playbooks, BAS MITRE, Sigma Transpiler, Malware Sandbox, KMS Vault, Supply Chain SLSA, EASM, Dark Web, CSPM e PKI' },
     { id: 'policyascode', label: 'Policy-as-Code (OPA)', icon: FileCheck, badge: report.opaCompliance ? `${report.opaCompliance.complianceScore}%` : 'Rego', tooltip: 'Policy-as-Code OPA: defina e teste regras Rego para verificação automática de conformidade contra padrões organizacionais' },
     { id: 'compliance', label: 'Auditoria Compliance (SOC2/ISO/HIPAA)', icon: Scale, badge: 'SOC2', tooltip: 'Score de prontidão determinístico e mapeamento formal para SOC 2 Type II, ISO 27001 e HIPAA' },

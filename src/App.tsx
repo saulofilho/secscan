@@ -68,6 +68,8 @@ import { PipelineFlowArchitectView } from './components/PipelineFlowArchitectVie
 import { CyberThreatIntelHubView } from './components/CyberThreatIntelHubView';
 import { PolicyAsCodeView } from './components/PolicyAsCodeView';
 import { ProSecurityToolsView } from './components/ProSecurityToolsView';
+import { VisualSoarPlaybookView } from './components/VisualSoarPlaybookView';
+import { LlmSecurityView } from './components/LlmSecurityView';
 import { ComplianceAuditView } from './components/ComplianceAuditView';
 import { SecurityHeadersView } from './components/SecurityHeadersView';
 import { ContainerSecurityView } from './components/ContainerSecurityView';
@@ -2159,6 +2161,26 @@ export default function App() {
             policies={opaPolicies}
             onUpdatePolicies={handleUpdateOpaPolicies}
             onSelectFinding={handleSelectFinding}
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onLogAudit={(event) => {
+              setAuditLogs(prev => [event, ...prev].slice(0, 80));
+            }}
+          />
+        )}
+
+        {activeTab === 'soarbuilder' && (
+          <VisualSoarPlaybookView
+            report={report}
+            onNavigateToTab={(tab) => setActiveTab(tab)}
+            onLogAudit={(event) => {
+              setAuditLogs(prev => [event, ...prev].slice(0, 80));
+            }}
+          />
+        )}
+
+        {activeTab === 'llmsecurity' && (
+          <LlmSecurityView
+            report={report}
             onNavigateToScanner={() => setActiveTab('scanner')}
             onLogAudit={(event) => {
               setAuditLogs(prev => [event, ...prev].slice(0, 80));

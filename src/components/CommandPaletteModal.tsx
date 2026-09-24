@@ -43,7 +43,8 @@ import {
   KeyRound,
   Clock,
   Workflow,
-  FileCheck
+  FileCheck,
+  Cpu
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
 
@@ -773,6 +774,34 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           setActiveTab('cicd');
         },
         keywords: ['cicd', 'github actions', 'gitlab', 'pipeline', 'devops', 'cloud', 'quality gate']
+      },
+      {
+        id: 'nav-soarbuilder',
+        title: 'Módulo: SOAR Visual Studio (Orquestração & Playbooks)',
+        subtitle: 'Construtor visual drag-and-drop de playbooks SOAR com simulação em tempo real e orquestração de resposta',
+        category: 'Navegação',
+        icon: Workflow,
+        badge: 'Visual Flow',
+        badgeColor: 'bg-[#00FF41]/15 text-[#00FF41] border-[#00FF41]/30',
+        action: () => {
+          onClose();
+          setActiveTab('soarbuilder');
+        },
+        keywords: ['soar', 'playbook', 'visual', 'orquestracao', 'workflow', 'automacao', 'aws iam', 'firewall', 'incidentes']
+      },
+      {
+        id: 'nav-llmsecurity',
+        title: 'Módulo: AI & LLM Security Suite (OWASP Top 10 for LLMs)',
+        subtitle: 'Auditoria de IA Generativa, fuzzer de prompt injection, jailbreaks e guardrails NeMo/Llama',
+        category: 'Navegação',
+        icon: Cpu,
+        badge: 'OWASP LLM',
+        badgeColor: 'bg-[#00F0FF]/15 text-[#00F0FF] border-[#00F0FF]/30',
+        action: () => {
+          onClose();
+          setActiveTab('llmsecurity');
+        },
+        keywords: ['llm', 'ia', 'ai', 'owasp', 'prompt injection', 'jailbreak', 'fuzzer', 'guardrails', 'nemo', 'rag', 'genai']
       }
     ];
 
