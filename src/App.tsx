@@ -482,6 +482,9 @@ export default function App() {
     return scanSourceFiles([], DEFAULT_RULES, activeIgnoreStrings);
   });
 
+  // Scan execution history: stores result object of each successful scan execution (limited to last 10 entries)
+  const [scanHistory, setScanHistory] = useState<ScanReport[]>([]);
+
   const [previousWorkspaceSize, setPreviousWorkspaceSize] = useState<number | undefined>(undefined);
   const [previousDataFlowGraph, setPreviousDataFlowGraph] = useState<DataFlowGraphData | undefined>(undefined);
   const lastScanWorkspaceBytesRef = useRef<number | null>(null);
@@ -553,6 +556,12 @@ export default function App() {
           return result;
         });
         setAuditLogs(prev => [...newLogs.reverse(), ...prev].slice(0, 80));
+
+        // Push latest result to scanHistory, ensuring it is limited to the last 10 entries
+        setScanHistory(prev => {
+          const updated = [...prev, result];
+          return updated.slice(-10);
+        });
       }
     } catch (err) {
       console.error('Error in executeScan:', err);
@@ -1936,6 +1945,7 @@ export default function App() {
           <DashboardOverview
             report={report}
             auditLogs={auditLogs}
+            scanHistory={scanHistory}
             onSelectFinding={handleSelectFinding}
             onNavigateToTab={setActiveTab}
             onNavigateToFile={handleSelectFileByPath}

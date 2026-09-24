@@ -69,6 +69,7 @@ import { LastFiveScansTrend } from './LastFiveScansTrend';
 import { SecurityPostureSummary } from './SecurityPostureSummary';
 import { RecentScansHistory } from './RecentScansHistory';
 import { ScanHistoryChart } from './ScanHistoryChart';
+import { ScanHistoryList } from './ScanHistoryList';
 import { ScanSpeedometerGauge } from './ScanSpeedometerGauge';
 import { SeverityDonutChart } from './SeverityDonutChart';
 import { SecurityRiskHeatmapCard } from './SecurityRiskHeatmapCard';
@@ -93,6 +94,7 @@ interface DashboardOverviewProps {
   onOpenIgnoreModal?: () => void;
   onToggleIgnorePattern?: (id: string) => void;
   onOpenGlossary?: (entry?: SecurityGlossaryEntry) => void;
+  scanHistory?: ScanReport[];
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -106,6 +108,7 @@ const SEVERITY_COLORS: Record<string, string> = {
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   report,
   auditLogs,
+  scanHistory = [],
   onSelectFinding,
   onNavigateToTab,
   onNavigateToFile,
@@ -2284,6 +2287,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* Recharts Scan History: Total Findings Over the Last 10 Scans to Track Remediation Progress */}
       <ScanHistoryChart
         report={report}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+      />
+
+      {/* Scrollable Scan Execution History List: Displaying timestamp, file count, and findings count of past scans */}
+      <ScanHistoryList
+        scanHistory={scanHistory.length > 0 ? scanHistory : [report]}
+        onSelectFinding={onSelectFinding}
         onNavigateToScanner={() => onNavigateToTab('scanner')}
       />
 
