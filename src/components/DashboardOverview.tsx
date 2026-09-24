@@ -70,6 +70,7 @@ import { SecurityPostureSummary } from './SecurityPostureSummary';
 import { RecentScansHistory } from './RecentScansHistory';
 import { ScanHistoryChart } from './ScanHistoryChart';
 import { ScanHistoryList } from './ScanHistoryList';
+import { RecentScansList } from './RecentScansList';
 import { ScanSpeedometerGauge } from './ScanSpeedometerGauge';
 import { SeverityDonutChart } from './SeverityDonutChart';
 import { SecurityRiskHeatmapCard } from './SecurityRiskHeatmapCard';
@@ -2287,6 +2288,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* Recharts Scan History: Total Findings Over the Last 10 Scans to Track Remediation Progress */}
       <ScanHistoryChart
         report={report}
+        onNavigateToScanner={() => onNavigateToTab('scanner')}
+      />
+
+      {/* Recent Scans List: Scrollable list-formatted dashboard view with Timestamp, Files Processed, Findings Detected and popover summary */}
+      <RecentScansList
+        scanHistory={scanHistory.length > 0 ? scanHistory : [report]}
+        onSelectFinding={onSelectFinding}
         onNavigateToScanner={() => onNavigateToTab('scanner')}
       />
 
