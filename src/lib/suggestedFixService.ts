@@ -152,7 +152,8 @@ export async function requestSuggestedFix(
       })
     });
 
-    if (!response.ok) {
+    const contentType = response.headers.get('content-type') || '';
+    if (!response.ok || !contentType.includes('application/json')) {
       return generateClientFallbackFix(finding, surroundingCode);
     }
 

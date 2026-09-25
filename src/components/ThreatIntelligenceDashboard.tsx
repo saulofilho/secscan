@@ -21,6 +21,11 @@ import {
   Sparkles
 } from 'lucide-react';
 import { ThreatIntelActivity, ThreatIntelSource, ThreatIntelFeedSummary, ScanReport } from '../types';
+import { 
+  fetchThreatFeedsSafe, 
+  correlateThreatsSafe, 
+  lookupThreatSafe 
+} from '../lib/osintThreatFeedsData';
 
 interface ThreatIntelligenceDashboardProps {
   report: ScanReport | null;
@@ -46,18 +51,18 @@ export const ThreatIntelligenceDashboard: React.FC<ThreatIntelligenceDashboardPr
   const [lookupResult, setLookupResult] = useState<any | null>(null);
   const [isLookingUp, setIsLookingUp] = useState<boolean>(false);
 
-  // Fetch OSINT threat feeds
+  // Fetch OSINT threat feeds safely
   const fetchFeeds = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/threat-intel/feeds');
-      if (res.ok) {
-        const data = await res.json();
-        setActivities(data.activities || []);
-        setSummary(data.summary || null);
-      }
-    } catch (err) {
-      console.error('Falha ao obter feeds de Threat Intelligence:', err);
+      const data = await fetchThreatFeedsSafe({
+        source: selectedSource !== 'ALL' ? selectedSource : undefined,
+        limit: 30
+      });
+      setActivities(data.activities || []);
+      setSummary(data.summary || null);
+    } catch {
+      // Graceful fallback handled inside fetchThreatFeedsSafe
     } finally {
       setIsLoading(false);
     }
@@ -74,20 +79,13 @@ export const ThreatIntelligenceDashboard: React.FC<ThreatIntelligenceDashboardPr
     if (!report) return;
     setIsCorrelating(true);
     try {
-      const res = await fetch('/api/threat-intel/correlate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          findings: report.findings || [],
-          endpoints: report.apiEndpoints || []
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCorrelationResults(data.correlations || []);
-      }
-    } catch (err) {
-      console.error('Falha ao correlacionar com OSINT:', err);
+      const data = await correlateThreatsSafe(
+        report.findings || [],
+        report.apiEndpoints || []
+      );
+      setCorrelationResults(data.correlations || []);
+    } catch {
+      // Graceful fallback handled inside correlateThreatsSafe
     } finally {
       setIsCorrelating(false);
     }
@@ -99,17 +97,10 @@ export const ThreatIntelligenceDashboard: React.FC<ThreatIntelligenceDashboardPr
     if (!lookupQuery.trim()) return;
     setIsLookingUp(true);
     try {
-      const res = await fetch('/api/threat-intel/lookup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: lookupQuery.trim() })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setLookupResult(data);
-      }
-    } catch (err) {
-      console.error('Falha no lookup OSINT:', err);
+      const data = await lookupThreatSafe(lookupQuery.trim());
+      setLookupResult(data);
+    } catch {
+      // Graceful fallback handled inside lookupThreatSafe
     } finally {
       setIsLookingUp(false);
     }
