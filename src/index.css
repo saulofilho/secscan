@@ -2,16 +2,24 @@
 
 @layer base {
   html, body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background-color: #050505;
-    color: #E0E0E0;
+    color: #E2E8F0;
     margin: 0;
     overflow-x: hidden;
     max-width: 100vw;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: #FF3E00;
+    color: #FFFFFF;
   }
 
   code, pre, .font-mono {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
 }
 
@@ -22,14 +30,64 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #080808;
+  background: #09090b;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #222;
-  border-radius: 2px;
+  background: #27272a;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #444;
+  background: #3f3f46;
+}
+
+/* Cyber SecOps UI Utilities */
+.glass-panel {
+  background: rgba(10, 10, 12, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sec-card {
+  background-color: #09090b;
+  border: 1px solid #1e1e24;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sec-card:hover {
+  border-color: #383844;
+}
+
+.sec-card-interactive {
+  background-color: #09090b;
+  border: 1px solid #1e1e24;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sec-card-interactive:hover {
+  border-color: rgba(255, 62, 0, 0.5);
+  box-shadow: 0 4px 20px -2px rgba(255, 62, 0, 0.12);
+  transform: translateY(-1px);
+}
+
+.sec-glow-orange {
+  box-shadow: 0 0 15px rgba(255, 62, 0, 0.2);
+}
+
+.sec-glow-green {
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);
+}
+
+.sec-glow-cyan {
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { 
   ShieldAlert, 
   ShieldCheck,
@@ -42,7 +42,9 @@ import {
   Sparkles,
   Workflow,
   FileCheck,
-  Cpu
+  Cpu,
+  Search,
+  X
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
 
@@ -89,53 +91,102 @@ export const Header: React.FC<HeaderProps> = ({
     return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
   }, []);
 
+  const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI'>('ALL');
+  const [toolSearchTerm, setToolSearchTerm] = useState('');
+
+  // Global shortcut '/' to focus tool search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === '/' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+        const input = document.getElementById('nav-tool-search-input');
+        if (input) {
+          input.focus();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const criticalCount = report.metrics.criticalCount;
   const isHealthy = criticalCount === 0;
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard & Métricas', icon: ShieldAlert, tooltip: 'Visão executiva com Risk Score cumulativo (0-100), velocímetro de scan e gráficos de criticidade' },
-    { id: 'scanner', label: 'Inspetor de Código', icon: FileCode2, badge: report.findings.length, tooltip: 'Auditoria de código linha a linha com destaque de segredos, CWEs e remediação inline' },
-    { id: 'endpoints', label: 'LinkFinder (APIs)', icon: Route, badge: report.apiEndpoints.length, tooltip: 'Mapeamento de rotas REST, GraphQL, métodos HTTP e endpoints internos desprotegidos' },
-    { id: 'jsminer', label: 'JS Miner', icon: Boxes, badge: report.jsMiner?.totalAssetsCount, tooltip: 'Mineração de bundles JS, verificação de vazamento de Source Maps (.map) e buckets de nuvem' },
-    { id: 'dataflow', label: 'Fluxo & Sinks (D3)', icon: Network, badge: report.dataFlowGraph?.metrics.totalTaintFlows, tooltip: 'Grafo D3 de fluxo de dados não confiáveis: Sources ➔ Consumidores ➔ Sinks (Taint Analysis)' },
-    { id: 'iast', label: 'IAST (Runtime Hooks)', icon: Activity, badge: report.iastReport?.findings.length ? `${report.iastReport.findings.length} hooks` : 'IAST', tooltip: 'Testes de segurança interativos em tempo de execução com ganchos em sinks dinâmicos' },
-    { id: 'sca', label: 'SCA (Dependências & CVEs)', icon: Package, badge: 'SCA', tooltip: 'Auditoria de dependências open-source contra base de CVEs/NVD e risco de licença copyleft' },
-    { id: 'iac', label: 'IaC Security (Docker/K8s)', icon: Container, badge: 'IaC', tooltip: 'Análise estática de infraestrutura: Dockerfile root, pods K8s privilegiados e workflows CI/CD' },
-    { id: 'apisecurity', label: 'API Security (BOLA/OWASP)', icon: Route, badge: 'OWASP', tooltip: 'Auditoria especializada de APIs: BOLA/IDOR, Mass Assignment, BFLA e Rate Limiting' },
-    { id: 'asocsla', label: 'ASOC & SLA Manager', icon: Clock, badge: 'SLA', tooltip: 'Gestão de Débito Técnico e cumprimento de SLAs de remediação corporativos (P0/P1/P2)' },
-    { id: 'dast', label: 'DAST (Fuzzer & Headers)', icon: Crosshair, badge: 'DAST', tooltip: 'Fuzzer de injeção em APIs (SQLi/XSS), auditoria de headers HTTP (CSP/HSTS) e comandos cURL' },
-    { id: 'sbom', label: 'SBOM Generator', icon: FileSpreadsheet, badge: 'CycloneDX', tooltip: 'Geração de inventário SBOM nos padrões oficiais OWASP CycloneDX v1.5 e SPDX v2.3' },
-    { id: 'entropy', label: 'Entropia & Segredos Git', icon: Binary, badge: 'Entropy', tooltip: 'Cálculo de Entropia de Shannon (H) para segredos e varredura forense no histórico Git' },
-    { id: 'threatmodel', label: 'Modelagem STRIDE & CVSS', icon: Target, badge: 'STRIDE', tooltip: 'Matriz STRIDE da Microsoft, checklist OWASP ASVS v4 e calculadora oficial CVSS v3.1' },
-    { id: 'ctihub', label: 'Threat Intel (CTI)', icon: Globe, badge: 'OTX', tooltip: 'Cyber Threat Intelligence Hub: feeds AlienVault OTX, CISA KEV e correlação com Threat Actors' },
-    { id: 'autoremediation', label: 'Auto-Remediação (Patches)', icon: Wrench, badge: '1-Click', tooltip: 'Geração automática de Git Unified Diffs e aplicação direta de patches corretivos no código' },
-    { id: 'refactoring', label: 'Refactoring Assistant', icon: Sparkles, badge: 'Modernize', tooltip: 'Sugestões guiadas de refatoração para vulnerabilidades comuns (ex: crypto legada) com preview comparativo antes/depois' },
-    { id: 'soarbuilder', label: 'SOAR Visual Studio', icon: Workflow, badge: 'Flow', tooltip: 'Construtor visual drag-and-drop de playbooks SOAR com simulação em tempo real e orquestração de resposta' },
-    { id: 'llmsecurity', label: 'AI & LLM Security (OWASP)', icon: Cpu, badge: 'OWASP LLM', tooltip: 'Auditoria de segurança para modelos de IA Generativa, fuzzer de prompt injection e guardrails NeMo/Llama' },
-    { id: 'procyber', label: 'Pro Cyber Suite', icon: ShieldAlert, badge: '10 PRO', tooltip: 'Suíte profissional com SOAR Playbooks, BAS MITRE, Sigma Transpiler, Malware Sandbox, KMS Vault, Supply Chain SLSA, EASM, Dark Web, CSPM e PKI' },
-    { id: 'policyascode', label: 'Policy-as-Code (OPA)', icon: FileCheck, badge: report.opaCompliance ? `${report.opaCompliance.complianceScore}%` : 'Rego', tooltip: 'Policy-as-Code OPA: defina e teste regras Rego para verificação automática de conformidade contra padrões organizacionais' },
-    { id: 'compliance', label: 'Auditoria Compliance (SOC2/ISO/HIPAA)', icon: Scale, badge: 'SOC2', tooltip: 'Score de prontidão determinístico e mapeamento formal para SOC 2 Type II, ISO 27001 e HIPAA' },
-    { id: 'frameworks', label: 'Frameworks (MITRE/NIST/OWASP)', icon: ShieldCheck, tooltip: 'Mapeamento cruzado para MITRE ATT&CK, NIST CSF 2.0 e OWASP Web Security Testing Guide' },
-    { id: 'soccommand', label: 'SOC Command View', icon: Radio, badge: 'LIVE', tooltip: 'Consolidação em tempo real de logs de auditoria, curvas de MTTR, telemetria e alertas críticos' },
-    { id: 'securityonion', label: 'Security Onion (SOC)', icon: Layers, badge: report.findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length, tooltip: 'Console de operações SOC e monitoramento de alertas de segurança' },
-    { id: 'crowdstrike', label: 'CrowdStrike (EDR/IOA)', icon: Zap, badge: 3, tooltip: 'Indicadores de Ataque (IOA) comportamentais e inteligência de ameaças Falcon' },
-    { id: 'edr', label: 'EDR (Detection & Response)', icon: Crosshair, badge: 'eBPF', tooltip: 'Sensor de endpoint com telemetria de processos, contenção Zero Trust e terminal RTR' },
-    { id: 'nmap', label: 'Nmap (Network Suite)', icon: Globe, badge: 'Recon', tooltip: 'Varredura de portas de rede, serviços ativos e fingerprinting de SO' },
-    { id: 'nikto', label: 'Nikto (Web Scanner)', icon: FileSearch, badge: 'Audit', tooltip: 'Scanner web de arquivos perigosos, versões obsoletas e configurações vulneráveis' },
-    { id: 'ngfw', label: 'NGFW (Next-Gen Firewall)', icon: Flame, badge: 'L7/IPS', tooltip: 'Firewall de aplicação L7 com inspeção profunda de pacotes e regras de tráfego' },
-    { id: 'idsips', label: 'IDS/IPS (Snort/Suricata)', icon: Binary, badge: 'DPI', tooltip: 'Sistema de detecção e prevenção de intrusões com assinaturas Snort/Suricata' },
-    { id: 'dnssec', label: 'DNS Security (RPZ/DNSSEC)', icon: Globe, badge: 'DoH', tooltip: 'Filtragem de DNS malicioso, Response Policy Zones (RPZ) e validação DNSSEC' },
-    { id: 'waf', label: 'WAF (ModSecurity CRS)', icon: ShieldCheck, badge: 'OWASP', tooltip: 'Web Application Firewall com simulador de ataques em tempo real e regras CRS' },
-    { id: 'sdwan', label: 'SD-WAN (Fabric & Steering)', icon: Network, badge: 'Overlay', tooltip: 'Malha de túneis IPsec e roteamento inteligente por SLA de latência/jitter' },
-    { id: 'headers', label: 'Security Headers (CSP)', icon: Lock, badge: 'OWASP', tooltip: 'Auditoria de cabeçalhos de resposta HTTP, conformidade OWASP e gerador de Content-Security-Policy (CSP)' },
-    { id: 'containerscan', label: 'Container (Trivy/CIS)', icon: Container, badge: 'CIS', tooltip: 'Varredura de Dockerfiles contra benchmarks CIS Docker, execução não-root e vulnerabilidades de base' },
-    { id: 'cloudiam', label: 'Cloud IAM / CSPM', icon: Key, badge: 'IAM', tooltip: 'Auditoria de privilégio mínimo em políticas AWS IAM, escalada de privilégio e exposição pública' },
-    { id: 'jwtinspector', label: 'JWT & Token Forensics', icon: KeyRound, badge: 'RFC7519', tooltip: 'Decodificador e inspetor forense de tokens JWT, detecção de alg: none e senhas HMAC fracas' },
-    { id: 'ssrfvalidator', label: 'SSRF & Webhook Validator', icon: Globe, badge: 'SSRF', tooltip: 'Validador de requisições de saída contra SSRF, proteção de metadados de nuvem e evasões de IP' },
-    { id: 'rules', label: 'Regras Regex', icon: SlidersHorizontal, tooltip: 'Editor e testador interativo de expressões regulares corporativas customizadas' },
-    { id: 'cli', label: 'Terminal CLI', icon: Terminal, tooltip: 'Emulador de console para testar comandos do bin/secscan.js e flags de quality gate' },
-    { id: 'pipelineflow', label: 'Pipeline Architect', icon: Workflow, badge: 'Flow', tooltip: 'Pipeline Flow Architect: mapeie achados locais para Pre-commit, Build e Deploy com drag-and-drop no GitHub Actions' },
-    { id: 'cicd', label: 'CI/CD & Cloud', icon: CloudCog, tooltip: 'Gerador de pipelines de automação para GitHub Actions, GitLab CI com SARIF 2.1.0' },
+  const navItems: { id: string; category: 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI'; label: string; icon: any; badge?: any; tooltip: string }[] = [
+    { id: 'dashboard', category: 'GOV_AI', label: 'Dashboard & Métricas', icon: ShieldAlert, tooltip: 'Visão executiva com Risk Score cumulativo (0-100), velocímetro de scan e gráficos de criticidade' },
+    { id: 'scanner', category: 'CODE_SAST', label: 'Inspetor de Código', icon: FileCode2, badge: report.findings.length, tooltip: 'Auditoria de código linha a linha com destaque de segredos, CWEs e remediação inline' },
+    { id: 'endpoints', category: 'CODE_SAST', label: 'LinkFinder (APIs)', icon: Route, badge: report.apiEndpoints.length, tooltip: 'Mapeamento de rotas REST, GraphQL, métodos HTTP e endpoints internos desprotegidos' },
+    { id: 'jsminer', category: 'CODE_SAST', label: 'JS Miner', icon: Boxes, badge: report.jsMiner?.totalAssetsCount, tooltip: 'Mineração de bundles JS, verificação de vazamento de Source Maps (.map) e buckets de nuvem' },
+    { id: 'dataflow', category: 'CODE_SAST', label: 'Fluxo & Sinks (D3)', icon: Network, badge: report.dataFlowGraph?.metrics.totalTaintFlows, tooltip: 'Grafo D3 de fluxo de dados não confiáveis: Sources ➔ Consumidores ➔ Sinks (Taint Analysis)' },
+    { id: 'iast', category: 'CODE_SAST', label: 'IAST (Runtime Hooks)', icon: Activity, badge: report.iastReport?.findings.length ? `${report.iastReport.findings.length} hooks` : 'IAST', tooltip: 'Testes de segurança interativos em tempo de execução com ganchos em sinks dinâmicos' },
+    { id: 'sca', category: 'CODE_SAST', label: 'SCA (Dependências & CVEs)', icon: Package, badge: 'SCA', tooltip: 'Auditoria de dependências open-source contra base de CVEs/NVD e risco de licença copyleft' },
+    { id: 'iac', category: 'CLOUD_INFRA', label: 'IaC Security (Docker/K8s)', icon: Container, badge: 'IaC', tooltip: 'Análise estática de infraestrutura: Dockerfile root, pods K8s privilegiados e workflows CI/CD' },
+    { id: 'apisecurity', category: 'API_DAST', label: 'API Security (BOLA/OWASP)', icon: Route, badge: 'OWASP', tooltip: 'Auditoria especializada de APIs: BOLA/IDOR, Mass Assignment, BFLA e Rate Limiting' },
+    { id: 'asocsla', category: 'GOV_AI', label: 'ASOC & SLA Manager', icon: Clock, badge: 'SLA', tooltip: 'Gestão de Débito Técnico e cumprimento de SLAs de remediação corporativos (P0/P1/P2)' },
+    { id: 'dast', category: 'API_DAST', label: 'DAST (Fuzzer & Headers)', icon: Crosshair, badge: 'DAST', tooltip: 'Fuzzer de injeção em APIs (SQLi/XSS), auditoria de headers HTTP (CSP/HSTS) e comandos cURL' },
+    { id: 'sbom', category: 'GOV_AI', label: 'SBOM Generator', icon: FileSpreadsheet, badge: 'CycloneDX', tooltip: 'Geração de inventário SBOM nos padrões oficiais OWASP CycloneDX v1.5 e SPDX v2.3' },
+    { id: 'entropy', category: 'CODE_SAST', label: 'Entropia & Segredos Git', icon: Binary, badge: 'Entropy', tooltip: 'Cálculo de Entropia de Shannon (H) para segredos e varredura forense no histórico Git' },
+    { id: 'threatmodel', category: 'GOV_AI', label: 'Modelagem STRIDE & CVSS', icon: Target, badge: 'STRIDE', tooltip: 'Matriz STRIDE da Microsoft, checklist OWASP ASVS v4 e calculadora oficial CVSS v3.1' },
+    { id: 'ctihub', category: 'GOV_AI', label: 'Threat Intel (CTI)', icon: Globe, badge: 'OTX', tooltip: 'Cyber Threat Intelligence Hub: feeds AlienVault OTX, CISA KEV e correlação com Threat Actors' },
+    { id: 'autoremediation', category: 'CODE_SAST', label: 'Auto-Remediação (Patches)', icon: Wrench, badge: '1-Click', tooltip: 'Geração automática de Git Unified Diffs e aplicação direta de patches corretivos no código' },
+    { id: 'refactoring', category: 'CODE_SAST', label: 'Refactoring Assistant', icon: Sparkles, badge: 'Modernize', tooltip: 'Sugestões guiadas de refatoração para vulnerabilidades comuns (ex: crypto legada) com preview comparativo antes/depois' },
+    { id: 'soarbuilder', category: 'GOV_AI', label: 'SOAR Visual Studio', icon: Workflow, badge: 'Flow', tooltip: 'Construtor visual drag-and-drop de playbooks SOAR com simulação em tempo real e orquestração de resposta' },
+    { id: 'llmsecurity', category: 'GOV_AI', label: 'AI & LLM Security (OWASP)', icon: Cpu, badge: 'OWASP LLM', tooltip: 'Auditoria de segurança para modelos de IA Generativa, fuzzer de prompt injection e guardrails NeMo/Llama' },
+    { id: 'procyber', category: 'GOV_AI', label: 'Pro Cyber Suite', icon: ShieldAlert, badge: '10 PRO', tooltip: 'Suíte profissional com SOAR Playbooks, BAS MITRE, Sigma Transpiler, Malware Sandbox, KMS Vault, Supply Chain SLSA, EASM, Dark Web, CSPM e PKI' },
+    { id: 'policyascode', category: 'GOV_AI', label: 'Policy-as-Code (OPA)', icon: FileCheck, badge: report.opaCompliance ? `${report.opaCompliance.complianceScore}%` : 'Rego', tooltip: 'Policy-as-Code OPA: defina e teste regras Rego para verificação automática de conformidade contra padrões organizacionais' },
+    { id: 'compliance', category: 'GOV_AI', label: 'Auditoria Compliance (SOC2/ISO/HIPAA)', icon: Scale, badge: 'SOC2', tooltip: 'Score de prontidão determinístico e mapeamento formal para SOC 2 Type II, ISO 27001 e HIPAA' },
+    { id: 'frameworks', category: 'GOV_AI', label: 'Frameworks (MITRE/NIST/OWASP)', icon: ShieldCheck, tooltip: 'Mapeamento cruzado para MITRE ATT&CK, NIST CSF 2.0 e OWASP Web Security Testing Guide' },
+    { id: 'soccommand', category: 'SOC_EDR', label: 'SOC Command View', icon: Radio, badge: 'LIVE', tooltip: 'Consolidação em tempo real de logs de auditoria, curvas de MTTR, telemetria e alertas críticos' },
+    { id: 'securityonion', category: 'SOC_EDR', label: 'Security Onion (SOC)', icon: Layers, badge: report.findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length, tooltip: 'Console de operações SOC e monitoramento de alertas de segurança' },
+    { id: 'crowdstrike', category: 'SOC_EDR', label: 'CrowdStrike (EDR/IOA)', icon: Zap, badge: 3, tooltip: 'Indicadores de Ataque (IOA) comportamentais e inteligência de ameaças Falcon' },
+    { id: 'edr', category: 'CLOUD_INFRA', label: 'EDR (Detection & Response)', icon: Crosshair, badge: 'eBPF', tooltip: 'Sensor de endpoint com telemetria de processos, contenção Zero Trust e terminal RTR' },
+    { id: 'nmap', category: 'SOC_EDR', label: 'Nmap (Network Suite)', icon: Globe, badge: 'Recon', tooltip: 'Varredura de portas de rede, serviços ativos e fingerprinting de SO' },
+    { id: 'nikto', category: 'SOC_EDR', label: 'Nikto (Web Scanner)', icon: FileSearch, badge: 'Audit', tooltip: 'Scanner web de arquivos perigosos, versões obsoletas e configurações vulneráveis' },
+    { id: 'ngfw', category: 'CLOUD_INFRA', label: 'NGFW (Next-Gen Firewall)', icon: Flame, badge: 'L7/IPS', tooltip: 'Firewall de aplicação L7 com inspeção profunda de pacotes e regras de tráfego' },
+    { id: 'idsips', category: 'CLOUD_INFRA', label: 'IDS/IPS (Snort/Suricata)', icon: Binary, badge: 'DPI', tooltip: 'Sistema de detecção e prevenção de intrusões com assinaturas Snort/Suricata' },
+    { id: 'dnssec', category: 'CLOUD_INFRA', label: 'DNS Security (RPZ/DNSSEC)', icon: Globe, badge: 'DoH', tooltip: 'Filtragem de DNS malicioso, Response Policy Zones (RPZ) e validação DNSSEC' },
+    { id: 'waf', category: 'SOC_EDR', label: 'WAF (ModSecurity CRS)', icon: ShieldCheck, badge: 'OWASP', tooltip: 'Web Application Firewall com simulador de ataques em tempo real e regras CRS' },
+    { id: 'sdwan', category: 'CLOUD_INFRA', label: 'SD-WAN (Fabric & Steering)', icon: Network, badge: 'Overlay', tooltip: 'Malha de túneis IPsec e roteamento inteligente por SLA de latência/jitter' },
+    { id: 'headers', category: 'API_DAST', label: 'Security Headers (CSP)', icon: Lock, badge: 'OWASP', tooltip: 'Auditoria de cabeçalhos de resposta HTTP, conformidade OWASP e gerador de Content-Security-Policy (CSP)' },
+    { id: 'containerscan', category: 'CLOUD_INFRA', label: 'Container (Trivy/CIS)', icon: Container, badge: 'CIS', tooltip: 'Varredura de Dockerfiles contra benchmarks CIS Docker, execução não-root e vulnerabilidades de base' },
+    { id: 'cloudiam', category: 'CLOUD_INFRA', label: 'Cloud IAM / CSPM', icon: Key, badge: 'IAM', tooltip: 'Auditoria de privilégio mínimo em políticas AWS IAM, escalada de privilégio e exposição pública' },
+    { id: 'jwtinspector', category: 'API_DAST', label: 'JWT & Token Forensics', icon: KeyRound, badge: 'RFC7519', tooltip: 'Decodificador e inspetor forense de tokens JWT, detecção de alg: none e senhas HMAC fracas' },
+    { id: 'ssrfvalidator', category: 'API_DAST', label: 'SSRF & Webhook Validator', icon: Globe, badge: 'SSRF', tooltip: 'Validador de requisições de saída contra SSRF, proteção de metadados de nuvem e evasões de IP' },
+    { id: 'rules', category: 'GOV_AI', label: 'Regras Regex', icon: SlidersHorizontal, tooltip: 'Editor e testador interativo de expressões regulares corporativas customizadas' },
+    { id: 'cli', category: 'GOV_AI', label: 'Terminal CLI', icon: Terminal, tooltip: 'Emulador de console para testar comandos do bin/secscan.js e flags de quality gate' },
+    { id: 'pipelineflow', category: 'GOV_AI', label: 'Pipeline Architect', icon: Workflow, badge: 'Flow', tooltip: 'Pipeline Flow Architect: mapeie achados locais para Pre-commit, Build e Deploy com drag-and-drop no GitHub Actions' },
+    { id: 'cicd', category: 'GOV_AI', label: 'CI/CD & Cloud', icon: CloudCog, tooltip: 'Gerador de pipelines de automação para GitHub Actions, GitLab CI com SARIF 2.1.0' },
+  ];
+
+  // Auto-switch domain category if activeTab belongs to a different domain
+  useEffect(() => {
+    const item = navItems.find(i => i.id === activeTab);
+    if (item && selectedCategory !== 'ALL' && item.category !== selectedCategory) {
+      setSelectedCategory('ALL');
+    }
+  }, [activeTab]);
+
+  const visibleNavItems = useMemo(() => {
+    let items = selectedCategory === 'ALL' ? navItems : navItems.filter(item => item.category === selectedCategory);
+    if (toolSearchTerm.trim()) {
+      const q = toolSearchTerm.toLowerCase().trim();
+      items = items.filter(item => 
+        item.label.toLowerCase().includes(q) || 
+        item.id.toLowerCase().includes(q) || 
+        item.tooltip.toLowerCase().includes(q) ||
+        (typeof item.badge === 'string' && item.badge.toLowerCase().includes(q))
+      );
+    }
+    return items;
+  }, [selectedCategory, navItems, toolSearchTerm]);
+
+  const SECOPS_DOMAINS = [
+    { id: 'ALL' as const, label: 'Todas as Ferramentas', count: navItems.length },
+    { id: 'CODE_SAST' as const, label: 'Code & SAST', count: navItems.filter(i => i.category === 'CODE_SAST').length },
+    { id: 'CLOUD_INFRA' as const, label: 'Cloud & Infra', count: navItems.filter(i => i.category === 'CLOUD_INFRA').length },
+    { id: 'API_DAST' as const, label: 'APIs & Web', count: navItems.filter(i => i.category === 'API_DAST').length },
+    { id: 'SOC_EDR' as const, label: 'SOC & Telemetria', count: navItems.filter(i => i.category === 'SOC_EDR').length },
+    { id: 'GOV_AI' as const, label: 'Gov, SOAR & AI', count: navItems.filter(i => i.category === 'GOV_AI').length },
   ];
 
   return (
@@ -435,6 +486,70 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
+        {/* SecOps Domain Category Selector Ribbon & Fast Search */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 pt-2 pb-1.5 border-b border-[#1A1A1A]">
+          {/* Domain tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            <span className="text-[10px] font-mono text-[#555] uppercase font-bold tracking-wider shrink-0 mr-1 hidden sm:inline">
+              Domínio:
+            </span>
+            {SECOPS_DOMAINS.map(domain => {
+              const isSelected = selectedCategory === domain.id;
+              return (
+                <button
+                  key={domain.id}
+                  onClick={() => setSelectedCategory(domain.id)}
+                  className={`flex items-center gap-1.5 py-1 px-2.5 rounded text-[10.5px] font-mono font-bold tracking-wide uppercase transition-all whitespace-nowrap cursor-pointer shrink-0 border ${
+                    isSelected
+                      ? 'bg-[#1C1C1C] text-[#00FF41] border-[#00FF41]/40 shadow-xs'
+                      : 'bg-transparent text-[#777] hover:text-white border-transparent hover:border-[#222]'
+                  }`}
+                >
+                  <span>{domain.label}</span>
+                  <span className={`text-[9px] font-mono ${
+                    isSelected ? 'text-[#00FF41]/75' : 'text-[#555]'
+                  }`}>
+                    ({domain.count})
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Quick Tool Search / Filter */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="relative flex items-center">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 text-zinc-500 pointer-events-none" />
+              <input
+                id="nav-tool-search-input"
+                type="text"
+                value={toolSearchTerm}
+                onChange={(e) => setToolSearchTerm(e.target.value)}
+                placeholder="Filtrar ferramentas... (/)"
+                className="w-44 sm:w-56 h-7.5 pl-8 pr-7 text-[11px] font-mono bg-[#0D0D10] border border-[#27272A] focus:border-[#FF3E00]/70 rounded text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-[#FF3E00]/50 transition-all"
+              />
+              {toolSearchTerm ? (
+                <button
+                  onClick={() => setToolSearchTerm('')}
+                  className="absolute right-2 text-zinc-400 hover:text-white cursor-pointer"
+                  title="Limpar filtro"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              ) : (
+                <kbd className="hidden sm:inline-block absolute right-2 text-[9px] font-mono px-1 py-0.2 bg-[#1A1A1E] text-zinc-500 border border-zinc-700/50 rounded pointer-events-none">
+                  /
+                </kbd>
+              )}
+            </div>
+            {toolSearchTerm && (
+              <span className="text-[10px] font-mono text-zinc-400 whitespace-nowrap">
+                {visibleNavItems.length} encontrada{visibleNavItems.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        </div>
+
         {/* Navigation Tabs Bar */}
         <nav className="flex items-center gap-1 sm:gap-2 pt-1.5 pb-2 overflow-x-auto no-scrollbar">
           {/* Tool Guide & Examples Button */}
@@ -443,7 +558,7 @@ export const Header: React.FC<HeaderProps> = ({
               id="btn-nav-open-tool-guide"
               type="button"
               onClick={() => onOpenToolGuide(activeTab)}
-              className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded text-[11px] font-mono font-bold tracking-wide uppercase whitespace-nowrap transition-all cursor-pointer bg-cyan-950/40 hover:bg-cyan-900/50 text-[#00F0FF] border border-cyan-500/40 hover:border-cyan-400 shrink-0 shadow-xs mr-1"
+              className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 text-[11px] font-mono font-bold tracking-wide uppercase whitespace-nowrap transition-all cursor-pointer bg-cyan-950/40 hover:bg-cyan-900/50 text-[#00F0FF] border border-cyan-500/40 hover:border-cyan-400 rounded shrink-0 shadow-xs mr-1"
               title="Abrir o Manual das Ferramentas com explicações, arquitetura, passo a passo e exemplos de código"
             >
               <BookOpen className="w-3.5 h-3.5 text-[#00F0FF] shrink-0" />
@@ -451,35 +566,47 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {navItems.map(item => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
+          {visibleNavItems.length === 0 ? (
+            <div className="flex items-center gap-3 py-2 px-3 text-xs font-mono text-zinc-400 bg-[#0F0F12] border border-zinc-800 rounded w-full">
+              <span>Nenhuma ferramenta encontrada com &ldquo;<strong className="text-white">{toolSearchTerm}</strong>&rdquo; no domínio selecionado.</span>
               <button
-                key={item.id}
-                id={`nav-tab-${item.id}`}
-                onClick={() => setActiveTab(item.id)}
-                title={item.tooltip}
-                className={`flex items-center gap-2 py-2 px-3 rounded text-[11px] font-mono font-bold tracking-wide uppercase whitespace-nowrap transition-all cursor-pointer border ${
-                  isActive
-                    ? 'bg-[#141414] text-[#FF3E00] border-[#FF3E00]/40 shadow-sm'
-                    : 'bg-transparent text-[#888] hover:text-white hover:bg-[#0F0F0F] border-transparent'
-                }`}
+                onClick={() => { setToolSearchTerm(''); setSelectedCategory('ALL'); }}
+                className="text-[#FF3E00] hover:underline font-bold cursor-pointer"
               >
-                <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#FF3E00]' : 'text-[#666]'}`} />
-                <span>{item.label}</span>
-                {item.badge !== undefined && (
-                  <span className={`text-[9.5px] font-mono px-1.5 py-0.2 rounded font-bold ${
-                    isActive 
-                      ? 'bg-[#FF3E00] text-white' 
-                      : 'bg-[#181818] text-[#888] border border-[#262626]'
-                  }`}>
-                    {item.badge}
-                  </span>
-                )}
+                Limpar filtros
               </button>
-            );
-          })}
+            </div>
+          ) : (
+            visibleNavItems.map(item => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  id={`nav-tab-${item.id}`}
+                  onClick={() => setActiveTab(item.id)}
+                  title={item.tooltip}
+                  className={`flex items-center gap-2 py-2 px-3 rounded text-[11px] font-mono font-bold tracking-wide uppercase whitespace-nowrap transition-all cursor-pointer border ${
+                    isActive
+                      ? 'bg-[#18181B] text-[#FF3E00] border-[#FF3E00]/60 shadow-[0_0_12px_rgba(255,62,0,0.18)] scale-[1.02]'
+                      : 'bg-[#0A0A0C] text-[#888] hover:text-white hover:bg-[#141416] border-[#1E1E24] hover:border-[#383844]'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#FF3E00]' : 'text-[#666]'}`} />
+                  <span>{item.label}</span>
+                  {item.badge !== undefined && (
+                    <span className={`text-[9.5px] font-mono px-1.5 py-0.2 rounded font-bold ${
+                      isActive 
+                        ? 'bg-[#FF3E00] text-black font-black' 
+                        : 'text-zinc-400 bg-[#141414] border border-[#2A2A30]'
+                    }`}>
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })
+          )}
         </nav>
       </div>
     </header>

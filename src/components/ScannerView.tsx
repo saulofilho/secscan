@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   FileCode, 
   FolderTree, 
@@ -11,14 +11,15 @@ import {
   ShieldAlert, 
   Code2, 
   Plus, 
-  Ban,
-  Sparkles,
-  Search,
-  Filter,
-  BookOpen,
-  Terminal,
-  Wrench,
-  ExternalLink
+  Ban, 
+  Sparkles, 
+  Search, 
+  Filter, 
+  BookOpen, 
+  Terminal, 
+  Wrench, 
+  ExternalLink,
+  X
 } from 'lucide-react';
 import { ScannedFile, ScanFinding, SeverityLevel, IgnorePatternItem } from '../types';
 import { SecurityGlossaryTooltip, SecurityGlossaryInlineCard } from './SecurityGlossary';
@@ -64,6 +65,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const [showRawSecret, setShowRawSecret] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [fileSearchTerm, setFileSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | 'ALL'>('ALL');
   const [showPasteModal, setShowPasteModal] = useState(false);
   const [pasteFileName, setPasteFileName] = useState('customService.js');
@@ -92,6 +94,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
   const activeFile = selectedFile || safeFiles[0];
   const fileFindings = safeFindings.filter(f => f.file === activeFile?.path);
+
+  const visibleFiles = useMemo(() => {
+    if (!fileSearchTerm.trim()) return safeFiles;
+    const q = fileSearchTerm.toLowerCase().trim();
+    return safeFiles.filter(f => f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q));
+  }, [safeFiles, fileSearchTerm]);
 
   const filteredFindings = fileFindings.filter(f => {
     if (severityFilter !== 'ALL' && f.severity !== severityFilter) return false;
@@ -189,20 +197,53 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         </div>
 
         {/* File List */}
-        <div className="bg-[#0A0A0A] border border-[#222] overflow-hidden">
-          <div className="px-4 py-3 bg-[#080808] border-b border-[#222] text-[10px] font-black tracking-[0.2em] uppercase text-[#666] flex items-center justify-between">
+        <div className="bg-[#09090C] rounded-xl border border-[#1E1E24] overflow-hidden shadow-sm">
+          <div className="px-4 py-3 bg-[#0D0D11] border-b border-[#1E1E24] text-[10px] font-black tracking-[0.2em] uppercase text-zinc-400 flex items-center justify-between">
             <span>Explorador de Arquivos</span>
-            <span className="font-mono text-[10px] text-[#444]">COUNT: {safeFiles.length}</span>
+            <span className="font-mono text-[10px] text-zinc-500">
+              {visibleFiles.length}{visibleFiles.length !== safeFiles.length ? ` / ${safeFiles.length}` : ''}
+            </span>
           </div>
 
+          {/* Quick File Search Filter */}
+          {safeFiles.length > 2 && (
+            <div className="p-2 border-b border-[#1E1E24] bg-[#0B0B0F]">
+              <div className="relative flex items-center">
+                <Search className="w-3 h-3 absolute left-2.5 text-zinc-500 pointer-events-none" />
+                <input
+                  type="text"
+                  value={fileSearchTerm}
+                  onChange={(e) => setFileSearchTerm(e.target.value)}
+                  placeholder="Filtrar arquivos..."
+                  className="w-full h-7 pl-7 pr-6 text-[11px] font-mono bg-[#14141A] border border-[#27272A] focus:border-[#FF3E00]/60 rounded text-zinc-200 placeholder-zinc-500 focus:outline-none transition-colors"
+                />
+                {fileSearchTerm && (
+                  <button
+                    onClick={() => setFileSearchTerm('')}
+                    className="absolute right-2 text-zinc-400 hover:text-white"
+                    title="Limpar filtro"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="max-h-[500px] overflow-y-auto">
-            {safeFiles.length === 0 ? (
+            {visibleFiles.length === 0 ? (
               <div className="p-6 text-center text-zinc-500 font-mono text-xs space-y-2">
                 <FileCode className="w-8 h-8 mx-auto text-zinc-700 mb-1" />
-                <p className="text-zinc-400 font-bold">Nenhum arquivo no workspace</p>
-                <p className="text-[10px] text-zinc-600">Carregue arquivos ou cole código para iniciar a análise.</p>
+                <p className="text-zinc-400 font-bold">
+                  {safeFiles.length === 0 ? 'Nenhum arquivo no workspace' : 'Nenhum arquivo encontrado'}
+                </p>
+                <p className="text-[10px] text-zinc-600">
+                  {safeFiles.length === 0 
+                    ? 'Carregue arquivos ou cole código para iniciar a análise.' 
+                    : `Nenhum resultado para "${fileSearchTerm}".`}
+                </p>
               </div>
-            ) : safeFiles.map((file) => {
+            ) : visibleFiles.map((file) => {
               const isSelected = activeFile?.path === file.path;
               const fileFindingCount = safeFindings.filter(f => f.file === file.path).length;
 
@@ -210,10 +251,10 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 <button
                   key={file.path}
                   onClick={() => onSelectFile(file)}
-                  className={`w-full text-left px-4 py-3 flex items-center justify-between transition-colors border-b border-[#141414] ${
+                  className={`w-full text-left px-4 py-3 flex items-center justify-between transition-colors border-b border-[#141418] ${
                     isSelected
-                      ? 'bg-[#141414] border-l-2 border-l-[#FF3E00] text-white font-bold'
-                      : 'hover:bg-[#111] text-[#888]'
+                      ? 'bg-[#181820] border-l-2 border-l-[#FF3E00] text-white font-bold'
+                      : 'hover:bg-[#121216] text-[#888]'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0 pr-2">
@@ -226,12 +267,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
                   <div className="shrink-0 flex items-center gap-1.5 font-mono">
                     {file.isIgnored ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono bg-[#141414] text-[#666] border border-[#222]" title={file.ignoreReason}>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono rounded bg-[#141414] text-[#666] border border-[#222]" title={file.ignoreReason}>
                         <Ban className="w-2.5 h-2.5 text-[#555]" />
                         <span>IGNORED</span>
                       </span>
                     ) : fileFindingCount > 0 ? (
-                      <span className="px-2 py-0.5 text-[9px] font-mono font-bold bg-[#220700] text-[#FF3E00] border border-[#FF3E00]/40">
+                      <span className="px-2 py-0.5 text-[9px] font-mono font-bold rounded bg-[#220700] text-[#FF3E00] border border-[#FF3E00]/40">
                         {fileFindingCount} ALERTA{fileFindingCount > 1 ? 'S' : ''}
                       </span>
                     ) : (

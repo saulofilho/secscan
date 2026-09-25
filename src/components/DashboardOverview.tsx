@@ -147,8 +147,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const [pdfSuccess, setPdfSuccess] = useState(false);
   const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
 
-  // Sub-view mode within DashboardOverview: 'OVERVIEW' | 'HEATMAP' | 'RISK_CALCULATOR'
-  const [dashboardView, setDashboardView] = useState<'OVERVIEW' | 'HEATMAP' | 'RISK_CALCULATOR'>('OVERVIEW');
+  // Sub-view mode within DashboardOverview: 'OVERVIEW' | 'TRENDS' | 'HEATMAP' | 'REMEDIATION' | 'RISK_CALCULATOR' | 'ALL'
+  const [dashboardView, setDashboardView] = useState<'OVERVIEW' | 'TRENDS' | 'HEATMAP' | 'REMEDIATION' | 'RISK_CALCULATOR' | 'ALL'>('OVERVIEW');
 
   // Compute file concentration stats for the Vulnerability Heatmap view integration
   const filesConcentrationStats = useMemo(() => {
@@ -518,67 +518,135 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       )}
 
-      {/* Sub-View Selector: Executive Overview vs. Risk Calculator vs. Vulnerability Heatmap */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-[#0A0A0A] border border-[#262626]">
-        <div className="flex flex-wrap items-center gap-2">
+      {/* Empty Workspace Hero Dropzone when totalFiles === 0 */}
+      {report?.totalFiles === 0 && (
+        <div className="bg-[#0A0A0A] border-2 border-[#222] p-8 text-center space-y-4 relative overflow-hidden shadow-2xl">
+          <div className="w-14 h-14 mx-auto bg-[#141414] border border-[#333] flex items-center justify-center text-[#00FF41] shadow-[0_0_20px_rgba(0,255,65,0.15)]">
+            <ShieldCheck className="w-7 h-7 text-[#00FF41]" />
+          </div>
+          <div className="space-y-1">
+            <span className="text-[10px] font-mono px-2 py-0.5 bg-[#00FF41]/10 text-[#00FF41] border border-[#00FF41]/30 font-bold uppercase tracking-wider">
+              WORKSPACE LIMPO • ZERO VULNERABILIDADES
+            </span>
+            <h3 className="text-xl sm:text-2xl font-black uppercase text-white tracking-wide mt-2">
+              Nenhum Arquivo em Análise Ativa
+            </h3>
+            <p className="text-xs font-mono text-[#888] max-w-xl mx-auto leading-relaxed">
+              O workspace está limpo com 0 arquivos. Envie o código-fonte do seu projeto no Inspetor de Código ou explore todas as ferramentas da suíte carregando os arquivos demonstrativos de teste.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <button
+              onClick={() => onNavigateToTab('scanner')}
+              className="px-5 py-2.5 bg-white hover:bg-[#FF3E00] text-black hover:text-white font-black font-mono text-xs uppercase transition-all cursor-pointer shadow-md"
+            >
+              Abrir Inspetor de Código &rarr;
+            </button>
+            {onOpenTour && (
+              <button
+                onClick={onOpenTour}
+                className="px-5 py-2.5 bg-[#141414] hover:bg-[#222] border border-[#333] hover:border-white text-white font-mono text-xs uppercase transition-all cursor-pointer"
+              >
+                Tutorial Guiado
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sub-View Selector: Executive Overview vs. Trends vs. Heatmaps vs. Remediation vs. Calculator vs. All */}
+      <div className="flex flex-wrap items-center justify-between gap-4 p-2.5 sm:p-3 bg-[#0B0B0E] border border-zinc-800 rounded-xl shadow-lg">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             id="btn-dashboard-view-overview"
             type="button"
             onClick={() => setDashboardView('OVERVIEW')}
-            className={`px-4 py-2 text-xs font-mono font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-3.5 py-2 text-xs font-mono font-black uppercase tracking-wider transition-all rounded-lg flex items-center gap-2 cursor-pointer ${
               dashboardView === 'OVERVIEW'
-                ? 'bg-white text-black shadow-md'
-                : 'text-[#888] hover:text-white hover:bg-[#161616]'
+                ? 'bg-white text-black shadow-md shadow-white/10 scale-[1.02]'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
             }`}
           >
             <Shield className="w-3.5 h-3.5" />
-            <span>Visão Geral Executiva</span>
+            <span>Visão Executiva</span>
           </button>
 
           <button
-            id="btn-dashboard-view-calculator"
+            id="btn-dashboard-view-trends"
             type="button"
-            onClick={() => setDashboardView('RISK_CALCULATOR')}
-            className={`px-4 py-2 text-xs font-mono font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
-              dashboardView === 'RISK_CALCULATOR'
-                ? 'bg-[#FF3E00] text-white shadow-[0_0_15px_rgba(255,62,0,0.5)]'
-                : 'text-[#888] hover:text-[#FF3E00] hover:bg-[#161616]'
+            onClick={() => setDashboardView('TRENDS')}
+            className={`px-3.5 py-2 text-xs font-mono font-black uppercase tracking-wider transition-all rounded-lg flex items-center gap-2 cursor-pointer ${
+              dashboardView === 'TRENDS'
+                ? 'bg-[#00FF41] text-black shadow-md shadow-[#00FF41]/20 scale-[1.02]'
+                : 'text-zinc-400 hover:text-[#00FF41] hover:bg-zinc-800/60'
             }`}
           >
-            <Cpu className={`w-3.5 h-3.5 ${dashboardView === 'RISK_CALCULATOR' ? 'text-white' : 'text-[#FF3E00]'}`} />
-            <span>Security Risk Calculator</span>
-            <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono ${
-              dashboardView === 'RISK_CALCULATOR' ? 'bg-black text-[#FF3E00] font-black' : 'bg-[#FF3E00]/20 text-[#FF3E00] font-bold'
-            }`}>
-              Node/TS
-            </span>
+            <Activity className="w-3.5 h-3.5" />
+            <span>Tendências &amp; Histórico</span>
           </button>
 
           <button
             id="btn-dashboard-view-heatmap"
             type="button"
             onClick={() => setDashboardView('HEATMAP')}
-            className={`px-4 py-2 text-xs font-mono font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-3.5 py-2 text-xs font-mono font-black uppercase tracking-wider transition-all rounded-lg flex items-center gap-2 cursor-pointer ${
               dashboardView === 'HEATMAP'
-                ? 'bg-[#FF3E00] text-white shadow-[0_0_15px_rgba(255,62,0,0.5)]'
-                : 'text-[#888] hover:text-[#FF3E00] hover:bg-[#161616]'
+                ? 'bg-[#FF3E00] text-white shadow-[0_0_15px_rgba(255,62,0,0.4)] scale-[1.02]'
+                : 'text-zinc-400 hover:text-[#FF3E00] hover:bg-zinc-800/60'
             }`}
           >
-            <Flame className={`w-3.5 h-3.5 ${dashboardView === 'HEATMAP' ? 'text-white' : 'text-[#FF3E00]'}`} />
-            <span>Vulnerability Heatmap</span>
-            <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono ${
-              dashboardView === 'HEATMAP' ? 'bg-black text-[#FF3E00] font-black' : 'bg-[#FF3E00]/20 text-[#FF3E00] font-bold'
-            }`}>
-              {filesConcentrationStats.uniqueFilesCount} arquivos
-            </span>
+            <Flame className="w-3.5 h-3.5" />
+            <span>Heatmaps &amp; Matriz</span>
+          </button>
+
+          <button
+            id="btn-dashboard-view-remediation"
+            type="button"
+            onClick={() => setDashboardView('REMEDIATION')}
+            className={`px-3.5 py-2 text-xs font-mono font-black uppercase tracking-wider transition-all rounded-lg flex items-center gap-2 cursor-pointer ${
+              dashboardView === 'REMEDIATION'
+                ? 'bg-cyan-400 text-black shadow-md shadow-cyan-400/20 scale-[1.02]'
+                : 'text-zinc-400 hover:text-cyan-400 hover:bg-zinc-800/60'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Remediação &amp; SLAs</span>
+          </button>
+
+          <button
+            id="btn-dashboard-view-calculator"
+            type="button"
+            onClick={() => setDashboardView('RISK_CALCULATOR')}
+            className={`px-3.5 py-2 text-xs font-mono font-black uppercase tracking-wider transition-all rounded-lg flex items-center gap-2 cursor-pointer ${
+              dashboardView === 'RISK_CALCULATOR'
+                ? 'bg-amber-400 text-black shadow-md shadow-amber-400/20 scale-[1.02]'
+                : 'text-zinc-400 hover:text-amber-400 hover:bg-zinc-800/60'
+            }`}
+          >
+            <Cpu className="w-3.5 h-3.5" />
+            <span>Risk Calculator</span>
+          </button>
+
+          <button
+            id="btn-dashboard-view-all"
+            type="button"
+            onClick={() => setDashboardView('ALL')}
+            className={`px-3.5 py-2 text-xs font-mono font-black uppercase tracking-wider transition-all rounded-lg flex items-center gap-2 cursor-pointer ${
+              dashboardView === 'ALL'
+                ? 'bg-zinc-700 text-white shadow-md scale-[1.02]'
+                : 'text-zinc-500 hover:text-white hover:bg-zinc-800/60'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Exibir Tudo</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-3 text-[11px] font-mono text-[#777]">
+        <div className="flex items-center gap-3 text-[11px] font-mono text-zinc-400">
           {filesConcentrationStats.topFile && (
-            <span className="hidden sm:inline-flex items-center gap-1.5">
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-zinc-900 border border-zinc-800">
               <span className="text-[#FF7A00]">Top Concentração:</span>
-              <strong className="text-white truncate max-w-[220px]" title={filesConcentrationStats.topFile.path}>
+              <strong className="text-white truncate max-w-[200px]" title={filesConcentrationStats.topFile.path}>
                 {filesConcentrationStats.topFile.fileName}
               </strong>
               <span className="text-[#FF3E00] font-bold">({filesConcentrationStats.topFile.total} achados)</span>
@@ -1063,7 +1131,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       </div>
 
       {/* Metrics Row - 7 High-Precision Cards with Cumulative Risk Score & Security Impact */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3.5">
         {/* Metric 1: Cumulative Workspace Risk Score (0-100) */}
         <div 
           id="metric-card-cumulative-risk-score"
@@ -1071,21 +1139,21 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             const el = document.getElementById('cumulative-risk-validation-section');
             if (el) el.scrollIntoView({ behavior: 'smooth' });
           }}
-          className="bg-[#0A0A0A] p-6 border border-[#2A2A2A] hover:border-[#FF3E00]/60 relative overflow-hidden flex flex-col justify-between cursor-pointer group transition-all"
+          className="bg-[#09090C] p-5 rounded-xl border border-[#1E1E24] hover:border-[#FF3E00]/60 relative overflow-hidden flex flex-col justify-between cursor-pointer group transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#FF3E00]/5"
           title="Clique para inspecionar o cálculo e a validação do Risk Score cumulativo do workspace"
         >
           <div className="absolute top-0 right-0 w-20 h-20 bg-[#FF3E00]/5 rounded-bl-full pointer-events-none" />
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] font-black tracking-[0.2em] text-[#888] group-hover:text-white uppercase">
                 Workspace Risk
               </span>
-              <div className={`px-2 py-0.5 font-mono font-black text-[10px] border ${riskScoreBadge.bg} ${riskScoreBadge.text}`}>
+              <div className={`px-2 py-0.5 font-mono font-black text-[10px] rounded border ${riskScoreBadge.bg} ${riskScoreBadge.text}`}>
                 {riskScoreBadge.label}
               </div>
             </div>
             <div className="flex items-baseline gap-1.5 mb-1">
-              <span className={`text-5xl font-black tracking-tighter ${riskScoreBadge.text}`}>
+              <span className={`text-4xl sm:text-5xl font-black tracking-tighter ${riskScoreBadge.text}`}>
                 {cumulativeRiskScore}
               </span>
               <span className="text-xs font-mono text-[#666] font-bold">/ 100</span>
@@ -1094,7 +1162,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               Cumulative Risk Score
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-[#1A1A1A] flex items-center justify-between text-[10px] font-mono text-[#AAA]">
+          <div className="mt-4 pt-3 border-t border-[#1A1A1E] flex items-center justify-between text-[10px] font-mono text-[#AAA]">
             <span>{metrics.criticalCount}C • {metrics.highCount}H</span>
             <button
               type="button"
@@ -1113,19 +1181,19 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
 
         {/* Metric 2: Security Impact Score (Weighted System) */}
-        <div className="bg-[#0A0A0A] p-6 border border-[#2A2A2A] relative overflow-hidden flex flex-col justify-between">
+        <div className="bg-[#09090C] p-5 rounded-xl border border-[#1E1E24] hover:border-zinc-700 relative overflow-hidden flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5">
           <div className="absolute top-0 right-0 w-20 h-20 bg-[#FF3E00]/5 rounded-bl-full pointer-events-none" />
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] font-black tracking-[0.2em] text-[#888] uppercase">
                 Security Impact
               </span>
-              <div className={`px-2 py-0.5 font-mono font-black text-[10px] border ${impactBadge.bg} ${impactBadge.text}`}>
+              <div className={`px-2 py-0.5 font-mono font-black text-[10px] rounded border ${impactBadge.bg} ${impactBadge.text}`}>
                 {impactBadge.label}
               </div>
             </div>
             <div className="flex items-baseline gap-1.5 mb-1">
-              <span className={`text-5xl font-black tracking-tighter ${impactBadge.text}`}>
+              <span className={`text-4xl sm:text-5xl font-black tracking-tighter ${impactBadge.text}`}>
                 {impactScore}
               </span>
               <span className="text-xs font-mono text-[#666] font-bold">/ 100</span>
@@ -1134,65 +1202,65 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               Weighted Risk Index
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-[#1A1A1A] flex items-center justify-between text-[10px] font-mono text-[#AAA]">
-            <span>Risk Médio: <strong className="text-white">{metrics.averageRiskScore ?? 0}</strong> pts</span>
+          <div className="mt-4 pt-3 border-t border-[#1A1A1E] flex items-center justify-between text-[10px] font-mono text-[#AAA]">
+            <span>Média: <strong className="text-white">{metrics.averageRiskScore ?? 0}</strong> pts</span>
             <span className={impactBadge.text}>{metrics.impactLevel ?? 'NOMINAL'}</span>
           </div>
         </div>
 
-        {/* Metric 2: Compliance Health */}
-        <div className="bg-[#0A0A0A] p-6 border border-[#222] flex flex-col justify-between">
+        {/* Metric 3: Compliance Health */}
+        <div className="bg-[#09090C] p-5 rounded-xl border border-[#1E1E24] hover:border-zinc-700 flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5">
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] font-black tracking-[0.2em] text-[#666] uppercase">System Health</span>
-              <div className={`w-7 h-7 flex items-center justify-center font-black text-xs border ${grade.bg} ${grade.color}`}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] font-black tracking-[0.2em] text-[#888] uppercase">System Health</span>
+              <div className={`w-7 h-7 rounded flex items-center justify-center font-black text-xs border ${grade.bg} ${grade.color}`}>
                 {grade.letter}
               </div>
             </div>
-            <div className="text-5xl font-black tracking-tighter text-white mb-1">
+            <div className="text-4xl sm:text-5xl font-black tracking-tighter text-white mb-1">
               {metrics.securityScore}%
             </div>
-            <div className="text-[11px] font-mono text-[#666] uppercase tracking-wide">
+            <div className="text-[11px] font-mono text-[#888] uppercase tracking-wide">
               Compliance Score
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-[#1A1A1A] text-[10px] font-mono text-[#888]">
+          <div className="mt-4 pt-3 border-t border-[#1A1A1E] text-[10px] font-mono text-[#888]">
             {metrics.criticalCount === 0 ? 'STATUS: NOMINAL / SECURE' : 'STATUS: REMEDIATION REQ'}
           </div>
         </div>
 
-        {/* Metric 3: Scanned vs Ignored */}
-        <div className="bg-[#0A0A0A] p-6 border border-[#222] flex flex-col justify-between">
+        {/* Metric 4: Scanned vs Ignored */}
+        <div className="bg-[#09090C] p-5 rounded-xl border border-[#1E1E24] hover:border-zinc-700 flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5">
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] font-black tracking-[0.2em] text-[#666] uppercase">Scanned Sources</span>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] font-black tracking-[0.2em] text-[#888] uppercase">Scanned Sources</span>
               <Layers className="w-4 h-4 text-[#888]" />
             </div>
-            <div className="text-5xl font-black tracking-tighter text-white mb-1">
+            <div className="text-4xl sm:text-5xl font-black tracking-tighter text-white mb-1">
               {report.scannedFilesCount}
             </div>
-            <div className="text-[11px] font-mono text-[#666] uppercase tracking-wide">
+            <div className="text-[11px] font-mono text-[#888] uppercase tracking-wide">
               Files Evaluated
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-[#1A1A1A] text-[11px] font-mono text-[#00FF41] flex items-center gap-1.5">
+          <div className="mt-4 pt-3 border-t border-[#1A1A1E] text-[11px] font-mono text-[#00FF41] flex items-center gap-1.5">
             <Ban className="w-3.5 h-3.5" />
             <span>{report.ignoredFilesCount} Ignored Deps</span>
           </div>
         </div>
 
-        {/* Metric 4: Total Secrets */}
-        <div className="bg-[#0A0A0A] p-6 border border-[#222] flex flex-col justify-between">
+        {/* Metric 5: Total Secrets */}
+        <div className="bg-[#09090C] p-5 rounded-xl border border-[#1E1E24] hover:border-zinc-700 flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5">
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] font-black tracking-[0.2em] text-[#666] uppercase">Active Exposures</span>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] font-black tracking-[0.2em] text-[#888] uppercase">Active Exposures</span>
               <ShieldAlert className="w-4 h-4 text-[#FF3E00]" />
             </div>
-            <div className={`text-5xl font-black tracking-tighter mb-1 ${findings.length > 0 ? 'text-[#FF3E00]' : 'text-white'}`}>
+            <div className={`text-4xl sm:text-5xl font-black tracking-tighter mb-1 ${findings.length > 0 ? 'text-[#FF3E00]' : 'text-white'}`}>
               {findings.length}
             </div>
             <div className="flex items-center justify-between">
-              <div className="text-[11px] font-mono text-[#666] uppercase tracking-wide">
+              <div className="text-[11px] font-mono text-[#888] uppercase tracking-wide">
                 Secrets Exposed
               </div>
               <button
@@ -1210,12 +1278,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </button>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-[#1A1A1A] flex items-center justify-between font-mono text-[10px]">
+          <div className="mt-4 pt-3 border-t border-[#1A1A1E] flex items-center justify-between font-mono text-[10px]">
             <div className="flex items-center gap-1.5">
-              <span className="bg-[#220700] text-[#FF3E00] px-1.5 py-0.5 border border-[#FF3E00]/30 font-bold">
+              <span className="bg-[#220700] text-[#FF3E00] px-1.5 py-0.5 rounded border border-[#FF3E00]/30 font-bold">
                 {metrics.criticalCount} CRIT
               </span>
-              <span className={`px-1.5 py-0.5 border font-bold ${
+              <span className={`px-1.5 py-0.5 rounded border font-bold ${
                 isThresholdExceeded
                   ? 'bg-[#FF3E00]/20 text-[#FF3E00] border-[#FF3E00]/50 animate-pulse'
                   : 'bg-[#1A1A1A] text-[#AAA] border-[#333]'
@@ -1228,7 +1296,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 const el = document.getElementById('critical-threshold-config');
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
               }}
-              className={`text-[9px] font-mono px-1 py-0.5 border transition-colors ${
+              className={`text-[9px] font-mono px-1 py-0.5 rounded border transition-colors ${
                 isThresholdExceeded 
                   ? 'text-[#FF3E00] border-[#FF3E00]/40 bg-[#FF3E00]/10 hover:bg-[#FF3E00] hover:text-white' 
                   : 'text-[#888] border-[#333] hover:text-white'
@@ -1240,44 +1308,44 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        {/* Metric 5: API Endpoints & LinkFinder */}
+        {/* Metric 6: API Endpoints & LinkFinder */}
         <button
           onClick={() => onNavigateToTab('endpoints')}
-          className="bg-[#0A0A0A] p-6 border border-[#222] hover:border-[#3366FF] text-left transition-all flex flex-col justify-between group cursor-pointer"
+          className="bg-[#09090C] p-5 rounded-xl border border-[#1E1E24] hover:border-[#3366FF] text-left transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group cursor-pointer"
         >
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] font-black tracking-[0.2em] text-[#666] group-hover:text-[#3366FF] uppercase">LinkFinder APIs</span>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] font-black tracking-[0.2em] text-[#888] group-hover:text-[#3366FF] uppercase">LinkFinder APIs</span>
               <Route className="w-4 h-4 text-[#3366FF]" />
             </div>
-            <div className="text-5xl font-black tracking-tighter text-white mb-1">
+            <div className="text-4xl sm:text-5xl font-black tracking-tighter text-white mb-1">
               {apiEndpoints.length}
             </div>
-            <div className="text-[11px] font-mono text-[#666] uppercase tracking-wide">
+            <div className="text-[11px] font-mono text-[#888] uppercase tracking-wide">
               Endpoints Mapped
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-[#1A1A1A] text-[10px] font-mono text-[#AAA] flex items-center justify-between w-full">
-            <span>{apiEndpoints.filter(e => e.isInternalOrAdmin).length} Admin / Internal</span>
-            <span className="text-[#3366FF] group-hover:underline text-[9px]">Ver LinkFinder &rarr;</span>
+          <div className="mt-4 pt-3 border-t border-[#1A1A1E] text-[10px] font-mono text-[#AAA] flex items-center justify-between w-full">
+            <span>{apiEndpoints.filter(e => e.isInternalOrAdmin).length} Admin/Int</span>
+            <span className="text-[#3366FF] group-hover:underline text-[9px]">LinkFinder &rarr;</span>
           </div>
         </button>
 
-        {/* Metric 6: Shannon Entropy */}
-        <div className="bg-[#0A0A0A] p-6 border border-[#222] flex flex-col justify-between">
+        {/* Metric 7: Shannon Entropy */}
+        <div className="bg-[#09090C] p-5 rounded-xl border border-[#1E1E24] hover:border-zinc-700 flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5">
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] font-black tracking-[0.2em] text-[#666] uppercase">Entropy Index</span>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] font-black tracking-[0.2em] text-[#888] uppercase">Entropy Index</span>
               <Sparkles className="w-4 h-4 text-[#00FF41]" />
             </div>
-            <div className="text-5xl font-black tracking-tighter text-white mb-1">
+            <div className="text-4xl sm:text-5xl font-black tracking-tighter text-white mb-1">
               {metrics.averageEntropy}
             </div>
-            <div className="text-[11px] font-mono text-[#666] uppercase tracking-wide">
+            <div className="text-[11px] font-mono text-[#888] uppercase tracking-wide">
               Shannon (Bits/Char)
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-[#1A1A1A] text-[10px] font-mono text-[#00FF41]">
+          <div className="mt-4 pt-3 border-t border-[#1A1A1E] text-[10px] font-mono text-[#00FF41]">
             CRYPTOGRAPHIC_RANDOMNESS
           </div>
         </div>
