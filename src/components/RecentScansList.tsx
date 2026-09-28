@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useId } from 'react';
 import { 
   History, 
   Clock, 
@@ -20,20 +20,237 @@ import {
   Eye, 
   Info,
   Calendar,
-  Layers
+  Layers,
+  TrendingDown,
+  TrendingUp,
+  Minus
 } from 'lucide-react';
 import { ScanReport, ScanFinding } from '../types';
+
+export interface FindingsTrendSparklineProps {
+  currentCount: number;
+  previousCount: number | null;
+  historyPoints?: number[];
+  hasPredecessor: boolean;
+  className?: string;
+}
+
+/**
+ * Visual sparkline and trend indicator displaying the evolution of findings
+ * compared to the immediately preceding historical scan.
+ */
+export const FindingsTrendSparkline: React.FC<FindingsTrendSparklineProps> = ({
+  currentCount,
+  previousCount,
+  historyPoints = [],
+  hasPredecessor,
+  className = ''
+}) => {
+  const delta = hasPredecessor && previousCount !== null ? currentCount - previousCount : null;
+
+  // Determine trend color, label, and icon
+  const trendInfo = useMemo(() => {
+    if (delta === null) {
+      return {
+        type: 'BASELINE' as const,
+        label: 'Base',
+        fullText: `Ponto inicial (baseline: ${currentCount} achado${currentCount === 1 ? '' : 's'})`,
+        color: '#00F0FF',
+        badgeBg: 'bg-cyan-950/40 text-cyan-300 border-cyan-500/40',
+        Icon: null
+      };
+    }
+    if (delta < 0) {
+      const diff = Math.abs(delta);
+      return {
+        type: 'DECREASE' as const,
+        label: `-${diff}`,
+        fullText: `Evolução: Redução de ${diff} achado${diff === 1 ? '' : 's'} (de ${previousCount} para ${currentCount})`,
+        color: '#00FF41',
+        badgeBg: 'bg-emerald-950/40 text-[#00FF41] border-[#00FF41]/40',
+        Icon: TrendingDown
+      };
+    }
+    if (delta > 0) {
+      return {
+        type: 'INCREASE' as const,
+        label: `+${delta}`,
+        fullText: `Evolução: Aumento de ${delta} achado${delta === 1 ? '' : 's'} (de ${previousCount} para ${currentCount})`,
+        color: '#FF3E00',
+        badgeBg: 'bg-rose-950/40 text-[#FF3E00] border-[#FF3E00]/40',
+        Icon: TrendingUp
+      };
+    }
+    return {
+      type: 'STABLE' as const,
+      label: '0',
+      fullText: `Evolução: Estável (${currentCount} achado${currentCount === 1 ? '' : 's'}) vs scan anterior`,
+      color: '#A1A1AA',
+      badgeBg: 'bg-zinc-900 text-zinc-400 border-zinc-700/60',
+      Icon: Minus
+    };
+  }, [delta, currentCount, previousCount]);
+
+  // Compute SVG sparkline trajectory
+  const svgData = useMemo(() => {
+    const width = 42;
+    const height = 16;
+    const pad = 2.5;
+
+    // Use historyPoints ending with currentCount if available and valid
+    let pts = historyPoints.length >= 2 
+      ? historyPoints 
+      : hasPredecessor && previousCount !== null 
+        ? [previousCount, currentCount] 
+        : [currentCount];
+
+    if (pts.length < 2) {
+      // Baseline single point representation
+      const cx = width / 2;
+      const cy = height / 2;
+      return {
+        isBaseline: true,
+        width,
+        height,
+        cx,
+        cy,
+        pathD: '',
+        areaD: ''
+      };
+    }
+
+    const min = Math.min(...pts);
+    const max = Math.max(...pts);
+    const range = max === min ? 1 : max - min;
+
+    const coords = pts.map((val, idx) => {
+      const x = pad + (idx / (pts.length - 1)) * (width - 2 * pad);
+      // Invert Y so higher counts are higher on screen; center vertically when flat
+      const y = max === min
+        ? height / 2
+        : height - pad - ((val - min) / range) * (height - 2 * pad);
+      return { x, y, val };
+    });
+
+    const pathD = coords.reduce((acc, c, i) => `${acc} ${i === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`, '');
+    const lastCoord = coords[coords.length - 1];
+    const firstCoord = coords[0];
+    const areaD = `${pathD} L ${lastCoord.x.toFixed(1)} ${height} L ${firstCoord.x.toFixed(1)} ${height} Z`;
+
+    return {
+      isBaseline: false,
+      width,
+      height,
+      coords,
+      pathD,
+      areaD,
+      lastX: lastCoord.x,
+      lastY: lastCoord.y,
+      prevX: coords.length >= 2 ? coords[coords.length - 2].x : null,
+      prevY: coords.length >= 2 ? coords[coords.length - 2].y : null
+    };
+  }, [historyPoints, hasPredecessor, previousCount, currentCount]);
+
+  const { Icon } = trendInfo;
+  const reactId = useId();
+  const gradientId = useMemo(() => `sparkline-grad-${reactId.replace(/[^a-zA-Z0-9_-]/g, '')}`, [reactId]);
+
+  return (
+    <div 
+      className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-[#101014] border border-[#222] select-none hover:border-[#444] transition-colors cursor-help ${className}`}
+      title={trendInfo.fullText}
+    >
+      {/* SVG Mini Sparkline */}
+      <svg
+        width={svgData.width}
+        height={svgData.height}
+        viewBox={`0 0 ${svgData.width} ${svgData.height}`}
+        className="overflow-visible shrink-0"
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={trendInfo.color} stopOpacity="0.4" />
+            <stop offset="100%" stopColor={trendInfo.color} stopOpacity="0.0" />
+          </linearGradient>
+        </defs>
+
+        {svgData.isBaseline ? (
+          <>
+            <line
+              x1="3"
+              y1={svgData.cy}
+              x2={svgData.width - 3}
+              y2={svgData.cy}
+              stroke="#00F0FF"
+              strokeWidth="1"
+              strokeDasharray="2,2"
+              opacity="0.6"
+            />
+            <circle
+              cx={svgData.cx}
+              cy={svgData.cy}
+              r="2"
+              fill="#00F0FF"
+            />
+          </>
+        ) : (
+          <>
+            {/* Area Fill */}
+            <path
+              d={svgData.areaD}
+              fill={`url(#${gradientId})`}
+            />
+            {/* Stroke Line */}
+            <path
+              d={svgData.pathD}
+              fill="none"
+              stroke={trendInfo.color}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {/* Previous point dot (lighter) */}
+            {svgData.prevX !== null && svgData.prevY !== null && (
+              <circle
+                cx={svgData.prevX}
+                cy={svgData.prevY}
+                r="1.5"
+                fill={trendInfo.color}
+                opacity="0.4"
+              />
+            )}
+            {/* Current point terminal dot */}
+            <circle
+              cx={svgData.lastX}
+              cy={svgData.lastY}
+              r="2"
+              fill={trendInfo.color}
+            />
+          </>
+        )}
+      </svg>
+
+      {/* Numerical delta badge with icon */}
+      <span className={`inline-flex items-center gap-0.5 text-[9px] font-mono px-1 py-0.2 rounded border font-bold ${trendInfo.badgeBg}`}>
+        {Icon && <Icon className="w-2.5 h-2.5 shrink-0" />}
+        <span>{trendInfo.label}</span>
+      </span>
+    </div>
+  );
+};
 
 export interface RecentScansListProps {
   scanHistory?: ScanReport[];
   onSelectFinding?: (finding: ScanFinding) => void;
   onNavigateToScanner?: () => void;
+  onNavigateToTrends?: () => void;
 }
 
 export const RecentScansList: React.FC<RecentScansListProps> = ({
   scanHistory = [],
   onSelectFinding,
-  onNavigateToScanner
+  onNavigateToScanner,
+  onNavigateToTrends
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedScan, setSelectedScan] = useState<ScanReport | null>(null);
@@ -120,6 +337,28 @@ export const RecentScansList: React.FC<RecentScansListProps> = ({
     setTimeout(() => setCopiedJson(false), 2000);
   };
 
+  // Predecessor trend for currently selected scan in popover modal
+  const selectedScanTrend = useMemo(() => {
+    if (!selectedScan) return null;
+    const chronIndex = scanHistory.findIndex(s => s === selectedScan || (s.id && selectedScan.id && s.id === selectedScan.id));
+    const findingsCount = selectedScan.findings?.length || 0;
+    if (chronIndex > 0) {
+      const prevScan = scanHistory[chronIndex - 1];
+      const prevCount = prevScan.findings?.length ?? 0;
+      const points = scanHistory.slice(Math.max(0, chronIndex - 4), chronIndex + 1).map(s => s.findings?.length ?? 0);
+      return {
+        hasPredecessor: true,
+        previousCount: prevCount,
+        historyPoints: points
+      };
+    }
+    return {
+      hasPredecessor: false,
+      previousCount: null,
+      historyPoints: [findingsCount]
+    };
+  }, [selectedScan, scanHistory]);
+
   return (
     <div 
       id="recent-scans-list-container" 
@@ -183,6 +422,18 @@ export const RecentScansList: React.FC<RecentScansListProps> = ({
               <span className="text-[#FF7A00] font-bold">{totalFindingsAccumulated}</span>
             </div>
           </div>
+
+          {onNavigateToTrends && (
+            <button
+              type="button"
+              onClick={onNavigateToTrends}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FF3E00]/15 hover:bg-[#FF3E00]/25 text-[#FF3E00] hover:text-white border border-[#FF3E00]/40 rounded text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
+              title="Abrir SecScan Trends Dashboard completo com gráficos Recharts de evolução"
+            >
+              <TrendingDown className="w-3.5 h-3.5" />
+              <span>Ver Trends (Recharts) &rarr;</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -232,6 +483,32 @@ export const RecentScansList: React.FC<RecentScansListProps> = ({
               const isClean = findingsCount === 0;
               const isSelected = selectedScan?.id === scan.id;
 
+              // Evolution compared to immediately preceding historical scan
+              const chronIndex = scanHistory.findIndex(s => s === scan || (s.id && scan.id && s.id === scan.id));
+              let previousScan: ScanReport | null = null;
+              let hasPredecessor = false;
+              let previousFindingsCount: number | null = null;
+              let historyPointsSlice: number[] = [findingsCount];
+
+              if (chronIndex > 0) {
+                hasPredecessor = true;
+                previousScan = scanHistory[chronIndex - 1];
+                previousFindingsCount = previousScan.findings?.length ?? 0;
+                historyPointsSlice = scanHistory.slice(Math.max(0, chronIndex - 4), chronIndex + 1).map(s => s.findings?.length ?? 0);
+              } else if (chronIndex === 0) {
+                // Earliest recorded scan: baseline
+                hasPredecessor = false;
+                previousScan = null;
+                previousFindingsCount = null;
+                historyPointsSlice = [findingsCount];
+              } else if (idx < filteredScans.length - 1) {
+                // Fallback using list ordering if direct reference was not indexed
+                previousScan = filteredScans[idx + 1];
+                hasPredecessor = true;
+                previousFindingsCount = previousScan.findings?.length ?? 0;
+                historyPointsSlice = [previousFindingsCount, findingsCount];
+              }
+
               return (
                 <div
                   key={scan.id || `scan-${idx}`}
@@ -269,11 +546,20 @@ export const RecentScansList: React.FC<RecentScansListProps> = ({
                   </div>
 
                   {/* Findings Detected Column */}
-                  <div className="col-span-3 sm:col-span-4 space-y-1">
+                  <div className="col-span-3 sm:col-span-4 space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={`font-bold ${isClean ? 'text-[#00FF41]' : 'text-white'}`}>
                         {findingsCount} {findingsCount === 1 ? 'achado' : 'achados'}
                       </span>
+
+                      {/* Visual Trend Indicator (Sparkline) vs Previous Historical Scan */}
+                      <FindingsTrendSparkline
+                        currentCount={findingsCount}
+                        previousCount={previousFindingsCount}
+                        hasPredecessor={hasPredecessor}
+                        historyPoints={historyPointsSlice}
+                      />
+
                       {scan.metrics?.riskScore !== undefined && (
                         <span className={`text-[10px] px-1.5 py-0.2 border font-bold ${
                           scan.metrics.riskScore >= 75 ? 'bg-[#FF3E00]/15 text-[#FF3E00] border-[#FF3E00]/30' :
@@ -382,7 +668,17 @@ export const RecentScansList: React.FC<RecentScansListProps> = ({
                 </div>
 
                 <div className="bg-black border border-[#222] p-3">
-                  <span className="text-[10px] text-[#666] uppercase block">Vulnerabilidades</span>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[10px] text-[#666] uppercase block">Vulnerabilidades</span>
+                    {selectedScanTrend && (
+                      <FindingsTrendSparkline
+                        currentCount={selectedScan.findings?.length || 0}
+                        previousCount={selectedScanTrend.previousCount}
+                        hasPredecessor={selectedScanTrend.hasPredecessor}
+                        historyPoints={selectedScanTrend.historyPoints}
+                      />
+                    )}
+                  </div>
                   <span className={`text-base font-bold mt-1 block ${
                     (selectedScan.findings?.length || 0) > 0 ? 'text-[#FF3E00]' : 'text-[#00FF41]'
                   }`}>

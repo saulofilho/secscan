@@ -7,7 +7,7 @@
 [![Quality Gate](https://img.shields.io/badge/Quality%20Gate-Max%20Risk%20Score%20(0--100)-FF3E00)](README.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-**SecScan AppSec Suite** é uma plataforma avançada e modular de **Análise Estática de Segurança de Aplicações (SAST)**, auditoria de código JavaScript/TypeScript, detecção de segredos de alta entropia e inteligência de superfície de ataque. Desenvolvida para engenheiros de DevSecOps, AppSec e desenvolvedores full-stack, a suíte reúne um motor de **Risk Score Cumulativo do Workspace (0-100)** para Quality Gates, grafo de fluxo de dados (**DataFlow Taint Analysis**), reconhecimento profundo de endpoints (**LinkFinder & JS-Miner**) e uma base unificada de remediação com links oficiais para **OWASP**, **Snyk Learn** e **MITRE CWE** diretamente nos cards de achados.
+**SecScan AppSec Suite** é uma plataforma avançada e modular de **Análise Estática de Segurança de Aplicações (SAST)**, auditoria de código JavaScript/TypeScript, detecção de segredos de alta entropia e inteligência de superfície de ataque. Desenvolvida para engenheiros de DevSecOps, AppSec, pesquisadores de Bug Bounty e desenvolvedores full-stack, a suíte reúne um motor de **Risk Score Cumulativo do Workspace (0-100)** para Quality Gates, painel de evolução temporal com gráficos Recharts (**SecScan Trend Dashboard**), grafo de fluxo de dados (**DataFlow Taint Analysis**), auditoria de rotas (**OWASP API Security & LinkFinder**), validação contra metadados de nuvem (**SSRF & Webhook Validator**), avaliação declarativa (**Policy-as-Code OPA Rego**) e uma base unificada de remediação com links oficiais para **OWASP**, **Snyk Learn** e **MITRE CWE** diretamente nos cards de achados.
 
 ---
 
@@ -330,14 +330,86 @@
 
 ---
 
-### 20. ⚙️ Motor de Regras Customizáveis (Custom Regex)
+### 20. 📈 SecScan Trend Dashboard & Sparklines de Evolução (Recharts)
+- **O que é e Como Funciona:** Painel analítico de séries temporais desenvolvido com **Recharts** para monitorar a evolução do estado de segurança (`scanHistory`) ciclo a ciclo. Permite identificar de forma visual se a base de código está evoluindo em sua postura de segurança ou se houve regressões e introdução de novos débitos técnicos.
+- **Recursos Principais:**
+  - **Composed Burndown Chart:** Visualização integrada com área sombreada do total de achados e linhas individuais para vulnerabilidades Críticas (P0), Altas e Médias, além de linha de referência estrita de Quality Gate / SLA corporativo.
+  - **Stacked Severity Distribution:** Gráfico de barras empilhadas para cada sessão de varredura, permitindo comparar a proporção de vulnerabilidades de alto risco versus médias/baixas.
+  - **Postura de Saúde (0-100%) vs. Score de Risco:** Curva comparativa de evolução da pontuação de integridade de segurança frente à queda do risco cumulativo.
+  - **Sparkline de Evolução em Tempo Real (`FindingsTrendSparkline`):** Indicador visual compacto em SVG embutido na coluna *Findings Detected* da tabela de scans recentes (`RecentScansList`), calculando o delta scan-a-scan (ex.: `-2` em verde esmeralda para remediações ou `+3` em laranja para regressões).
+  - **Tabela Histórica Cronológica & Diagnóstico Automatizado:** Resumo determinístico com cálculo de delta da baseline, porcentagem de melhoria e insights automatizados de recomendação preventiva.
+
+---
+
+### 21. 🛡️ API Security — OWASP API Top 10 (BOLA / IDOR / Mass Assignment)
+- **O que é e Como Funciona:** Auditoria especializada na superfície de ataque de APIs REST e microsserviços modernos, inspecionando endpoints mapeados contra os riscos mais críticos do **OWASP API Security Top 10**:
+  - **API1:2023 - Broken Object Level Authorization (BOLA/IDOR):** Detecção de rotas com parâmetros de identificador (`/users/:id`, `/orders/:orderId`) desprovidas de verificação de permissão e contexto da sessão do usuário.
+  - **API3:2023 - Broken Object Property Level Authorization (Mass Assignment):** Validação de rotas que aceitam payloads JSON completos diretamente em modelos de banco sem sanitização ou DTOs restritivos.
+  - **API4:2023 - Unrestricted Resource Consumption (Rate Limiting):** Alerta para rotas sensíveis de login, checkout, reset de senha e envio de SMS sem middlewares de limitação de requisições.
+  - **API5:2023 - Broken Function Level Authorization (BFLA):** Mapeamento de endpoints administrativos (`/api/admin/*`, `/internal/*`) expostos sem validação estrita de papéis (RBAC).
+
+---
+
+### 22. 🌐 SSRF & Webhook Validator (Cloud Metadata & RFC 1918)
+- **O que é e Como Funciona:** Validador proativo de requisições de saída geradas pelo servidor (webhooks, download de avatares, importação de URLs remotas). Audita se as URLs de destino contêm defesas contra:
+  - **IPs de Loopback e Locais:** `127.0.0.1`, `localhost`, `0.0.0.0`.
+  - **Redes Privadas RFC 1918:** `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`.
+  - **Metadados de Nuvem (AWS/GCP/Azure):** `169.254.169.254`, `metadata.google.internal`.
+  - **DNS Rebinding & Evasões de Formato:** IPs em notação hexadecimal, octal e dword.
+
+---
+
+### 23. 🔑 JWT & Token Forensics (RFC 7519 & Alg: None)
+- **O que é e Como Funciona:** Inspetor forense de JSON Web Tokens (JWT). Decodifica cabeçalhos e payloads em tempo real, avaliando vulnerabilidades críticas:
+  - **Bypass de Assinatura (`alg: none`):** Tokens aceitos sem assinatura criptográfica válida.
+  - **Chaves HMAC Fracas:** Teste de força bruta local contra dicionário de senhas padrão para chaves simétricas (HS256).
+  - **Validação de Claims:** Checagem de expiração (`exp`), data de emissão (`iat`), emissor (`iss`) e público-alvo (`aud`).
+
+---
+
+### 24. 🔒 Security Headers & Gerador de CSP (Content-Security-Policy)
+- **O que é e Como Funciona:** Avalia as respostas do servidor contra as recomendações de cabeçalhos HTTP do OWASP Secure Headers Project. Constrói automaticamente políticas estritas de **Content-Security-Policy (CSP)** sem `unsafe-inline` ou `unsafe-eval`, além de habilitar `HSTS`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` e `Permissions-Policy`.
+
+---
+
+### 25. 📜 Policy-as-Code (Open Policy Agent - OPA Rego Engine)
+- **O que é e Como Funciona:** Avaliador nativo de políticas escritas na linguagem declarativa **Rego (OPA)**. Permite que equipes de segurança corporativa definam regras de compliance inegociáveis (ex.: "proibir dependências com licença AGPL", "bloquear deploys com segredos de severidade Alta no código", "exigir HSTS em todos os endpoints públicos") e validem o workspace automaticamente antes do merge.
+
+---
+
+### 26. 🧠 AI & LLM Security (OWASP Top 10 for LLM Applications)
+- **O que é e Como Funciona:** Módulo dedicado à segurança de aplicações integradas a modelos de inteligência artificial e LLMs:
+  - **LLM01: Prompt Injection:** Fuzzer de injeção direta e indireta de prompts para desvio de instruções do sistema.
+  - **LLM02: Sensitive Information Disclosure:** Detecção de vazamento de segredos e chaves de API nos prompts de contexto ou nas respostas geradas.
+  - **LLM06: Excessive Agency:** Auditoria de permissões de ferramentas externas (Function Calling) com execução autônoma de comandos ou manipulação destrutiva de banco de dados.
+
+---
+
+### 27. ⚙️ Motor de Regras Customizáveis (Custom Regex)
 - Criação e validação dinâmica de regras regex customizadas na interface ou via arquivo JSON, com suporte a categorias personalizadas, severidade e limiar de entropia mínima.
 
 ---
 
-### 21. 🚀 CI/CD & Automação DevSecOps
+### 28. 🚀 CI/CD & Automação DevSecOps
 - Exportação instantânea em múltiplos formatos: **SARIF 2.1.0** (nativamente renderizado na aba *Security > Code Scanning* do GitHub), **JSON Estruturado** e **CSV**.
 - Interface de Linha de Comando (CLI) executável em qualquer ambiente Node.js com qualidade gate duplo: por severidade (`--fail-on critical`) e por pontuação de risco cumulativo (`--max-risk <score>`).
+
+---
+
+### 29. 🏆 Guia de Aplicação para Torneios e Desafios de Bug Bounty (ByPassSec / Méliuz)
+O SecScan serve como suíte preparatória e de auditoria de código para programas de Bug Bounty e desafios de segurança ofensiva/defensiva:
+
+| Área de Foco do Desafio | Módulo SecScan Correspondente | O que Verificar |
+| :--- | :--- | :--- |
+| **Vazamento de PII & Cartões** | *Inspetor de Código*, *Entropia*, *Workspace Validator* | Regex de cartões de crédito (Luhn), chaves mestras `.env`, CPFs em logs e chaves privadas de pagamento. |
+| **Ataques de Injeção (SQLi / Command)** | *DataFlow Taint Analysis*, *SAST Engine*, *DAST Fuzzer* | Rastrear sinks `db.query` e `child_process.exec` recebendo fontes desprotegidas de `req.body` ou `req.query`. |
+| **SSRF (Server-Side Request Forgery)** | *SSRF & Webhook Validator* | Identificar requisições HTTP internas sem whitelist de domínios, mirando `169.254.169.254` ou redes privadas. |
+| **IDOR / BOLA** | *API Security (BOLA/OWASP)*, *LinkFinder* | Validar rotas REST com IDs (`/api/v1/orders/:id`, `/account/:accId`) sem checagem de autorização do usuário logado. |
+| **Remote Code Execution (RCE)** | *DataFlow Sinks*, *IAST Runtime Hooks* | Desserializações inseguras (`unserialize`, `pickle`), chamadas a `eval()` dinâmico e execução de comandos de shell. |
+| **Directory Traversal / LFI** | *SAST Custom Rules*, *DataFlow* | Verificação de chamadas `fs.readFile` e `path.join` manipulando variáveis externas com sequências `../`. |
+| **Roubo de Contas (Account Takeover)** | *JWT & Token Forensics*, *DAST Fuzzer* | Tokens sem assinatura (`alg: none`), chaves fracas HMAC e endpoints de autenticação sem rate limiting. |
+| **Funcionalidades Financeiras / Cashback** | *Policy-as-Code*, *LinkFinder*, *Custom Rules* | Mapeamento de endpoints de crédito/débito, validação de tipos de dados (`amount < 0`) e regras de concorrência. |
+| **Misconfigurations de Servidor & Infra** | *IaC Security*, *Security Headers*, *WAF Suite* | Ausência de CSP/HSTS, Dockerfile executando como root e privilégios excessivos em políticas IAM. |
 
 ---
 

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Header } from './components/Header';
 import { DashboardOverview } from './components/DashboardOverview';
+import { SecScanTrendDashboard } from './components/SecScanTrendDashboard';
 import { ScannerView } from './components/ScannerView';
 import { ApiPathsView } from './components/ApiPathsView';
 import { JsMinerView } from './components/JsMinerView';
@@ -1957,6 +1958,18 @@ export default function App() {
             onOpenIgnoreModal={() => setShowIgnoreModal(true)}
             onToggleIgnorePattern={handleToggleIgnorePattern}
             onOpenGlossary={handleOpenGlossary}
+          />
+        )}
+
+        {activeTab === 'trenddashboard' && (
+          <SecScanTrendDashboard
+            scanHistory={scanHistory}
+            currentReport={report}
+            onNavigateToScanner={() => setActiveTab('scanner')}
+            onNavigateToDashboard={() => setActiveTab('dashboard')}
+            onSelectFinding={handleSelectFinding}
+            onTriggerNewScan={() => executeScan(files, rules, ignorePatterns)}
+            isScanning={isScanning}
           />
         )}
 

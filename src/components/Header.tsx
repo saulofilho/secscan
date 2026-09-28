@@ -44,6 +44,7 @@ import {
   FileCheck,
   Cpu,
   Search,
+  TrendingDown,
   X
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
@@ -114,6 +115,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const navItems: { id: string; category: 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI'; label: string; icon: any; badge?: any; tooltip: string }[] = [
     { id: 'dashboard', category: 'GOV_AI', label: 'Dashboard & Métricas', icon: ShieldAlert, tooltip: 'Visão executiva com Risk Score cumulativo (0-100), velocímetro de scan e gráficos de criticidade' },
+    { id: 'trenddashboard', category: 'GOV_AI', label: 'SecScan Trends', icon: TrendingDown, badge: 'Trends', tooltip: 'SecScan Trend Dashboard: evolução de achados detectados ao longo do tempo e melhoria contínua da postura com Recharts' },
     { id: 'scanner', category: 'CODE_SAST', label: 'Inspetor de Código', icon: FileCode2, badge: report.findings.length, tooltip: 'Auditoria de código linha a linha com destaque de segredos, CWEs e remediação inline' },
     { id: 'endpoints', category: 'CODE_SAST', label: 'LinkFinder (APIs)', icon: Route, badge: report.apiEndpoints.length, tooltip: 'Mapeamento de rotas REST, GraphQL, métodos HTTP e endpoints internos desprotegidos' },
     { id: 'jsminer', category: 'CODE_SAST', label: 'JS Miner', icon: Boxes, badge: report.jsMiner?.totalAssetsCount, tooltip: 'Mineração de bundles JS, verificação de vazamento de Source Maps (.map) e buckets de nuvem' },

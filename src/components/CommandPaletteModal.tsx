@@ -44,7 +44,8 @@ import {
   Clock,
   Workflow,
   FileCheck,
-  Cpu
+  Cpu,
+  TrendingDown
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
 
@@ -337,6 +338,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           }, 150);
         },
         keywords: ['scan history', 'historico', '10 scans', 'recharts', 'remediacao', 'progresso', 'grafico']
+      },
+      {
+        id: 'nav-secscan-trends',
+        title: 'Módulo: SecScan Trends (Dashboard de Evolução)',
+        subtitle: 'Visualização Recharts de tendências temporais de Findings Detected e melhoria de postura',
+        category: 'Navegação',
+        icon: TrendingDown,
+        badge: 'Trends',
+        badgeColor: 'bg-[#00FF41]/15 text-[#00FF41] border-[#00FF41]/30',
+        action: () => {
+          onClose();
+          setActiveTab('trenddashboard');
+        },
+        keywords: ['trends', 'tendencias', 'recharts', 'historico', 'evolucao', 'posture', 'burndown', 'postura', 'secscan trends']
       },
       {
         id: 'nav-scanner',

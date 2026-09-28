@@ -2364,6 +2364,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         scanHistory={scanHistory.length > 0 ? scanHistory : [report]}
         onSelectFinding={onSelectFinding}
         onNavigateToScanner={() => onNavigateToTab('scanner')}
+        onNavigateToTrends={() => onNavigateToTab('trenddashboard')}
       />
 
       {/* Scrollable Scan Execution History List: Displaying timestamp, file count, and findings count of past scans */}
