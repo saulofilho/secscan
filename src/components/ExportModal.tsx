@@ -29,6 +29,7 @@ interface ExportModalProps {
 export const ExportModal: React.FC<ExportModalProps> = ({ report, onClose, initialFormat = 'PDF' }) => {
   const [selectedFormat, setSelectedFormat] = useState<'PDF' | 'JSON' | 'CSV' | 'SARIF' | 'MARKDOWN'>(initialFormat);
   const [sarifSubTab, setSarifSubTab] = useState<'payload' | 'github_actions'>('payload');
+  const [includeSummaryMetadata, setIncludeSummaryMetadata] = useState<boolean>(true);
   const [copied, setCopied] = useState(false);
   const [copiedWorkflow, setCopiedWorkflow] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
@@ -139,7 +140,7 @@ ${report.findings.map((f, i) => `[#${i + 1}] [${f.severity}] ${f.ruleName} (${f.
       fileName = 'secscan-sarif-upload.yml';
       mimeType = 'text/yaml';
     } else {
-      exportContent = exportToSarif(report);
+      exportContent = exportToSarif(report, includeSummaryMetadata);
       fileName += '.sarif';
       mimeType = 'application/sarif+json';
     }
@@ -192,7 +193,7 @@ ${report.findings.map((f, i) => `[#${i + 1}] [${f.severity}] ${f.ruleName} (${f.
   };
 
   const handleDownloadSarifDirect = () => {
-    const sarifRaw = exportToSarif(report);
+    const sarifRaw = exportToSarif(report, includeSummaryMetadata);
     const blob = new Blob([sarifRaw], { type: 'application/sarif+json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -344,9 +345,9 @@ ${report.findings.map((f, i) => `[#${i + 1}] [${f.severity}] ${f.ruleName} (${f.
           </div>
         )}
 
-        {/* Sub-Tabs for SARIF: Payload vs GitHub Actions Workflow */}
+        {/* Sub-Tabs for SARIF: Payload vs GitHub Actions Workflow + Include Summary Metadata Checkbox */}
         {selectedFormat === 'SARIF' && (
-          <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-zinc-800 pb-2.5">
             <div className="flex items-center gap-2 font-mono text-xs">
               <button
                 type="button"
@@ -377,11 +378,35 @@ ${report.findings.map((f, i) => `[#${i + 1}] [${f.severity}] ${f.ruleName} (${f.
               </button>
             </div>
 
-            {sarifSubTab === 'github_actions' && (
-              <span className="text-[10px] font-mono text-zinc-500 hidden sm:inline">
-                upload-sarif@v3
+            {/* Checkbox: Include Summary Metadata */}
+            <div className="flex items-center gap-2.5 pl-1 sm:pl-0">
+              <label 
+                htmlFor="checkbox-sarif-summary-metadata"
+                className="inline-flex items-center gap-2 font-mono text-xs text-zinc-300 hover:text-white cursor-pointer select-none"
+              >
+                <input
+                  type="checkbox"
+                  id="checkbox-sarif-summary-metadata"
+                  checked={includeSummaryMetadata}
+                  onChange={(e) => setIncludeSummaryMetadata(e.target.checked)}
+                  className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-purple-600 focus:ring-purple-500 focus:ring-offset-zinc-950 cursor-pointer accent-purple-500"
+                />
+                <span className="font-semibold text-[11px] sm:text-xs">
+                  Include Summary Metadata
+                </span>
+              </label>
+
+              <span 
+                className={`text-[9px] font-mono px-1.5 py-0.5 rounded border uppercase tracking-wider ${
+                  includeSummaryMetadata 
+                    ? 'bg-purple-950/50 text-purple-300 border-purple-500/40 font-bold' 
+                    : 'bg-zinc-900 text-zinc-500 border-zinc-800'
+                }`}
+                title={includeSummaryMetadata ? 'Platform-wide scan summary & invocations included' : 'Minimalist mode: Only finding entries and rule definitions'}
+              >
+                {includeSummaryMetadata ? 'WITH SUMMARY' : 'FINDINGS ONLY'}
               </span>
-            )}
+            </div>
           </div>
         )}
 
