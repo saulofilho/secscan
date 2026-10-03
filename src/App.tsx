@@ -80,6 +80,7 @@ import { SsrfValidatorView } from './components/SsrfValidatorView';
 import { ToolGuideModal } from './components/ToolGuideModal';
 import { GitignoreAuditModal } from './components/GitignoreAuditModal';
 import { auditGitignoreSecurity } from './lib/gitignoreAuditor';
+import { useLanguage } from './lib/i18nContext';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -104,6 +105,7 @@ export interface NoticeDetailItem {
 }
 
 export default function App() {
+  const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [files, setFiles] = useState<ScannedFile[]>([]);
   const [rules, setRules] = useState<RegexRule[]>(() => {
@@ -1307,7 +1309,7 @@ export default function App() {
   ]);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#E0E0E0] flex flex-col font-sans selection:bg-[#FF3E00] selection:text-white relative">
+    <div key={`app-container-${language}`} className="min-h-screen bg-[#050505] text-[#E0E0E0] flex flex-col font-sans selection:bg-[#FF3E00] selection:text-white relative">
       {/* Global Real-time Scan Progress Bar (0% to 100%) */}
       <GlobalScanProgressBar
         isScanning={isScanning}
@@ -1340,7 +1342,7 @@ export default function App() {
       />
 
       {/* Main Container Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">
+      <main key={`app-main-${language}`} className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">
         {/* Workspace Ingestion & Security Validation Banner */}
         {validationNotice && (
           <div 

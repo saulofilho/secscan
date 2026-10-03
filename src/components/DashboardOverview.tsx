@@ -63,6 +63,7 @@ import { RemediationRoadmapCard } from './RemediationRoadmapCard';
 import { StrategicRemediationPlan } from './StrategicRemediationPlan';
 import { CiCdPipelineHealthWidget } from './CiCdPipelineHealthWidget';
 import { SecScanWorkflowModal } from './SecScanWorkflowModal';
+import { useLanguage } from '../lib/i18nContext';
 import { RiskMitigationStrategies } from './RiskMitigationStrategies';
 import { ComplianceReadinessPanel } from './ComplianceReadinessPanel';
 import { LastFiveScansTrend } from './LastFiveScansTrend';
@@ -120,6 +121,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onToggleIgnorePattern,
   onOpenGlossary
 }) => {
+  const { language, t, translateText } = useLanguage();
   const findings = report?.findings || [];
   const apiEndpoints = report?.apiEndpoints || [];
   const metrics: ScanReport['metrics'] = report?.metrics || {
@@ -293,7 +295,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const riskScoreBadge = getRiskScoreBadge(cumulativeRiskScore);
 
   return (
-    <div className="space-y-8 pb-12">
+    <div key={`dashboard-overview-${language}`} className="space-y-8 pb-12">
       {/* Persistent Automated Alert: Global Risk Threshold Exceeded */}
       {isQualityGateExceeded && (
         <div 

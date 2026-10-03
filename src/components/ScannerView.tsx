@@ -28,6 +28,7 @@ import { SecurityRemediationWikiModal } from './SecurityRemediationWikiModal';
 import { getOfficialDocLinksForFinding } from '../lib/remediationWikiData';
 import { SuggestedFixPanel } from './SuggestedFixPanel';
 import { SuggestedFixModal } from './SuggestedFixModal';
+import { useLanguage } from '../lib/i18nContext';
 
 interface ScannerViewProps {
   files: ScannedFile[];
@@ -58,6 +59,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   onOpenRemediationWiki,
   onApplyFix
 }) => {
+  const { language, t, translateText } = useLanguage();
   const safeFiles = Array.isArray(files) ? files : [];
   const safeFindings = Array.isArray(findings) ? findings : [];
   const safeIgnorePatterns = Array.isArray(ignorePatterns) ? ignorePatterns : [];
@@ -131,7 +133,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const lines = activeFile?.content ? activeFile.content.split('\n') : [];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-12">
+    <div key={`scanner-view-${language}`} className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-12">
       {/* Left Sidebar: File Tree & Upload */}
       <div className="lg:col-span-4 space-y-4">
         {/* Actions header */}

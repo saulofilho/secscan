@@ -26,6 +26,7 @@ import {
   Minus
 } from 'lucide-react';
 import { ScanReport, ScanFinding } from '../types';
+import { useLanguage } from '../lib/i18nContext';
 
 export interface FindingsTrendSparklineProps {
   currentCount: number;
@@ -252,6 +253,7 @@ export const RecentScansList: React.FC<RecentScansListProps> = ({
   onNavigateToScanner,
   onNavigateToTrends
 }) => {
+  const { language } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedScan, setSelectedScan] = useState<ScanReport | null>(null);
   const [copiedJson, setCopiedJson] = useState(false);
@@ -361,6 +363,7 @@ export const RecentScansList: React.FC<RecentScansListProps> = ({
 
   return (
     <div 
+      key={`recent-scans-${language}`}
       id="recent-scans-list-container" 
       className="bg-[#0A0A0A] border-2 border-[#1E1E1E] hover:border-[#2A2A2A] transition-colors p-5 sm:p-6 rounded-none space-y-4 shadow-xl relative"
     >

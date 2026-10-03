@@ -48,6 +48,7 @@ import {
   TrendingDown
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
+import { useLanguage, SUPPORTED_LANGUAGES } from '../lib/i18nContext';
 
 export interface CommandItem {
   id: string;
@@ -109,6 +110,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const { language, setLanguage } = useLanguage();
 
   const isMac = useMemo(() => {
     return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -274,6 +276,22 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         },
         keywords: ['limpar', 'zerar', 'clean', 'clear', 'remover', 'vazio', 'novo']
       }] : []),
+
+      // Language Switcher Commands
+      ...SUPPORTED_LANGUAGES.map((lang) => ({
+        id: `cmd-lang-${lang.code}`,
+        title: `Mudar Idioma: ${lang.name} (${lang.nativeName})`,
+        subtitle: `Alterar o idioma da interface para ${lang.name} [${lang.code.toUpperCase()}]`,
+        category: 'Ações Rápidas' as const,
+        icon: Globe,
+        badge: lang.code === language ? 'Ativo' : `${lang.flag} ${lang.code.toUpperCase()}`,
+        badgeColor: lang.code === language ? 'bg-[#00FF41]/20 text-[#00FF41] border-[#00FF41]/40' : 'bg-zinc-800 text-zinc-300 border-zinc-700',
+        action: () => {
+          setLanguage(lang.code);
+          onClose();
+        },
+        keywords: ['idioma', 'language', 'idiomas', 'i18n', 'traducao', 'translate', lang.code, lang.name.toLowerCase(), lang.nativeName.toLowerCase(), 'locale']
+      })),
 
       // Navigation Modules
       {
