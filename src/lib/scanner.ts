@@ -1447,9 +1447,11 @@ export function exportToCsv(report: ScanReport): string {
 }
 
 /**
- * Exports report to SARIF 2.1.0 standard (OASIS standard consumed natively by GitHub Code Scanning)
+ * Exports report to SARIF 2.1.0 standard (OASIS standard consumed natively by GitHub Advanced Security & Code Scanning)
  */
 export function exportToSarif(report: ScanReport): string {
+  const uniqueRuleIds = Array.from(new Set(report.findings.map(f => f.ruleId)));
+
   const sarif = {
     $schema: "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
     version: "2.1.0",
@@ -1460,50 +1462,102 @@ export function exportToSarif(report: ScanReport): string {
             name: "SecScan AppSec Suite",
             semanticVersion: "2.5.0",
             informationUri: "https://github.com/secscan/secscan",
-            rules: Array.from(new Set(report.findings.map(f => f.ruleId))).map(ruleId => {
+            rules: uniqueRuleIds.map(ruleId => {
               const finding = report.findings.find(f => f.ruleId === ruleId)!;
+              const cvssScore = finding.severity === 'CRITICAL' ? '9.8' : finding.severity === 'HIGH' ? '8.0' : finding.severity === 'MEDIUM' ? '5.5' : '2.0';
+              const problemSeverity = finding.severity === 'CRITICAL' || finding.severity === 'HIGH' ? 'error' : finding.severity === 'MEDIUM' ? 'warning' : 'recommendation';
+              const tagCategory = finding.category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
               return {
                 id: finding.ruleId,
                 name: finding.ruleName,
-                shortDescription: { text: finding.description },
-                help: { text: finding.remediation },
+                shortDescription: { text: finding.ruleName },
+                fullDescription: { text: finding.description || finding.ruleName },
+                help: {
+                  text: finding.remediation,
+                  markdown: `### ${finding.ruleName}\n\n**Severity:** ${finding.severity} (CVSS: ${cvssScore})\n**Category:** ${finding.category}\n\n#### Remediation Guidance\n${finding.remediation}${finding.entropy ? `\n\n**Calculated Shannon Entropy:** ${finding.entropy.toFixed(2)} bits/char` : ''}`
+                },
+                helpUri: "https://github.com/secscan/secscan/wiki/security-rules",
                 defaultConfiguration: {
-                  level: finding.severity === 'CRITICAL' || finding.severity === 'HIGH' ? 'error' : 'warning'
+                  level: finding.severity === 'CRITICAL' || finding.severity === 'HIGH' ? 'error' : finding.severity === 'MEDIUM' ? 'warning' : 'note'
+                },
+                properties: {
+                  tags: [
+                    "security",
+                    "sast",
+                    tagCategory,
+                    finding.severity.toLowerCase()
+                  ],
+                  "problem.severity": problemSeverity,
+                  "security-severity": cvssScore,
+                  precision: "very-high"
                 }
               };
             })
           }
         },
+        invocations: [
+          {
+            executionSuccessful: true,
+            startTimeUtc: new Date(report.timestamp).toISOString(),
+            endTimeUtc: new Date(report.timestamp + (report.durationMs || 100)).toISOString()
+          }
+        ],
         properties: {
           riskScore: report.metrics.riskScore,
           riskLevel: report.metrics.riskLevel,
           securityScore: report.metrics.securityScore,
           rawRiskPoints: report.metrics.workspaceRiskBreakdown?.rawPoints ?? 0,
-          qualityGate: report.metrics.riskScore >= 75 ? 'FAIL' : report.metrics.riskScore >= 50 ? 'WARN' : 'PASS'
+          qualityGate: (report.metrics.riskScore ?? 0) >= 75 ? 'FAIL' : (report.metrics.riskScore ?? 0) >= 50 ? 'WARN' : 'PASS',
+          engine: "SecScan AppSec Suite v2.5",
+          findingsCount: report.findings.length,
+          scannedFilesCount: report.scannedFilesCount
         },
-        results: report.findings.map(finding => ({
-          ruleId: finding.ruleId,
-          level: finding.severity === 'CRITICAL' || finding.severity === 'HIGH' ? 'error' : 'warning',
-          message: {
-            text: `Exposed secret detected: ${finding.ruleName}. Value: ${finding.maskedSecret}`
-          },
-          locations: [
-            {
-              physicalLocation: {
-                artifactLocation: {
-                  uri: finding.file
-                },
-                region: {
-                  startLine: finding.line,
-                  startColumn: finding.column,
-                  snippet: {
-                    text: finding.snippet
+        results: report.findings.map(finding => {
+          const isSecret = finding.category.toLowerCase().includes('secret') || 
+            finding.category.toLowerCase().includes('token') || 
+            finding.category.toLowerCase().includes('key') || 
+            Boolean(finding.maskedSecret);
+          
+          const descriptionText = finding.description || finding.remediation;
+          const msg = isSecret
+            ? `Exposed secret detected: ${finding.ruleName}. ${finding.maskedSecret ? `Masked: ${finding.maskedSecret}` : ''}`
+            : `${finding.ruleName}: ${descriptionText}`;
+
+          return {
+            ruleId: finding.ruleId,
+            ruleIndex: Math.max(0, uniqueRuleIds.indexOf(finding.ruleId)),
+            level: finding.severity === 'CRITICAL' || finding.severity === 'HIGH' ? 'error' : finding.severity === 'MEDIUM' ? 'warning' : 'note',
+            message: {
+              text: `[${finding.severity}] ${msg}`
+            },
+            locations: [
+              {
+                physicalLocation: {
+                  artifactLocation: {
+                    uri: finding.file.replace(/^\.?\/+/, '') || 'unknown',
+                    uriBaseId: "%SRCROOT%"
+                  },
+                  region: {
+                    startLine: Math.max(1, finding.line || 1),
+                    startColumn: Math.max(1, finding.column || 1),
+                    snippet: {
+                      text: finding.snippet || ''
+                    }
                   }
                 }
               }
+            ],
+            properties: {
+              severity: finding.severity,
+              category: finding.category,
+              entropy: finding.entropy,
+              fileCriticality: finding.fileCriticality,
+              remediation: finding.remediation,
+              findingId: finding.id
             }
-          ]
-        }))
+          };
+        })
       }
     ]
   };
