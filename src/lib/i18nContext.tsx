@@ -258,7 +258,57 @@ export const PHRASE_DICTIONARY: Array<[string, string, string]> = [
   ["Regras Regex", "Regex Rules", "Reglas Regex"],
   ["Terminal CLI", "CLI Terminal", "Terminal CLI"],
   ["Pipeline Architect", "Pipeline Architect", "Arquitecto de Pipeline"],
-  ["CI/CD & Cloud", "CI/CD & Cloud", "CI/CD y Cloud"]
+  ["CI/CD & Cloud", "CI/CD & Cloud", "CI/CD y Cloud"],
+
+  // Contextual phrases with connectives
+  ["no workspace", "in workspace", "en el espacio de trabajo"],
+  ["no scanner", "in scanner", "en el escáner"],
+  ["no repositório", "in repository", "en el repositorio"],
+  ["no arquivo", "in file", "en el archivo"],
+  ["no código", "in code", "en el código"],
+  ["na linha", "at line", "en la línea"],
+  ["na esteira", "in pipeline", "en el pipeline"],
+  ["do workspace", "of the workspace", "del espacio de trabajo"],
+  ["do sistema", "of the system", "del sistema"],
+  ["do arquivo", "of the file", "del archivo"],
+  ["do repositório", "of the repository", "del repositorio"],
+  ["da aplicação", "of the application", "de la aplicación"],
+  ["da esteira", "of the pipeline", "de la esteira"],
+  ["dos achados", "of findings", "de los hallazgos"],
+  ["das vulnerabilidades", "of vulnerabilities", "de las vulnerabilidades"],
+  ["dos arquivos", "of files", "de los archivos"],
+  ["os arquivos", "the files", "los archivos"],
+  ["as regras", "the rules", "las reglas"],
+  ["os achados", "the findings", "los hallazgos"],
+  ["as vulnerabilidades", "the vulnerabilities", "las vulnerabilidades"],
+  ["as dependências", "the dependencies", "las dependencias"],
+  ["os pacotes", "the packages", "los paquetes"],
+  ["os endpoints", "the endpoints", "los endpoints"],
+  ["as rotas", "the routes", "las rutas"],
+  ["os módulos", "the modules", "los módulos"],
+  ["sem vulnerabilidades", "without vulnerabilities", "sin vulnerabilidades"],
+  ["sem falhas", "without flaws", "sin fallas"],
+  ["sem segredos", "without secrets", "sin secretos"],
+  ["com sucesso", "successfully", "con éxito"],
+  ["com falhas", "with flaws", "con fallas"],
+  ["com avisos", "with warnings", "con advertencias"],
+  ["por severidade", "by severity", "por severidad"],
+  ["por criticidade", "by criticality", "por criticidad"],
+  ["por categoria", "by category", "por categoría"],
+  ["por arquivo", "by file", "por archivo"],
+  ["para análise", "for analysis", "para análisis"],
+  ["para correção", "for fix", "para corrección"],
+  ["para remediação", "for remediation", "para remediación"],
+  ["nenhum achado encontrado", "no findings found", "ningún hallazgo encontrado"],
+  ["nenhum achado", "no findings", "ningún hallazgo"],
+  ["nenhuma vulnerabilidade encontrada", "no vulnerabilities found", "ninguna vulnerabilidad encontrada"],
+  ["nenhuma vulnerabilidade", "no vulnerabilities", "ninguna vulnerabilidad"],
+  ["nenhum arquivo encontrado", "no files found", "ningún archivo encontrado"],
+  ["nenhum arquivo", "no files", "ningún archivo"],
+  ["nenhum segredo", "no secrets", "ningún secreto"],
+  ["salvar como", "save as", "guardar como"],
+  ["exportar como", "export as", "exportar como"],
+  ["como usar", "how to use", "cómo usar"]
 ];
 
 // Phase 2: Word-level bilingual dictionary for complete coverage of all words
@@ -626,20 +676,6 @@ export const WORD_DICTIONARY: Record<string, { en: string; es: string }> = {
   "rápida": { en: "quick", es: "rápida" },
 
   // Grammar & connectives
-  "para": { en: "to", es: "para" },
-  "por": { en: "by", es: "por" },
-  "com": { en: "with", es: "con" },
-  "sem": { en: "without", es: "sin" },
-  "em": { en: "in", es: "en" },
-  "de": { en: "of", es: "de" },
-  "do": { en: "of the", es: "del" },
-  "da": { en: "of the", es: "de la" },
-  "dos": { en: "of the", es: "de los" },
-  "das": { en: "of the", es: "de las" },
-  "no": { en: "in", es: "en el" },
-  "na": { en: "in", es: "en la" },
-  "nos": { en: "in", es: "en los" },
-  "nas": { en: "in", es: "en las" },
   "pelo": { en: "by the", es: "por el" },
   "pela": { en: "by the", es: "por la" },
   "pelos": { en: "by the", es: "por los" },
@@ -695,16 +731,6 @@ export const WORD_DICTIONARY: Record<string, { en: string; es: string }> = {
   "nesta": { en: "in this", es: "en esta" },
   "nestes": { en: "in these", es: "en estos" },
   "nestas": { en: "in these", es: "en estas" },
-  "um": { en: "a", es: "un" },
-  "uma": { en: "a", es: "una" },
-  "uns": { en: "some", es: "unos" },
-  "umas": { en: "some", es: "unas" },
-  "o": { en: "the", es: "el" },
-  "a": { en: "the", es: "la" },
-  "os": { en: "the", es: "los" },
-  "as": { en: "the", es: "las" },
-  "e": { en: "and", es: "y" },
-  "ou": { en: "or", es: "o" },
   "onde": { en: "where", es: "donde" },
   "quando": { en: "when", es: "cuando" },
   "como": { en: "how", es: "cómo" },
@@ -740,7 +766,118 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     'app.export': 'Exportar',
     'app.scan_all': 'Executar Análise SAST',
     'app.scanning': 'Analisando...',
-    'app.search_placeholder': 'Buscar regras, arquivos, rotas, CVEs ou pacotes...'
+    'app.search_placeholder': 'Buscar regras, arquivos, rotas, CVEs ou pacotes...',
+    'app.duration': 'Duração:',
+    'app.risk_score': 'Risk Score:',
+
+    // Categorias de Navegação
+    'nav.category_all': 'Todos os Módulos',
+    'nav.category_code_sast': 'Code & SAST',
+    'nav.category_cloud_infra': 'Cloud & Infra',
+    'nav.category_api_dast': 'API & DAST',
+    'nav.category_soc_edr': 'SOC & EDR',
+    'nav.category_gov_ai': 'Gov, GRC & AI',
+    'nav.search_placeholder': 'Filtrar ferramentas por nome (/)...',
+    'nav.domain_label': 'Domínio:',
+
+    // Ações
+    'action.commands': 'Comandos',
+    'action.tutorial': 'Tutorial',
+    'action.exclusions': 'Exclusões',
+    'action.glossary': 'Glossário',
+    'action.gitignore': '.gitignore',
+    'action.export': 'Exportar',
+    'action.run_scan': 'Executar Análise',
+
+    // Abas de Ferramentas
+    'tab.dashboard': 'Dashboard Executivo',
+    'tab.dashboard_tooltip': 'Visão consolidada com matriz de risco e métricas executivas',
+    'tab.trenddashboard': 'Tendências de Risco',
+    'tab.trenddashboard_tooltip': 'Histórico e evolução do Risk Score e MTTR',
+    'tab.scanner': 'Scanner SAST',
+    'tab.scanner_tooltip': 'Análise estática profunda de código e detecção de segredos',
+    'tab.endpoints': 'Rotas & APIs',
+    'tab.endpoints_tooltip': 'Mapeamento e catalogação de rotas e endpoints de API',
+    'tab.jsminer': 'JS Miner Recon',
+    'tab.jsminer_tooltip': 'Mineração de bundles JS, endpoints e source maps',
+    'tab.dataflow': 'Fluxo de Dados & Taint',
+    'tab.dataflow_tooltip': 'Grafo interativo D3 de fluxo de variáveis e sinks',
+    'tab.iast': 'IAST Runtime',
+    'tab.iast_tooltip': 'Testes interativos de segurança de aplicação em tempo de execução',
+    'tab.sca': 'SCA Dependências',
+    'tab.sca_tooltip': 'Software Composition Analysis e inventário de CVEs',
+    'tab.iac': 'IaC & Kubernetes',
+    'tab.iac_tooltip': 'Auditoria de Terraform, Dockerfile e manifests K8s',
+    'tab.apisecurity': 'OWASP API Top 10',
+    'tab.apisecurity_tooltip': 'Inspeção de vulnerabilidades BOLA, quebra de autorização e rate limits',
+    'tab.asocsla': 'ASOC & SLA MTTR',
+    'tab.asocsla_tooltip': 'Gestão de conformidade com SLA e prazos de remediação',
+    'tab.dast': 'DAST Fuzzer Web',
+    'tab.dast_tooltip': 'Simulação de injeção dinâmica de payloads defensivos',
+    'tab.sbom': 'SBOM CycloneDX',
+    'tab.sbom_tooltip': 'Geração de Software Bill of Materials CycloneDX e SPDX',
+    'tab.entropy': 'Entropia de Shannon',
+    'tab.entropy_tooltip': 'Análise probabilística de alta entropia para chaves e credenciais',
+    'tab.threatmodel': 'STRIDE Ameaças',
+    'tab.threatmodel_tooltip': 'Modelagem automatizada de ameaças STRIDE e ASVS',
+    'tab.ctihub': 'CTI Threat Intel',
+    'tab.ctihub_tooltip': 'Feeds de inteligência de ameaças e IoCs em tempo real',
+    'tab.autoremediation': 'Auto-Remediação',
+    'tab.autoremediation_tooltip': 'Geração automatizada de patches unified diff',
+    'tab.refactoring': 'Refatoração Segura',
+    'tab.refactoring_tooltip': 'Sugestões de modernização e padrões de código seguro',
+    'tab.soarbuilder': 'SOAR Playbooks',
+    'tab.soarbuilder_tooltip': 'Designer visual de fluxos de resposta a incidentes',
+    'tab.llmsecurity': 'OWASP LLM & AI',
+    'tab.llmsecurity_tooltip': 'Segurança para modelos de linguagem e injeção de prompt',
+    'tab.procyber': 'Pro Cyber Tools',
+    'tab.procyber_tooltip': 'Suíte com 10 ferramentas de segurança ofensiva e defensiva',
+    'tab.policyascode': 'Policy as Code (OPA)',
+    'tab.policyascode_tooltip': 'Governança e quality gates baseados em Rego Open Policy Agent',
+    'tab.compliance': 'Conformidade Regulatória',
+    'tab.compliance_tooltip': 'Prontidão para PCI-DSS, LGPD, GDPR, HIPAA e SOC 2',
+    'tab.frameworks': 'Frameworks de Segurança',
+    'tab.frameworks_tooltip': 'Mapeamento NIST CSF, CIS Controls e MITRE ATT&CK',
+    'tab.soccommand': 'SOC 24/7 Command Center',
+    'tab.soccommand_tooltip': 'Centro de operações de segurança e correlação de alertas',
+    'tab.securityonion': 'Security Onion NSM',
+    'tab.securityonion_tooltip': 'Monitoramento de segurança de rede e telemetria Zeek',
+    'tab.crowdstrike': 'CrowdStrike Falcon',
+    'tab.crowdstrike_tooltip': 'Integração de telemetria EDR e detecções em tempo real',
+    'tab.edr': 'EDR Behavioral',
+    'tab.edr_tooltip': 'Regras de detecção comportamental e eBPF',
+    'tab.nmap': 'Nmap Port Scanner',
+    'tab.nmap_tooltip': 'Mapeamento de portas abertas e serviços de rede',
+    'tab.nikto': 'Nikto Web Scanner',
+    'tab.nikto_tooltip': 'Varredura de itens perigosos e versões de servidor web',
+    'tab.ngfw': 'NGFW Firewall',
+    'tab.ngfw_tooltip': 'Regras de inspeção de camada 7 e filtragem de pacotes',
+    'tab.idsips': 'IDS/IPS Snort',
+    'tab.idsips_tooltip': 'Assinaturas de detecção e prevenção de intrusão',
+    'tab.dnssec': 'DNS & DNSSEC',
+    'tab.dnssec_tooltip': 'Auditoria de integridade DNS, DoH e DNSSEC',
+    'tab.waf': 'WAF ModSecurity',
+    'tab.waf_tooltip': 'Regras de proteção web contra ataques OWASP',
+    'tab.sdwan': 'SD-WAN & SASE',
+    'tab.sdwan_tooltip': 'Mesh de túneis seguros e arquitetura Zero-Trust',
+    'tab.headers': 'HTTP Security Headers',
+    'tab.headers_tooltip': 'Auditoria de CSP, HSTS, X-Frame-Options e cabeçalhos',
+    'tab.containerscan': 'Container Image Scan',
+    'tab.containerscan_tooltip': 'Análise de segurança em contêineres e Dockerfiles',
+    'tab.cloudiam': 'Cloud IAM Privileges',
+    'tab.cloudiam_tooltip': 'Auditoria de privilégios mínimos e permissões wildcard',
+    'tab.jwtinspector': 'JWT Inspector',
+    'tab.jwtinspector_tooltip': 'Inspeção profunda de tokens JWT e vetores de exploração',
+    'tab.ssrfvalidator': 'SSRF Validator',
+    'tab.ssrfvalidator_tooltip': 'Validação de superfície de ataque e metadados de nuvem',
+    'tab.rules': 'Regras Customizadas',
+    'tab.rules_tooltip': 'Construtor e sandbox de expressões regulares de detecção',
+    'tab.cli': 'Terminal CLI SecScan',
+    'tab.cli_tooltip': 'Linha de comando interativa para automação de scans',
+    'tab.pipelineflow': 'Pipeline Flow',
+    'tab.pipelineflow_tooltip': 'Arquiteto visual de esteiras de segurança CI/CD',
+    'tab.cicd': 'Integrações CI/CD',
+    'tab.cicd_tooltip': 'Geração de templates para GitHub Actions, GitLab e Azure'
   },
   en: {
     'app.name': 'SECSCAN // AppSec & DevSecOps Platform',
@@ -751,7 +888,118 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     'app.export': 'Export',
     'app.scan_all': 'Run SAST Analysis',
     'app.scanning': 'Analyzing...',
-    'app.search_placeholder': 'Search rules, files, routes, CVEs or packages...'
+    'app.search_placeholder': 'Search rules, files, routes, CVEs or packages...',
+    'app.duration': 'Duration:',
+    'app.risk_score': 'Risk Score:',
+
+    // Navigation categories
+    'nav.category_all': 'All Modules',
+    'nav.category_code_sast': 'Code & SAST',
+    'nav.category_cloud_infra': 'Cloud & Infra',
+    'nav.category_api_dast': 'API & DAST',
+    'nav.category_soc_edr': 'SOC & EDR',
+    'nav.category_gov_ai': 'Gov, GRC & AI',
+    'nav.search_placeholder': 'Filter tools by name (/)...',
+    'nav.domain_label': 'Domain:',
+
+    // Actions
+    'action.commands': 'Commands',
+    'action.tutorial': 'Tutorial',
+    'action.exclusions': 'Exclusions',
+    'action.glossary': 'Glossary',
+    'action.gitignore': '.gitignore',
+    'action.export': 'Export',
+    'action.run_scan': 'Run Scan',
+
+    // Tool tabs
+    'tab.dashboard': 'Executive Dashboard',
+    'tab.dashboard_tooltip': 'Consolidated view with risk matrix and executive metrics',
+    'tab.trenddashboard': 'Risk Trends',
+    'tab.trenddashboard_tooltip': 'Historical evolution of Risk Score and MTTR',
+    'tab.scanner': 'SAST Scanner',
+    'tab.scanner_tooltip': 'Deep static code analysis and secret exposure detection',
+    'tab.endpoints': 'Routes & APIs',
+    'tab.endpoints_tooltip': 'API endpoints mapping and LinkFinder reconnaissance',
+    'tab.jsminer': 'JS Miner Recon',
+    'tab.jsminer_tooltip': 'Mining of JS bundles, API routes and source maps',
+    'tab.dataflow': 'Data Flow & Taint',
+    'tab.dataflow_tooltip': 'Interactive D3 taint flow graph from sources to sinks',
+    'tab.iast': 'IAST Runtime',
+    'tab.iast_tooltip': 'Interactive application security testing at runtime',
+    'tab.sca': 'SCA Packages',
+    'tab.sca_tooltip': 'Software Composition Analysis and CVE inventory',
+    'tab.iac': 'IaC & Kubernetes',
+    'tab.iac_tooltip': 'Terraform, Dockerfile and K8s configuration audit',
+    'tab.apisecurity': 'OWASP API Top 10',
+    'tab.apisecurity_tooltip': 'API security inspection for BOLA, broken auth, rate limits',
+    'tab.asocsla': 'ASOC & SLA MTTR',
+    'tab.asocsla_tooltip': 'SLA compliance management and remediation deadlines',
+    'tab.dast': 'DAST Web Fuzzer',
+    'tab.dast_tooltip': 'Dynamic simulation of defensive fuzzing payloads',
+    'tab.sbom': 'SBOM CycloneDX',
+    'tab.sbom_tooltip': 'CycloneDX and SPDX Software Bill of Materials generator',
+    'tab.entropy': 'Shannon Entropy',
+    'tab.entropy_tooltip': 'Shannon entropy probabilistic analysis for high-entropy secrets',
+    'tab.threatmodel': 'STRIDE Threats',
+    'tab.threatmodel_tooltip': 'Automated STRIDE and ASVS threat modeling',
+    'tab.ctihub': 'CTI Threat Intel',
+    'tab.ctihub_tooltip': 'Real-time cyber threat intelligence and IoC feeds',
+    'tab.autoremediation': 'Auto-Remediation',
+    'tab.autoremediation_tooltip': 'Unified diff remediation patch generator',
+    'tab.refactoring': 'Secure Refactoring',
+    'tab.refactoring_tooltip': 'Modernization suggestions and secure code patterns',
+    'tab.soarbuilder': 'SOAR Playbooks',
+    'tab.soarbuilder_tooltip': 'Visual incident response workflow designer',
+    'tab.llmsecurity': 'OWASP LLM & AI',
+    'tab.llmsecurity_tooltip': 'Large Language Model security and prompt injection guardrails',
+    'tab.procyber': 'Pro Cyber Tools',
+    'tab.procyber_tooltip': 'Suite of 10 professional offensive and defensive tools',
+    'tab.policyascode': 'Policy as Code (OPA)',
+    'tab.policyascode_tooltip': 'Rego-based Open Policy Agent CI/CD quality gates',
+    'tab.compliance': 'Regulatory Compliance',
+    'tab.compliance_tooltip': 'PCI-DSS, LGPD, GDPR, HIPAA and SOC 2 readiness audit',
+    'tab.frameworks': 'Security Frameworks',
+    'tab.frameworks_tooltip': 'NIST CSF, CIS Controls and MITRE ATT&CK mapping',
+    'tab.soccommand': 'SOC 24/7 Command Center',
+    'tab.soccommand_tooltip': 'Security operations center and event correlation',
+    'tab.securityonion': 'Security Onion NSM',
+    'tab.securityonion_tooltip': 'Network security monitoring and Zeek telemetry',
+    'tab.crowdstrike': 'CrowdStrike Falcon',
+    'tab.crowdstrike_tooltip': 'EDR telemetry integration and real-time detections',
+    'tab.edr': 'EDR Behavioral',
+    'tab.edr_tooltip': 'Behavioral detection rules and eBPF tracing',
+    'tab.nmap': 'Nmap Port Scanner',
+    'tab.nmap_tooltip': 'Open port and network service discovery',
+    'tab.nikto': 'Nikto Web Scanner',
+    'tab.nikto_tooltip': 'Web server misconfiguration and version scanner',
+    'tab.ngfw': 'NGFW Firewall',
+    'tab.ngfw_tooltip': 'Layer-7 traffic inspection and packet filtering rules',
+    'tab.idsips': 'IDS/IPS Snort',
+    'tab.idsips_tooltip': 'Intrusion detection and prevention signatures',
+    'tab.dnssec': 'DNS & DNSSEC',
+    'tab.dnssec_tooltip': 'DNS integrity, DoH and DNSSEC audit',
+    'tab.waf': 'WAF ModSecurity',
+    'tab.waf_tooltip': 'Web application firewall rules against OWASP attacks',
+    'tab.sdwan': 'SD-WAN & SASE',
+    'tab.sdwan_tooltip': 'Secure tunnel mesh and Zero-Trust architecture',
+    'tab.headers': 'HTTP Security Headers',
+    'tab.headers_tooltip': 'Audit of CSP, HSTS, X-Frame-Options and headers',
+    'tab.containerscan': 'Container Image Scan',
+    'tab.containerscan_tooltip': 'Container image security and Dockerfile CIS audit',
+    'tab.cloudiam': 'Cloud IAM Privileges',
+    'tab.cloudiam_tooltip': 'Least-privilege audit and wildcard permissions detector',
+    'tab.jwtinspector': 'JWT Inspector',
+    'tab.jwtinspector_tooltip': 'Deep JWT token inspection and algorithm exploit analyzer',
+    'tab.ssrfvalidator': 'SSRF Validator',
+    'tab.ssrfvalidator_tooltip': 'SSRF attack surface and cloud metadata validator',
+    'tab.rules': 'Custom Rules',
+    'tab.rules_tooltip': 'Regex rule builder and detection unit test library',
+    'tab.cli': 'SecScan CLI Terminal',
+    'tab.cli_tooltip': 'Interactive command line for scan automation',
+    'tab.pipelineflow': 'Pipeline Flow',
+    'tab.pipelineflow_tooltip': 'Visual CI/CD security pipeline architect',
+    'tab.cicd': 'CI/CD Integrations',
+    'tab.cicd_tooltip': 'Ready-to-use templates for GitHub Actions, GitLab and Azure'
   },
   es: {
     'app.name': 'SECSCAN // AppSec & DevSecOps Platform',
@@ -762,7 +1010,118 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     'app.export': 'Exportar',
     'app.scan_all': 'Ejecutar Análisis SAST',
     'app.scanning': 'Analizando...',
-    'app.search_placeholder': 'Buscar reglas, archivos, rutas, CVEs o paquetes...'
+    'app.search_placeholder': 'Buscar reglas, archivos, rutas, CVEs o paquetes...',
+    'app.duration': 'Duración:',
+    'app.risk_score': 'Puntaje de Riesgo:',
+
+    // Categorías de Navegación
+    'nav.category_all': 'Todos los Módulos',
+    'nav.category_code_sast': 'Código y SAST',
+    'nav.category_cloud_infra': 'Nube e Infra',
+    'nav.category_api_dast': 'API y DAST',
+    'nav.category_soc_edr': 'SOC y EDR',
+    'nav.category_gov_ai': 'Gov, GRC e IA',
+    'nav.search_placeholder': 'Filtrar herramientas por nombre (/)...',
+    'nav.domain_label': 'Dominio:',
+
+    // Acciones
+    'action.commands': 'Comandos',
+    'action.tutorial': 'Tutorial',
+    'action.exclusions': 'Exclusiones',
+    'action.glossary': 'Glosario',
+    'action.gitignore': '.gitignore',
+    'action.export': 'Exportar',
+    'action.run_scan': 'Ejecutar Análisis',
+
+    // Pestañas
+    'tab.dashboard': 'Tablero Ejecutivo',
+    'tab.dashboard_tooltip': 'Vista consolidada con matriz de riesgo y métricas ejecutivas',
+    'tab.trenddashboard': 'Tendencias de Riesgo',
+    'tab.trenddashboard_tooltip': 'Evolución histórica de Risk Score y MTTR',
+    'tab.scanner': 'Escáner SAST',
+    'tab.scanner_tooltip': 'Análisis estático profundo de código y detección de secretos',
+    'tab.endpoints': 'Rutas y APIs',
+    'tab.endpoints_tooltip': 'Mapeo y catalogación de rutas y endpoints de API',
+    'tab.jsminer': 'JS Miner Recon',
+    'tab.jsminer_tooltip': 'Minería de paquetes JS, rutas de API y mapas de origen',
+    'tab.dataflow': 'Flujo de Datos y Taint',
+    'tab.dataflow_tooltip': 'Grafo interactivo D3 de flujo de variables y sumideros',
+    'tab.iast': 'IAST Runtime',
+    'tab.iast_tooltip': 'Pruebas interactivas de seguridad de aplicaciones en tiempo de ejecución',
+    'tab.sca': 'SCA Dependencias',
+    'tab.sca_tooltip': 'Software Composition Analysis e inventario de CVEs',
+    'tab.iac': 'IaC y Kubernetes',
+    'tab.iac_tooltip': 'Auditoría de Terraform, Dockerfile y manifiestos de K8s',
+    'tab.apisecurity': 'OWASP API Top 10',
+    'tab.apisecurity_tooltip': 'Inspección de vulnerabilidades BOLA, autorización rota y límites de tasa',
+    'tab.asocsla': 'ASOC y SLA MTTR',
+    'tab.asocsla_tooltip': 'Gestión de cumplimiento de SLA y plazos de remediación',
+    'tab.dast': 'DAST Fuzzer Web',
+    'tab.dast_tooltip': 'Simulación de inyección dinámica de cargas defensivas',
+    'tab.sbom': 'SBOM CycloneDX',
+    'tab.sbom_tooltip': 'Generación de Software Bill of Materials CycloneDX y SPDX',
+    'tab.entropy': 'Entropía de Shannon',
+    'tab.entropy_tooltip': 'Análisis probabilístico de alta entropía para claves y credenciales',
+    'tab.threatmodel': 'STRIDE Amenazas',
+    'tab.threatmodel_tooltip': 'Modelado automatizado de amenazas STRIDE y ASVS',
+    'tab.ctihub': 'CTI Threat Intel',
+    'tab.ctihub_tooltip': 'Feeds de inteligencia de amenazas e IoCs en tiempo real',
+    'tab.autoremediation': 'Auto-Remediación',
+    'tab.autoremediation_tooltip': 'Generador de parches de remediación unified diff',
+    'tab.refactoring': 'Refactorización Segura',
+    'tab.refactoring_tooltip': 'Sugerencias de modernización y patrones de código seguro',
+    'tab.soarbuilder': 'SOAR Playbooks',
+    'tab.soarbuilder_tooltip': 'Diseñador visual de flujos de respuesta a incidentes',
+    'tab.llmsecurity': 'OWASP LLM e IA',
+    'tab.llmsecurity_tooltip': 'Seguridad para modelos de lenguaje e inyección de prompts',
+    'tab.procyber': 'Pro Cyber Tools',
+    'tab.procyber_tooltip': 'Suite con 10 herramientas profesionales ofensivas y defensivas',
+    'tab.policyascode': 'Policy as Code (OPA)',
+    'tab.policyascode_tooltip': 'Gobernanza y quality gates basados en Rego Open Policy Agent',
+    'tab.compliance': 'Cumplimiento Regulatorio',
+    'tab.compliance_tooltip': 'Auditoría de preparación para PCI-DSS, LGPD, GDPR, HIPAA y SOC 2',
+    'tab.frameworks': 'Frameworks de Seguridad',
+    'tab.frameworks_tooltip': 'Mapeo NIST CSF, CIS Controls y MITRE ATT&CK',
+    'tab.soccommand': 'SOC 24/7 Command Center',
+    'tab.soccommand_tooltip': 'Centro de operaciones de seguridad y correlación de alertas',
+    'tab.securityonion': 'Security Onion NSM',
+    'tab.securityonion_tooltip': 'Monitoreo de seguridad de red y telemetría Zeek',
+    'tab.crowdstrike': 'CrowdStrike Falcon',
+    'tab.crowdstrike_tooltip': 'Integración de telemetría EDR y detecciones en tiempo real',
+    'tab.edr': 'EDR Behavioral',
+    'tab.edr_tooltip': 'Reglas de detección conductual y eBPF',
+    'tab.nmap': 'Escáner Nmap',
+    'tab.nmap_tooltip': 'Mapeo de puertos abiertos y servicios de red',
+    'tab.nikto': 'Nikto Web Scanner',
+    'tab.nikto_tooltip': 'Escaneo de configuraciones incorrectas y versiones web',
+    'tab.ngfw': 'NGFW Firewall',
+    'tab.ngfw_tooltip': 'Inspección de capa 7 y reglas de filtrado de paquetes',
+    'tab.idsips': 'IDS/IPS Snort',
+    'tab.idsips_tooltip': 'Firmas de detección y prevención de intrusiones',
+    'tab.dnssec': 'DNS y DNSSEC',
+    'tab.dnssec_tooltip': 'Auditoría de integridad DNS, DoH y DNSSEC',
+    'tab.waf': 'WAF ModSecurity',
+    'tab.waf_tooltip': 'Reglas de firewall de aplicaciones web contra ataques OWASP',
+    'tab.sdwan': 'SD-WAN y SASE',
+    'tab.sdwan_tooltip': 'Malla de túneles seguros y arquitectura Zero-Trust',
+    'tab.headers': 'Encabezados HTTP',
+    'tab.headers_tooltip': 'Auditoría de CSP, HSTS, X-Frame-Options y encabezados',
+    'tab.containerscan': 'Escaneo de Contenedores',
+    'tab.containerscan_tooltip': 'Seguridad de imágenes de contenedor y auditoría CIS Dockerfile',
+    'tab.cloudiam': 'Cloud IAM Privileges',
+    'tab.cloudiam_tooltip': 'Auditoría de privilegios mínimos y permisos comodín',
+    'tab.jwtinspector': 'Inspector JWT',
+    'tab.jwtinspector_tooltip': 'Inspección profunda de tokens JWT y análisis de vulnerabilidades',
+    'tab.ssrfvalidator': 'Validador SSRF',
+    'tab.ssrfvalidator_tooltip': 'Validación de superficie de ataque y metadatos de nube',
+    'tab.rules': 'Reglas Personalizadas',
+    'tab.rules_tooltip': 'Constructor y sandbox de expresiones regulares de detección',
+    'tab.cli': 'Terminal CLI SecScan',
+    'tab.cli_tooltip': 'Línea de comando interactiva para automatización de análisis',
+    'tab.pipelineflow': 'Pipeline Flow',
+    'tab.pipelineflow_tooltip': 'Arquitecto visual de canalizaciones de seguridad CI/CD',
+    'tab.cicd': 'Integraciones CI/CD',
+    'tab.cicd_tooltip': 'Plantillas listas para usar en GitHub Actions, GitLab y Azure'
   }
 };
 
@@ -796,6 +1155,16 @@ function matchCase(source: string, replacement: string): string {
   return replacement;
 }
 
+// Protected technical terms regex to prevent any translation or alteration of acronyms and tooling
+const TECHNICAL_TERMS_REGEX = /\b(DoS|DDoS|SAST|DAST|IAST|SCA|IaC|SOC|EDR|SIEM|WAF|NGFW|IDS|IPS|DPI|DNS|DNSSEC|DoH|SD-WAN|SDWAN|SASE|JWT|SSRF|BOLA|BFLA|XSS|CSRF|SQLi|RCE|CORS|CSP|HSTS|CVE|CVEs|CVSS|CWE|SBOM|CycloneDX|SPDX|STRIDE|ASOC|MTTR|SLA|SLAs|OPA|Rego|REGO|REST|API|APIs|GraphQL|gRPC|HTML|JSON|CSV|PDF|SARIF|CLI|eBPF|Zeek|Snort|Suricata|Docker|Kubernetes|K8s|Falcon|CrowdStrike|Nikto|Nmap|GitHub|GitLab|Azure|AWS|GCP|Linux|Windows|macOS|OS|Node|NodeJS|TypeScript|JavaScript|SHA256|SHA1|MD5|AES|RSA|TLS|SSL|SSH|VPN|IP|IPs|TCP|UDP|HTTP|HTTPS|URL|URI|URN|UUID|OAuth|IAM|RBAC|ABAC|PCI-DSS|LGPD|GDPR|HIPAA|SOC2|CIS|MITRE|OWASP|NIST|CSF|ASVS|SecScan|AppSec|DevSecOps)\b/g;
+
+// Dangerous short words that MUST NOT be replaced in single-word translation (avoids colliding with English 'a', 'as', 'do', 'no', 'os', 'dos', etc.)
+const UNSAFE_SHORT_WORDS = new Set([
+  'a', 'as', 'e', 'o', 'os', 'no', 'do', 'dos', 'da', 'das',
+  'na', 'nas', 'nos', 'em', 'de', 'se', 'me', 'so', 'or',
+  'in', 'is', 'it', 'at', 'to', 'by', 'on', 'if', 'up', 'us'
+]);
+
 // Pre-compiled regex entries for fast execution of Phase 1
 export const COMPILED_PHRASES = PHRASE_DICTIONARY.map(([pt, en, es]) => ({
   regex: new RegExp(escapeRegex(pt), 'gi'),
@@ -803,13 +1172,13 @@ export const COMPILED_PHRASES = PHRASE_DICTIONARY.map(([pt, en, es]) => ({
   es
 }));
 
-// Two-phase translation: Phase 1 (Compound phrases protected via tokens) + Phase 2 (Word replacement)
+// Two-phase translation: Phase 1 (Compound phrases protected via tokens) + Phase 1.5 (Technical terms protection) + Phase 2 (Word replacement)
 export function translateString(str: string, targetLang: SupportedLanguage): string {
   if (targetLang === 'pt' || !str || typeof str !== 'string') return str;
   let res = str;
   const tokens: string[] = [];
 
-  // Phase 1: Compound phrases (longest first, preserved via token placeholders)
+  // Step 1: Compound phrases (longest first, preserved via token placeholders)
   for (let i = 0; i < COMPILED_PHRASES.length; i++) {
     const item = COMPILED_PHRASES[i];
     const repl = targetLang === 'en' ? item.en : item.es;
@@ -824,9 +1193,19 @@ export function translateString(str: string, targetLang: SupportedLanguage): str
     }
   }
 
-  // Phase 2: Word-level replacement for any residual Portuguese words
+  // Step 1.5: Protect standalone technical acronyms & proper nouns that were not part of compound phrases
+  res = res.replace(TECHNICAL_TERMS_REGEX, (matched) => {
+    const idx = tokens.length;
+    tokens.push(matched);
+    return `\uE000${idx}\uE001`;
+  });
+
+  // Step 2: Safe Word-level replacement for Portuguese words
   res = res.replace(/[a-zA-ZáàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ]+/g, (word) => {
     const lower = word.toLowerCase();
+    if (UNSAFE_SHORT_WORDS.has(lower)) {
+      return word;
+    }
     const entry = WORD_DICTIONARY[lower];
     if (entry) {
       const repl = targetLang === 'en' ? entry.en : entry.es;
@@ -835,7 +1214,7 @@ export function translateString(str: string, targetLang: SupportedLanguage): str
     return word;
   });
 
-  // Restore protected compound phrase tokens
+  // Step 3: Restore protected compound phrase tokens & technical terms
   if (tokens.length > 0) {
     res = res.replace(/\uE000(\d+)\uE001/g, (_, idx) => tokens[Number(idx)]);
   }
@@ -882,25 +1261,26 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       while (node) {
         const parent = node.parentElement;
         if (parent) {
-          const tag = parent.tagName ? parent.tagName.toUpperCase() : '';
-          // Skip user code editors, syntax highlighters, and raw scripts/styles
-          if (!['SCRIPT', 'STYLE', 'CODE', 'PRE', 'NOSCRIPT', 'TEXTAREA'].includes(tag)) {
-            if (!parent.closest('[data-no-translate="true"]') && !parent.closest('.prism-code, .monaco-editor, #code-snippet-pre')) {
-              const currentVal = node.nodeValue;
-              if (currentVal && currentVal.trim()) {
-                if (!originalTextNodeMap.has(node)) {
-                  originalTextNodeMap.set(node, currentVal);
+          // Strictly skip code blocks, syntax highlighters, scripts, and marked areas
+          if (!parent.closest('pre, code, kbd, script, style, noscript, textarea, .prism-code, .monaco-editor, #code-snippet-pre, [data-no-translate="true"]')) {
+            const currentVal = node.nodeValue;
+            if (currentVal && currentVal.trim()) {
+              // Store pristine original text directly on the node instance
+              let originalVal = (node as any).__origPtText || originalTextNodeMap.get(node);
+              if (!originalVal) {
+                originalVal = currentVal;
+                (node as any).__origPtText = originalVal;
+                originalTextNodeMap.set(node, originalVal);
+              }
+
+              if (targetLang === 'pt') {
+                if (node.nodeValue !== originalVal) {
+                  node.nodeValue = originalVal;
                 }
-                const originalVal = originalTextNodeMap.get(node) || currentVal;
-                if (targetLang === 'pt') {
-                  if (currentVal !== originalVal) {
-                    node.nodeValue = originalVal;
-                  }
-                } else {
-                  const translated = translateString(originalVal, targetLang);
-                  if (translated !== currentVal) {
-                    node.nodeValue = translated;
-                  }
+              } else {
+                const translated = translateString(originalVal, targetLang);
+                if (node.nodeValue !== translated) {
+                  node.nodeValue = translated;
                 }
               }
             }
@@ -913,23 +1293,22 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       const elements = root.querySelectorAll('[title], [placeholder], [aria-label]');
       for (let i = 0; i < elements.length; i++) {
         const el = elements[i];
-        const tag = el.tagName ? el.tagName.toUpperCase() : '';
-        if (['CODE', 'PRE', 'SCRIPT', 'STYLE'].includes(tag)) continue;
-        if (el.closest('[data-no-translate="true"]')) continue;
+        if (el.closest('pre, code, kbd, script, style, noscript, textarea, .prism-code, .monaco-editor, #code-snippet-pre, [data-no-translate="true"]')) continue;
 
-        let stored = originalAttrMap.get(el);
+        let stored = (el as any).__origAttrs || originalAttrMap.get(el);
         if (!stored) {
           stored = {};
           if (el.hasAttribute('title')) stored.title = el.getAttribute('title') || '';
           if (el.hasAttribute('placeholder')) stored.placeholder = el.getAttribute('placeholder') || '';
           if (el.hasAttribute('aria-label')) stored['aria-label'] = el.getAttribute('aria-label') || '';
+          (el as any).__origAttrs = stored;
           originalAttrMap.set(el, stored);
         }
 
         const attrs = ['title', 'placeholder', 'aria-label'] as const;
         for (let j = 0; j < attrs.length; j++) {
           const attr = attrs[j];
-          if (stored[attr] !== undefined) {
+          if (stored[attr] !== undefined && stored[attr].trim()) {
             const original = stored[attr];
             if (targetLang === 'pt') {
               if (el.getAttribute(attr) !== original) {
@@ -1032,7 +1411,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
           } finally {
             isApplying = false;
           }
-        }, 50);
+        }, 40);
       }
     });
 
@@ -1051,7 +1430,12 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
 
   const t = (key: string, params?: Record<string, string | number>, defaultText?: string): string => {
     const langDict = TRANSLATIONS[language] || TRANSLATIONS.pt;
-    let text = langDict[key] || TRANSLATIONS.en[key] || TRANSLATIONS.pt[key] || defaultText || key;
+    let text = langDict[key] || TRANSLATIONS.en[key] || TRANSLATIONS.pt[key];
+
+    if (!text) {
+      const fallback = defaultText || key;
+      text = language === 'pt' ? fallback : translateString(fallback, language);
+    }
 
     if (params) {
       Object.entries(params).forEach(([paramKey, val]) => {

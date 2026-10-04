@@ -1342,7 +1342,7 @@ export default function App() {
       />
 
       {/* Main Container Content */}
-      <main key={`app-main-${language}`} className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">
         {/* Workspace Ingestion & Security Validation Banner */}
         {validationNotice && (
           <div 

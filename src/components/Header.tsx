@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { 
   ShieldAlert, 
   ShieldCheck,
@@ -164,13 +164,53 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'cicd', category: 'GOV_AI', label: t('tab.cicd'), icon: CloudCog, tooltip: t('tab.cicd_tooltip') },
   ], [t, language, report]);
 
-  // Auto-switch domain category if activeTab belongs to a different domain
+  // Primary landing tab for each domain
+  const PRIMARY_DOMAIN_TABS: Record<string, string> = useMemo(() => ({
+    CODE_SAST: 'scanner',
+    CLOUD_INFRA: 'iac',
+    API_DAST: 'apisecurity',
+    SOC_EDR: 'soccommand',
+    GOV_AI: 'dashboard',
+  }), []);
+
+  // Track previous active tab to sync category smoothly without feedback loops
+  const lastActiveTabRef = useRef(activeTab);
+
   useEffect(() => {
-    const item = navItems.find(i => i.id === activeTab);
-    if (item && selectedCategory !== 'ALL' && item.category !== selectedCategory) {
-      setSelectedCategory('ALL');
+    if (lastActiveTabRef.current !== activeTab) {
+      lastActiveTabRef.current = activeTab;
+      const currentItem = navItems.find(i => i.id === activeTab);
+      if (currentItem && selectedCategory !== 'ALL' && currentItem.category !== selectedCategory) {
+        setSelectedCategory(currentItem.category);
+      }
     }
   }, [activeTab, navItems, selectedCategory]);
+
+  // Handler for domain navigation in ribbon
+  const handleDomainSelect = (domainId: 'ALL' | 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI') => {
+    setSelectedCategory(domainId);
+
+    if (domainId === 'ALL') {
+      return;
+    }
+
+    const currentItem = navItems.find(i => i.id === activeTab);
+    // If user is not already in a tab belonging to this domain, navigate to the default module
+    if (!currentItem || currentItem.category !== domainId) {
+      const targetTab = PRIMARY_DOMAIN_TABS[domainId];
+      if (targetTab) {
+        setActiveTab(targetTab);
+      }
+    }
+  };
+
+  // Scroll active sub-tab into view if it overflows horizontally
+  useEffect(() => {
+    const el = document.getElementById(`nav-tab-${activeTab}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    }
+  }, [activeTab]);
 
   const visibleNavItems = useMemo(() => {
     let items = selectedCategory === 'ALL' ? navItems : navItems.filter(item => item.category === selectedCategory);
@@ -187,12 +227,12 @@ export const Header: React.FC<HeaderProps> = ({
   }, [selectedCategory, navItems, toolSearchTerm]);
 
   const SECOPS_DOMAINS = useMemo(() => [
-    { id: 'ALL' as const, label: t('nav.category_all'), count: navItems.length },
-    { id: 'CODE_SAST' as const, label: t('nav.category_code_sast'), count: navItems.filter(i => i.category === 'CODE_SAST').length },
-    { id: 'CLOUD_INFRA' as const, label: t('nav.category_cloud_infra'), count: navItems.filter(i => i.category === 'CLOUD_INFRA').length },
-    { id: 'API_DAST' as const, label: t('nav.category_api_dast'), count: navItems.filter(i => i.category === 'API_DAST').length },
-    { id: 'SOC_EDR' as const, label: t('nav.category_soc_edr'), count: navItems.filter(i => i.category === 'SOC_EDR').length },
-    { id: 'GOV_AI' as const, label: t('nav.category_gov_ai'), count: navItems.filter(i => i.category === 'GOV_AI').length },
+    { id: 'ALL' as const, label: t('nav.category_all'), count: navItems.length, icon: Layers },
+    { id: 'CODE_SAST' as const, label: t('nav.category_code_sast'), count: navItems.filter(i => i.category === 'CODE_SAST').length, icon: FileCode2 },
+    { id: 'CLOUD_INFRA' as const, label: t('nav.category_cloud_infra'), count: navItems.filter(i => i.category === 'CLOUD_INFRA').length, icon: Container },
+    { id: 'API_DAST' as const, label: t('nav.category_api_dast'), count: navItems.filter(i => i.category === 'API_DAST').length, icon: Route },
+    { id: 'SOC_EDR' as const, label: t('nav.category_soc_edr'), count: navItems.filter(i => i.category === 'SOC_EDR').length, icon: Radio },
+    { id: 'GOV_AI' as const, label: t('nav.category_gov_ai'), count: navItems.filter(i => i.category === 'GOV_AI').length, icon: ShieldCheck },
   ], [t, navItems]);
 
   return (
@@ -496,30 +536,55 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* SecOps Domain Category Selector Ribbon & Fast Search */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 pt-2 pb-1.5 border-b border-[#1A1A1A]">
+        <div 
+          id="header-domain-navigation-ribbon"
+          className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 py-2 px-3 my-1.5 rounded-lg bg-[#0A0A0E]/95 border border-[#1E1E26] shadow-sm backdrop-blur-md"
+        >
           {/* Domain tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-            <span className="text-[10px] font-mono text-[#555] uppercase font-bold tracking-wider shrink-0 mr-1 hidden sm:inline">
-              Domínio:
-            </span>
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5">
+            <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400 uppercase font-black tracking-wider shrink-0 mr-1 hidden sm:flex">
+              <span className="text-[#FF3E00]">⚡</span>
+              <span>{language === 'pt' ? 'Módulos:' : language === 'es' ? 'Módulos:' : 'Modules:'}</span>
+            </div>
             {SECOPS_DOMAINS.map(domain => {
+              const Icon = domain.icon;
               const isSelected = selectedCategory === domain.id;
+              // Check if currently activeTab belongs to this category when in ALL mode
+              const currentItem = navItems.find(i => i.id === activeTab);
+              const isCurrentTabDomain = currentItem?.category === domain.id;
+
               return (
                 <button
                   key={domain.id}
-                  onClick={() => setSelectedCategory(domain.id)}
-                  className={`flex items-center gap-1.5 py-1 px-2.5 rounded text-[10.5px] font-mono font-bold tracking-wide uppercase transition-all whitespace-nowrap cursor-pointer shrink-0 border ${
+                  id={`domain-nav-btn-${domain.id.toLowerCase()}`}
+                  onClick={() => handleDomainSelect(domain.id)}
+                  title={`${domain.label} (${domain.count} ${language === 'pt' ? 'módulos' : language === 'es' ? 'módulos' : 'modules'}) - ${language === 'pt' ? 'Clique para navegar' : language === 'es' ? 'Haga clic para navegar' : 'Click to navigate'}`}
+                  className={`flex items-center gap-2 py-1.5 px-3 rounded-md text-[11px] font-mono font-bold tracking-wide uppercase transition-all whitespace-nowrap cursor-pointer shrink-0 border relative group ${
                     isSelected
-                      ? 'bg-[#1C1C1C] text-[#00FF41] border-[#00FF41]/40 shadow-xs'
-                      : 'bg-transparent text-[#777] hover:text-white border-transparent hover:border-[#222]'
+                      ? 'bg-[#181820] text-white border-[#00FF41]/70 shadow-[0_0_12px_rgba(0,255,65,0.2)]'
+                      : isCurrentTabDomain && selectedCategory === 'ALL'
+                      ? 'bg-[#121217] text-zinc-200 border-[#FF3E00]/40 hover:border-[#FF3E00]/70'
+                      : 'bg-[#0E0E12] text-zinc-400 hover:text-zinc-100 hover:bg-[#16161D] border-[#22222B] hover:border-zinc-600'
                   }`}
                 >
-                  <span>{domain.label}</span>
-                  <span className={`text-[9px] font-mono ${
-                    isSelected ? 'text-[#00FF41]/75' : 'text-[#555]'
+                  <Icon className={`w-3.5 h-3.5 shrink-0 transition-transform group-hover:scale-110 ${
+                    isSelected 
+                      ? 'text-[#00FF41]' 
+                      : isCurrentTabDomain && selectedCategory === 'ALL'
+                      ? 'text-[#FF3E00]'
+                      : 'text-zinc-500'
+                  }`} />
+                  <span className="tracking-tight">{domain.label}</span>
+                  <span className={`text-[9.5px] font-mono px-1.5 py-0.2 rounded font-black ${
+                    isSelected
+                      ? 'bg-[#00FF41]/20 text-[#00FF41] border border-[#00FF41]/50'
+                      : 'bg-black/50 text-zinc-400 border border-[#272730]'
                   }`}>
-                    ({domain.count})
+                    {domain.count}
                   </span>
+                  {isSelected && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00FF41] shadow-[0_0_6px_#00FF41] animate-pulse shrink-0 ml-0.5" />
+                  )}
                 </button>
               );
             })}
@@ -534,8 +599,13 @@ export const Header: React.FC<HeaderProps> = ({
                 type="text"
                 value={toolSearchTerm}
                 onChange={(e) => setToolSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && visibleNavItems.length > 0) {
+                    setActiveTab(visibleNavItems[0].id);
+                  }
+                }}
                 placeholder={t('nav.search_placeholder')}
-                className="w-44 sm:w-56 h-7.5 pl-8 pr-7 text-[11px] font-mono bg-[#0D0D10] border border-[#27272A] focus:border-[#FF3E00]/70 rounded text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-[#FF3E00]/50 transition-all"
+                className="w-44 sm:w-56 h-8 pl-8 pr-7 text-[11px] font-mono bg-[#0D0D10] border border-[#27272A] focus:border-[#FF3E00]/70 rounded text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-[#FF3E00]/50 transition-all"
               />
               {toolSearchTerm ? (
                 <button
@@ -543,7 +613,7 @@ export const Header: React.FC<HeaderProps> = ({
                   className="absolute right-2 text-zinc-400 hover:text-white cursor-pointer"
                   title="Limpar filtro"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               ) : (
                 <kbd className="hidden sm:inline-block absolute right-2 text-[9px] font-mono px-1 py-0.2 bg-[#1A1A1E] text-zinc-500 border border-zinc-700/50 rounded pointer-events-none">
@@ -553,7 +623,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             {toolSearchTerm && (
               <span className="text-[10px] font-mono text-zinc-400 whitespace-nowrap">
-                {visibleNavItems.length} encontrada{visibleNavItems.length !== 1 ? 's' : ''}
+                {visibleNavItems.length} {language === 'pt' ? 'encontrado(s)' : 'found'}
               </span>
             )}
           </div>

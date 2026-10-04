@@ -6,8 +6,7 @@ import { LanguageProvider, useLanguage } from './lib/i18nContext';
 import './index.css';
 
 const AppContainer: React.FC = () => {
-  const { language } = useLanguage();
-  return <App key={language} />;
+  return <App />;
 };
 
 createRoot(document.getElementById('root')!).render(
