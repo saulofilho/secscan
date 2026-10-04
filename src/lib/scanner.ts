@@ -668,13 +668,16 @@ export function matchesIgnorePattern(filePath: string, rawPattern: string): bool
  */
 export function isThirdPartyOrIgnored(
   filePath: string,
-  customIgnorePatterns: string[] = []
+  customIgnorePatterns: Array<string | { pattern: string; enabled?: boolean }> = []
 ): { isIgnored: boolean; reason?: string } {
   const normalized = filePath.replace(/\\/g, '/').toLowerCase();
 
   // 1. Custom user global ignore patterns take precedence
-  for (const pattern of customIgnorePatterns) {
-    if (matchesIgnorePattern(filePath, pattern)) {
+  for (const item of customIgnorePatterns) {
+    if (!item) continue;
+    if (typeof item === 'object' && item.enabled === false) continue;
+    const pattern = typeof item === 'string' ? item : item.pattern;
+    if (typeof pattern === 'string' && matchesIgnorePattern(filePath, pattern)) {
       return { isIgnored: true, reason: `Global Ignore List (${pattern})` };
     }
   }
@@ -754,7 +757,7 @@ function getLineAndColumn(content: string, index: number): { line: number; colum
 function scanSingleFile(
   file: ScannedFile,
   activeRules: RegexRule[],
-  customIgnorePatterns: string[],
+  customIgnorePatterns: Array<string | IgnorePatternItem>,
   findings: ScanFinding[],
   apiEndpoints: ApiEndpointFinding[],
   allSourceMaps: SourceMapFinding[],
@@ -1079,7 +1082,7 @@ function assembleScanReport(
 export function scanSourceFiles(
   files: ScannedFile[],
   rules: RegexRule[],
-  customIgnorePatterns: string[] = [],
+  customIgnorePatterns: Array<string | IgnorePatternItem> = [],
   onLog?: (event: AuditLogEvent) => void,
   onProgress?: (progress: ScanProgress) => void
 ): ScanReport {
@@ -1211,7 +1214,7 @@ export function scanSourceFiles(
 export async function scanSourceFilesAsync(
   files: ScannedFile[],
   rules: RegexRule[],
-  customIgnorePatterns: string[] = [],
+  customIgnorePatterns: Array<string | IgnorePatternItem> = [],
   onLog?: (event: AuditLogEvent) => void,
   onProgress?: (progress: ScanProgress) => void
 ): Promise<ScanReport> {
@@ -1447,6 +1450,28 @@ export function exportToCsv(report: ScanReport): string {
 }
 
 /**
+ * Translates internal severity levels (CRITICAL, HIGH, WARNING, MEDIUM, LOW, INFO)
+ * to standard OASIS SARIF v2.1 'level' strings ('error', 'warning', 'note')
+ * for accurate rendering in GitHub Advanced Security and third-party security platforms.
+ */
+export function mapSeverityToSarifLevel(severity: string): 'error' | 'warning' | 'note' {
+  const normalized = (severity || '').toUpperCase().trim();
+  switch (normalized) {
+    case 'CRITICAL':
+    case 'HIGH':
+      return 'error';
+    case 'WARNING':
+    case 'MEDIUM':
+      return 'warning';
+    case 'LOW':
+    case 'INFO':
+    case 'NOTE':
+    default:
+      return 'note';
+  }
+}
+
+/**
  * Exports report to SARIF 2.1.0 standard (OASIS standard consumed natively by GitHub Advanced Security & Code Scanning)
  * @param report The scan report to serialize
  * @param includeSummaryMetadata When true, includes platform-wide risk metrics, quality gate status, and invocations
@@ -1477,7 +1502,7 @@ export function exportToSarif(report: ScanReport, includeSummaryMetadata: boolea
             },
             helpUri: "https://github.com/secscan/secscan/wiki/security-rules",
             defaultConfiguration: {
-              level: finding.severity === 'CRITICAL' || finding.severity === 'HIGH' ? 'error' : finding.severity === 'MEDIUM' ? 'warning' : 'note'
+              level: mapSeverityToSarifLevel(finding.severity)
             },
             properties: {
               tags: [
@@ -1498,11 +1523,14 @@ export function exportToSarif(report: ScanReport, includeSummaryMetadata: boolea
 
   // Include platform-wide summary metadata and invocations only if toggled
   if (includeSummaryMetadata) {
+    const startMs = new Date(report.timestamp).getTime() || Date.now();
+    const endMs = startMs + (typeof report.durationMs === 'number' ? report.durationMs : 100);
+
     sarifRun.invocations = [
       {
         executionSuccessful: true,
-        startTimeUtc: new Date(report.timestamp).toISOString(),
-        endTimeUtc: new Date(report.timestamp + (report.durationMs || 100)).toISOString()
+        startTimeUtc: new Date(startMs).toISOString(),
+        endTimeUtc: new Date(endMs).toISOString()
       }
     ];
 
@@ -1532,7 +1560,7 @@ export function exportToSarif(report: ScanReport, includeSummaryMetadata: boolea
           return {
             ruleId: finding.ruleId,
             ruleIndex: Math.max(0, uniqueRuleIds.indexOf(finding.ruleId)),
-            level: finding.severity === 'CRITICAL' || finding.severity === 'HIGH' ? 'error' : finding.severity === 'MEDIUM' ? 'warning' : 'note',
+            level: mapSeverityToSarifLevel(finding.severity),
             message: {
               text: `[${finding.severity}] ${msg}`
             },

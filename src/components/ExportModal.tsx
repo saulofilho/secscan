@@ -20,6 +20,28 @@ import { ScanReport } from '../types';
 import { exportToJson, exportToCsv, exportToSarif, exportToMarkdown } from '../lib/scanner';
 import { downloadSecurityReportPdf } from '../lib/pdfReportGenerator';
 
+/**
+ * Translates internal severity levels (CRITICAL, HIGH, WARNING, MEDIUM, LOW, INFO)
+ * to standard OASIS SARIF v2.1 'level' strings ('error', 'warning', 'note')
+ * for accurate rendering in GitHub Advanced Security and third-party security platforms.
+ */
+export function mapSeverityToSarifLevel(severity: string): 'error' | 'warning' | 'note' {
+  const normalized = (severity || '').toUpperCase().trim();
+  switch (normalized) {
+    case 'CRITICAL':
+    case 'HIGH':
+      return 'error';
+    case 'WARNING':
+    case 'MEDIUM':
+      return 'warning';
+    case 'LOW':
+    case 'INFO':
+    case 'NOTE':
+    default:
+      return 'note';
+  }
+}
+
 interface ExportModalProps {
   report: ScanReport;
   onClose: () => void;

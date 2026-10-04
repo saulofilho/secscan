@@ -42,6 +42,11 @@ const COMMON_WEAK_SECRETS = [
 ];
 
 function base64UrlDecode(str: string): string {
+  if (typeof Buffer !== 'undefined') {
+    try {
+      return Buffer.from(str, 'base64url').toString('utf8');
+    } catch {}
+  }
   let output = str.replace(/-/g, '+').replace(/_/g, '/');
   switch (output.length % 4) {
     case 0: break;
