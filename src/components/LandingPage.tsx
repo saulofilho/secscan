@@ -32,19 +32,66 @@ import {
   BookOpen,
   Boxes,
   Code2,
-  Database
+  Database,
+  Globe,
+  Loader2
 } from 'lucide-react';
 import { useLanguage } from '../lib/i18nContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { ScannedFile } from '../types';
 
 interface LandingPageProps {
   onEnterApp: (loadDemoData?: boolean) => void;
+  onOpenUrlIngest?: () => void;
+  onIngestUrlFiles?: (files: ScannedFile[], targetUrl: string) => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ 
+  onEnterApp,
+  onOpenUrlIngest,
+  onIngestUrlFiles
+}) => {
   const { language } = useLanguage();
   const [activeDomainTab, setActiveDomainTab] = useState<'sast' | 'iac' | 'dast' | 'soc' | 'gov'>('sast');
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+  const [heroUrlInput, setHeroUrlInput] = useState('');
+  const [isHeroLoading, setIsHeroLoading] = useState(false);
+  const [heroError, setHeroError] = useState<string | null>(null);
+
+  const handleHeroUrlSubmit = async (customUrl?: string) => {
+    const rawUrl = customUrl || heroUrlInput;
+    if (!rawUrl || !rawUrl.trim()) return;
+
+    let targetUrl = rawUrl.trim();
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = 'https://' + targetUrl;
+    }
+
+    setIsHeroLoading(true);
+    setHeroError(null);
+
+    try {
+      const res = await fetch('/api/url-ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: targetUrl })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Falha ao auditar URL.');
+      }
+
+      setIsHeroLoading(false);
+      if (onIngestUrlFiles) {
+        onIngestUrlFiles(data.files, targetUrl);
+      } else {
+        onEnterApp(false);
+      }
+    } catch (err: any) {
+      setIsHeroLoading(false);
+      setHeroError(err.message || 'Não foi possível conectar ao host.');
+    }
+  };
 
   // Content localized for PT, EN, and ES
   const content = {
@@ -704,6 +751,18 @@ critical_findings[f] {
           {/* Right actions: Language switcher + Enter button */}
           <div className="flex items-center gap-3">
             <LanguageSwitcher />
+
+            {onOpenUrlIngest && (
+              <button
+                id="landing-btn-nav-audit-url"
+                onClick={onOpenUrlIngest}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#00F0FF]/10 hover:bg-[#00F0FF]/20 text-[#00F0FF] border border-[#00F0FF]/30 font-mono text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                title="Auditar website ou API pública via link direto"
+              >
+                <Globe className="w-3.5 h-3.5 text-[#00F0FF]" />
+                <span>Auditar URL</span>
+              </button>
+            )}
             
             <button
               id="landing-btn-enter-app-nav"
@@ -768,6 +827,50 @@ critical_findings[f] {
               <Play className="w-4 h-4 text-[#00FF41]" />
               <span>{t.ctaSecondary}</span>
             </button>
+          </div>
+
+          {/* Direct URL Audit Ingestion Bar */}
+          <div className="pt-2 max-w-xl mx-auto w-full">
+            <div className="p-2 rounded-xl bg-[#0B0B12] border border-[#232332] focus-within:border-[#00F0FF] shadow-lg flex flex-col sm:flex-row items-center gap-2 transition-all">
+              <div className="relative flex-1 w-full">
+                <Globe className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="url"
+                  value={heroUrlInput}
+                  onChange={(e) => setHeroUrlInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleHeroUrlSubmit();
+                  }}
+                  placeholder="Ou audite via link (ex: https://meusite.com)"
+                  disabled={isHeroLoading}
+                  className="w-full pl-9 pr-3 py-2 bg-transparent text-xs text-white placeholder-zinc-500 font-mono focus:outline-none disabled:opacity-50"
+                />
+              </div>
+              <button
+                id="landing-btn-hero-audit-url"
+                onClick={() => handleHeroUrlSubmit()}
+                disabled={isHeroLoading || !heroUrlInput.trim()}
+                className="w-full sm:w-auto px-4 py-2 rounded-lg bg-[#00F0FF]/15 hover:bg-[#00F0FF]/25 text-[#00F0FF] border border-[#00F0FF]/40 hover:border-[#00F0FF] font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              >
+                {isHeroLoading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Auditando...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Auditar Link</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </button>
+            </div>
+            {heroError && (
+              <div className="mt-2 text-rose-400 text-[11px] font-mono flex items-center justify-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span>{heroError}</span>
+              </div>
+            )}
           </div>
 
           {/* Clean Unboxed Metadata Strip (Zero-Pill Discipline) */}

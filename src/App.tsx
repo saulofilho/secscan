@@ -79,6 +79,7 @@ import { JwtTokenInspectorView } from './components/JwtTokenInspectorView';
 import { SsrfValidatorView } from './components/SsrfValidatorView';
 import { ToolGuideModal } from './components/ToolGuideModal';
 import { LandingPage } from './components/LandingPage';
+import { UrlIngestModal } from './components/UrlIngestModal';
 import { GitignoreAuditModal } from './components/GitignoreAuditModal';
 import { auditGitignoreSecurity } from './lib/gitignoreAuditor';
 import { useLanguage } from './lib/i18nContext';
@@ -162,6 +163,7 @@ export default function App() {
   const [showToolGuideModal, setShowToolGuideModal] = useState<boolean>(false);
   const [toolGuideTargetTab, setToolGuideTargetTab] = useState<string>('compliance');
   const [showGitignoreModal, setShowGitignoreModal] = useState<boolean>(false);
+  const [showUrlIngestModal, setShowUrlIngestModal] = useState<boolean>(false);
   const [shortcutToast, setShortcutToast] = useState<{ message: string; key?: string } | null>(null);
 
   // Policy-as-Code (Open Policy Agent - OPA Rego) State
@@ -613,6 +615,26 @@ export default function App() {
     setIgnorePatterns(newPatterns);
     executeScan(files, rules, newPatterns);
   };
+
+  const handleIngestUrlFiles = useCallback((ingestedFiles: ScannedFile[], targetUrl: string) => {
+    if (!ingestedFiles || ingestedFiles.length === 0) return;
+    setFiles(ingestedFiles);
+    setSelectedFile(ingestedFiles[0]);
+    setCurrentView('app');
+    setActiveTab('scanner');
+
+    executeScan(ingestedFiles, rules, ignorePatterns);
+
+    const logEvent: AuditLogEvent = {
+      id: `audit-url-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'SCAN_COMPLETE',
+      message: `Auditoria web iniciada para ${targetUrl} (${ingestedFiles.length} arquivos ingeridos).`,
+      severity: 'LOW',
+      details: { action: 'URL_INGEST', targetUrl, filesCount: ingestedFiles.length }
+    };
+    setAuditLogs(prev => [logEvent, ...prev].slice(0, 80));
+  }, [rules, ignorePatterns, executeScan]);
 
   const handleToggleIgnorePattern = (id: string) => {
     const updated = ignorePatterns.map(p => p.id === id ? { ...p, enabled: !p.enabled } : p);
@@ -1325,7 +1347,20 @@ export default function App() {
   ]);
 
   if (currentView === 'landing') {
-    return <LandingPage onEnterApp={handleEnterApp} />;
+    return (
+      <>
+        <LandingPage 
+          onEnterApp={handleEnterApp} 
+          onOpenUrlIngest={() => setShowUrlIngestModal(true)}
+          onIngestUrlFiles={handleIngestUrlFiles}
+        />
+        <UrlIngestModal
+          isOpen={showUrlIngestModal}
+          onClose={() => setShowUrlIngestModal(false)}
+          onIngestSuccess={handleIngestUrlFiles}
+        />
+      </>
+    );
   }
 
   return (
@@ -1360,6 +1395,7 @@ export default function App() {
         }}
         onOpenGitignoreAudit={() => setShowGitignoreModal(true)}
         onNavigateToLanding={handleNavigateToLanding}
+        onOpenUrlIngest={() => setShowUrlIngestModal(true)}
       />
 
       {/* Main Container Content */}
@@ -2009,6 +2045,7 @@ export default function App() {
             onQuickIgnore={handleQuickIgnore}
             onOpenGlossary={handleOpenGlossary}
             onApplyFix={handleApplyFix}
+            onOpenUrlIngest={() => setShowUrlIngestModal(true)}
           />
         )}
 
@@ -2616,6 +2653,13 @@ export default function App() {
         files={files}
         onApplyGitignoreToWorkspace={handleApplyGitignoreToWorkspace}
         onRemoveFileFromWorkspace={handleRemoveFileFromWorkspace}
+      />
+
+      {/* URL & Live Website Audit Modal */}
+      <UrlIngestModal
+        isOpen={showUrlIngestModal}
+        onClose={() => setShowUrlIngestModal(false)}
+        onIngestSuccess={handleIngestUrlFiles}
       />
 
       {/* Non-intrusive Shortcut Toast Feedback */}

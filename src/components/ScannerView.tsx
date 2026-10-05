@@ -19,7 +19,9 @@ import {
   Terminal, 
   Wrench, 
   ExternalLink,
-  X
+  X,
+  Globe,
+  ArrowRight
 } from 'lucide-react';
 import { ScannedFile, ScanFinding, SeverityLevel, IgnorePatternItem } from '../types';
 import { SecurityGlossaryTooltip, SecurityGlossaryInlineCard } from './SecurityGlossary';
@@ -43,6 +45,7 @@ interface ScannerViewProps {
   onOpenGlossary?: (entry?: SecurityGlossaryEntry) => void;
   onOpenRemediationWiki?: (finding?: ScanFinding) => void;
   onApplyFix?: (finding: ScanFinding, newSnippet: string) => void;
+  onOpenUrlIngest?: () => void;
 }
 
 export const ScannerView: React.FC<ScannerViewProps> = ({
@@ -57,7 +60,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   onQuickIgnore,
   onOpenGlossary,
   onOpenRemediationWiki,
-  onApplyFix
+  onApplyFix,
+  onOpenUrlIngest
 }) => {
   const { language, t, translateText } = useLanguage();
   const safeFiles = Array.isArray(files) ? files : [];
@@ -143,14 +147,50 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
               <FolderTree className="w-3.5 h-3.5 text-[#FF3E00]" />
               <span>Workspace Files ({files.length})</span>
             </h2>
-            <button
-              onClick={() => setShowPasteModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-white border border-[#333] bg-[#111] hover:bg-white hover:text-black transition-colors"
-            >
-              <Plus className="w-3 h-3" />
-              <span>Paste Code</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              {onOpenUrlIngest && (
+                <button
+                  id="btn-scanner-open-url-audit"
+                  onClick={onOpenUrlIngest}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[#00F0FF] border border-[#00F0FF]/40 bg-[#00F0FF]/10 hover:bg-[#00F0FF]/20 transition-colors cursor-pointer"
+                  title="Auditar website ou API pública via URL"
+                >
+                  <Globe className="w-3 h-3 text-[#00F0FF]" />
+                  <span>Auditar URL</span>
+                </button>
+              )}
+              <button
+                onClick={() => setShowPasteModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-white border border-[#333] bg-[#111] hover:bg-white hover:text-black transition-colors cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Paste Code</span>
+              </button>
+            </div>
           </div>
+
+          {/* Quick URL Audit Alternative Banner */}
+          {onOpenUrlIngest && (
+            <button
+              id="btn-scanner-banner-url-audit"
+              onClick={onOpenUrlIngest}
+              className="w-full flex items-center justify-between p-3 rounded-lg bg-[#080D14] border border-[#00F0FF]/30 hover:border-[#00F0FF] hover:bg-[#0C1522] text-left transition-all cursor-pointer group shadow-xs"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-7 h-7 rounded bg-[#00F0FF]/15 border border-[#00F0FF]/40 flex items-center justify-center text-[#00F0FF] group-hover:scale-110 transition-transform shrink-0">
+                  <Globe className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold text-white group-hover:text-[#00F0FF] transition-colors flex items-center gap-1.5">
+                    <span>Não tem arquivos locais?</span>
+                    <span className="text-[9px] px-1 py-0.2 rounded bg-[#00F0FF]/20 text-[#00F0FF] border border-[#00F0FF]/40 font-mono font-bold">NOVO</span>
+                  </div>
+                  <div className="text-[10px] text-zinc-400 truncate">Audite qualquer site ou API pública via link direto</div>
+                </div>
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-[#00F0FF] group-hover:translate-x-1 transition-transform shrink-0 ml-2" />
+            </button>
+          )}
 
           {/* File Upload Drag & Drop Area */}
           <label className="border border-dashed border-[#333] hover:border-[#FF3E00] hover:bg-[#FF3E00]/5 p-5 flex flex-col items-center justify-center cursor-pointer transition-colors text-center group">

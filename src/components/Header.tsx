@@ -70,6 +70,7 @@ interface HeaderProps {
   onOpenToolGuide?: (toolId?: string) => void;
   onOpenGitignoreAudit?: () => void;
   onNavigateToLanding?: () => void;
+  onOpenUrlIngest?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -90,7 +91,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenShortcuts,
   onOpenToolGuide,
   onOpenGitignoreAudit,
-  onNavigateToLanding
+  onNavigateToLanding,
+  onOpenUrlIngest
 }) => {
   const isMac = useMemo(() => {
     return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -415,6 +417,19 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <BookOpen className="w-3.5 h-3.5 text-[#FF3E00] shrink-0" />
                 <span>Página Inicial</span>
+              </button>
+            )}
+
+            {/* Auditar URL Button */}
+            {onOpenUrlIngest && (
+              <button
+                id="btn-header-open-url-audit"
+                onClick={onOpenUrlIngest}
+                className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-[#00F0FF] hover:text-white bg-[#00F0FF]/10 hover:bg-[#00F0FF]/25 border border-[#00F0FF]/30 hover:border-[#00F0FF] transition-all cursor-pointer shadow-xs"
+                title="Auditar website ou API pública via URL"
+              >
+                <Globe className="w-3.5 h-3.5 text-[#00F0FF] shrink-0" />
+                <span className="hidden sm:inline">Auditar URL</span>
               </button>
             )}
 

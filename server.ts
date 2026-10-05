@@ -742,6 +742,186 @@ Responda ESTRITAMENTE em formato JSON com o seguinte formato, sem markdown ou fe
     }
   });
 
+  // ==========================================
+  // URL & LIVE WEBSITE AUDIT INGESTION ENGINE
+  // ==========================================
+  app.post('/api/url-ingest', async (req, res) => {
+    try {
+      const { url } = req.body || {};
+      if (!url || typeof url !== 'string') {
+        return res.status(400).json({ error: 'A URL do site ou API é obrigatória.' });
+      }
+
+      let parsedUrl: URL;
+      let targetUrl = url.trim();
+      if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        targetUrl = 'https://' + targetUrl;
+      }
+
+      try {
+        parsedUrl = new URL(targetUrl);
+      } catch {
+        return res.status(400).json({ error: 'Formato de URL inválido.' });
+      }
+
+      // Safe hostname restrictions: prevent SSRF to cloud metadata
+      const host = parsedUrl.hostname.toLowerCase();
+      if (host === '169.254.169.254' || host === 'metadata.google.internal' || host === 'instance-data') {
+        return res.status(400).json({ error: 'Acesso a metadados de nuvem é restrito por motivos de segurança.' });
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 9000);
+
+      const response = await fetch(targetUrl, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 SecScan-Auditor/2.5',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json,*/*;q=0.8',
+        }
+      });
+      clearTimeout(timeout);
+
+      const contentType = response.headers.get('content-type') || '';
+      const text = await response.text();
+      const files: any[] = [];
+      const now = Date.now();
+
+      // 1. Response Headers file
+      const rawHeaders: Record<string, string> = {};
+      response.headers.forEach((val, key) => {
+        rawHeaders[key] = val;
+      });
+
+      const headersJson = JSON.stringify({
+        targetUrl: targetUrl,
+        status: response.status,
+        statusText: response.statusText,
+        httpVersion: 'HTTP/1.1 or HTTP/2',
+        testedAt: new Date().toISOString(),
+        headers: rawHeaders
+      }, null, 2);
+
+      files.push({
+        name: 'security-headers.json',
+        path: 'audit/security-headers.json',
+        content: headersJson,
+        size: Buffer.byteLength(headersJson, 'utf8'),
+        extension: 'json',
+        lastModified: now
+      });
+
+      // 2. Main response file (HTML or JSON)
+      const isJson = contentType.includes('json') || targetUrl.endsWith('.json');
+      const mainFileName = isJson ? 'api-response.json' : 'website-index.html';
+      files.push({
+        name: mainFileName,
+        path: isJson ? 'api/response.json' : 'index.html',
+        content: text,
+        size: Buffer.byteLength(text, 'utf8'),
+        extension: isJson ? 'json' : 'html',
+        lastModified: now
+      });
+
+      // 3. Extract script tags or endpoints if HTML
+      const scripts: string[] = [];
+      const endpointsFound: string[] = [];
+
+      if (!isJson && text) {
+        // Find <script src="...">
+        const scriptRegex = /<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+        let match;
+        while ((match = scriptRegex.exec(text)) !== null && scripts.length < 5) {
+          const src = match[1];
+          if (src && !src.startsWith('data:')) {
+            scripts.push(src);
+          }
+        }
+
+        // Find API paths in HTML/inline scripts: /api/..., /v1/..., etc.
+        const apiPathRegex = /["'](\/(?:api|v[0-9]|auth|users|graphql|rest|webhook)[a-zA-Z0-9_\-\/]*)["']/gi;
+        let apiMatch;
+        while ((apiMatch = apiPathRegex.exec(text)) !== null && endpointsFound.length < 30) {
+          if (!endpointsFound.includes(apiMatch[1])) {
+            endpointsFound.push(apiMatch[1]);
+          }
+        }
+      }
+
+      // Try fetching the first 2 external scripts if available
+      for (let i = 0; i < Math.min(scripts.length, 2); i++) {
+        const scriptSrc = scripts[i];
+        try {
+          const absScriptUrl = new URL(scriptSrc, targetUrl).href;
+          const sController = new AbortController();
+          const sTimeout = setTimeout(() => sController.abort(), 4000);
+          const sRes = await fetch(absScriptUrl, { signal: sController.signal });
+          clearTimeout(sTimeout);
+          if (sRes.ok) {
+            const sText = await sRes.text();
+            const sName = path.basename(new URL(absScriptUrl).pathname) || `bundle-${i + 1}.js`;
+            const cleanName = sName.endsWith('.js') ? sName : `${sName}.js`;
+            const truncated = sText.slice(0, 250000);
+            files.push({
+              name: cleanName,
+              path: `scripts/${cleanName}`,
+              content: truncated,
+              size: Buffer.byteLength(truncated, 'utf8'),
+              extension: 'js',
+              lastModified: now
+            });
+          }
+        } catch {
+          // Ignore script fetch failures gracefully
+        }
+      }
+
+      // 4. If endpoints found, generate an endpoints file for API Security & DAST
+      if (endpointsFound.length > 0) {
+        const endpointsCode = `// [SecScan Auto-Discovery] Rotas identificadas em ${targetUrl}
+// Gerado em: ${new Date().toISOString()}
+
+export const DISCOVERED_ROUTES = [
+${endpointsFound.map(ep => `  "${ep}"`).join(',\n')}
+];
+
+// Handlers simulados para análise de segurança SAST e DAST
+${endpointsFound.slice(0, 10).map((ep, i) => `export function handleRoute_${i}(req, res) {
+  const queryParam = req.query?.id;
+  // Rota mapeada: ${ep}
+  return { path: "${ep}", status: 200, query: queryParam };
+}`).join('\n\n')}
+`;
+        files.push({
+          name: 'discovered-api-routes.js',
+          path: 'routes/discovered-api-routes.js',
+          content: endpointsCode,
+          size: Buffer.byteLength(endpointsCode, 'utf8'),
+          extension: 'js',
+          lastModified: now
+        });
+      }
+
+      return res.json({
+        success: true,
+        targetUrl,
+        statusCode: response.status,
+        files,
+        summary: {
+          filesGenerated: files.length,
+          scriptsExtracted: scripts.length,
+          endpointsDiscovered: endpointsFound.length,
+          hasHeaders: true
+        }
+      });
+    } catch (err: any) {
+      return res.status(500).json({ 
+        error: 'Falha ao conectar ou auditar URL: ' + (err?.message || String(err)),
+        details: 'Verifique se o site está online e acessível publicamente.'
+      });
+    }
+  });
+
   // Helper to safely list working files from disk repository
   function getRepositoryWorkingFiles(dir: string, baseDir: string = dir, maxFiles = 300): Array<{ name: string; path: string; size: number }> {
     const results: Array<{ name: string; path: string; size: number }> = [];
