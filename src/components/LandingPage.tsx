@@ -666,7 +666,7 @@ critical_findings[f] {
   const currentDomain = t.domains[activeDomainTab];
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#E0E0E0] font-sans selection:bg-[#FF3E00] selection:text-white flex flex-col relative overflow-x-hidden">
+    <div data-no-translate="true" className="min-h-screen bg-[#050505] text-[#E0E0E0] font-sans selection:bg-[#FF3E00] selection:text-white flex flex-col relative overflow-x-hidden">
       {/* Background cyber grid & glow effects */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#121214_1px,transparent_1px),linear-gradient(to_bottom,#121214_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none opacity-40" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-b from-[#FF3E00]/10 via-[#FF7A00]/5 to-transparent blur-3xl pointer-events-none" />
@@ -728,10 +728,18 @@ critical_findings[f] {
 
           {/* Main Headline */}
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-[1.1] uppercase">
-            {t.heroTitle.split(':')[0]}:{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF3E00] via-[#FF7A00] to-[#00F0FF]">
-              {t.heroTitle.split(':')[1] || t.heroTitle}
-            </span>
+            {t.heroTitle.includes(':') ? (
+              <>
+                <span>{t.heroTitle.split(':')[0]}: </span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF3E00] via-[#FF7A00] to-[#00F0FF]">
+                  {t.heroTitle.split(':')[1].trim()}
+                </span>
+              </>
+            ) : (
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF3E00] via-[#FF7A00] to-[#00F0FF]">
+                {t.heroTitle}
+              </span>
+            )}
           </h1>
 
           {/* Subtitle */}

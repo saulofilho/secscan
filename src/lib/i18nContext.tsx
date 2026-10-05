@@ -38,6 +38,17 @@ export const SUPPORTED_LANGUAGES: LanguageInfo[] = [
 // Phase 1: Compound phrases sorted by descending length to match compound terms before single words
 export const PHRASE_DICTIONARY: Array<[string, string, string]> = [
   // Compound Titles & Headers
+  ["Segurança Cibernética Total: Do Código ao SOC em Tempo Real", "Total Cybersecurity Defense: From Source Code to SOC in Real-Time", "Ciberseguridad Total: Del Código Fuente al SOC en Tiempo Real"],
+  ["Segurança Cibernética Total", "Total Cybersecurity Defense", "Ciberseguridad Total"],
+  ["Do Código ao SOC em Tempo Real", "From Source Code to SOC in Real-Time", "Del Código Fuente al SOC en Tiempo Real"],
+  ["Do Código ao SOC", "From Source Code to SOC", "Del Código al SOC"],
+  ["em Tempo Real", "in Real-Time", "en Tiempo Real"],
+  ["em tempo real", "in real-time", "en tiempo real"],
+  ["Acessar Plataforma SecOps", "Launch SecOps Platform", "Acceder a la Plataforma SecOps"],
+  ["Explorar com Workspace Demo", "Explore with Demo Workspace", "Explorar con Workspace Demo"],
+  ["Ir para a Home do App", "Go to App Home", "Ir a la Home de la App"],
+  ["Acessar Sistema", "Launch System", "Acceder al Sistema"],
+  ["Página Inicial", "Home Page", "Página Inicial"],
   ["Plataforma avançada e completa de cibersegurança e AppSec", "Advanced and comprehensive cybersecurity & AppSec platform", "Plataforma avanzada y completa de ciberseguridad y AppSec"],
   ["Cyber Threat Intelligence (CTI) Hub em tempo real", "Real-Time Cyber Threat Intelligence (CTI) Hub", "Hub de Cyber Threat Intelligence (CTI) en tiempo real"],
   ["Pipeline Flow Architect com mapeamento visual drag-and-drop", "Pipeline Flow Architect with visual drag-and-drop mapping", "Pipeline Flow Architect con mapeo visual drag-and-drop"],
@@ -417,6 +428,10 @@ export const WORD_DICTIONARY: Record<string, { en: string; es: string }> = {
   "segredos": { en: "secrets", es: "secretos" },
   "segurança": { en: "security", es: "seguridad" },
   "cibersegurança": { en: "cybersecurity", es: "ciberseguridad" },
+  "cibernética": { en: "cyber", es: "cibernética" },
+  "cibernéticas": { en: "cyber", es: "cibernéticas" },
+  "cibernético": { en: "cyber", es: "cibernético" },
+  "cibernéticos": { en: "cyber", es: "cibernéticos" },
   "conformidade": { en: "compliance", es: "cumplimiento" },
   "remediação": { en: "remediation", es: "remediación" },
   "mitigação": { en: "mitigation", es: "mitigación" },
