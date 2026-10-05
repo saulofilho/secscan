@@ -78,6 +78,7 @@ import { CloudIamSecurityView } from './components/CloudIamSecurityView';
 import { JwtTokenInspectorView } from './components/JwtTokenInspectorView';
 import { SsrfValidatorView } from './components/SsrfValidatorView';
 import { ToolGuideModal } from './components/ToolGuideModal';
+import { LandingPage } from './components/LandingPage';
 import { GitignoreAuditModal } from './components/GitignoreAuditModal';
 import { auditGitignoreSecurity } from './lib/gitignoreAuditor';
 import { useLanguage } from './lib/i18nContext';
@@ -106,6 +107,7 @@ export interface NoticeDetailItem {
 
 export default function App() {
   const { language } = useLanguage();
+  const [currentView, setCurrentView] = useState<'landing' | 'app'>('landing');
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [files, setFiles] = useState<ScannedFile[]>([]);
   const [rules, setRules] = useState<RegexRule[]>(() => {
@@ -470,6 +472,20 @@ export default function App() {
     setShowWelcomeModal(false);
     handleClearAllFilesAndValidation();
   };
+
+  const handleEnterApp = useCallback((loadDemoData?: boolean) => {
+    setCurrentView('app');
+    setActiveTab('dashboard');
+    setShowWelcomeModal(false);
+    safeSetItem('secscan_welcome_completed', 'true');
+    if (loadDemoData) {
+      handleExploreWithMock();
+    }
+  }, []);
+
+  const handleNavigateToLanding = useCallback(() => {
+    setCurrentView('landing');
+  }, []);
 
   const [showTour, setShowTour] = useState<boolean>(() => {
     return !safeGetItem('secscan_tour_completed');
@@ -1308,6 +1324,10 @@ export default function App() {
     isMac
   ]);
 
+  if (currentView === 'landing') {
+    return <LandingPage onEnterApp={handleEnterApp} />;
+  }
+
   return (
     <div key={`app-container-${language}`} className="min-h-screen bg-[#050505] text-[#E0E0E0] flex flex-col font-sans selection:bg-[#FF3E00] selection:text-white relative">
       {/* Global Real-time Scan Progress Bar (0% to 100%) */}
@@ -1339,6 +1359,7 @@ export default function App() {
           setShowToolGuideModal(true);
         }}
         onOpenGitignoreAudit={() => setShowGitignoreModal(true)}
+        onNavigateToLanding={handleNavigateToLanding}
       />
 
       {/* Main Container Content */}

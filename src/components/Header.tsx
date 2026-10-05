@@ -69,6 +69,7 @@ interface HeaderProps {
   onOpenShortcuts?: () => void;
   onOpenToolGuide?: (toolId?: string) => void;
   onOpenGitignoreAudit?: () => void;
+  onNavigateToLanding?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -88,7 +89,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenCommandPalette,
   onOpenShortcuts,
   onOpenToolGuide,
-  onOpenGitignoreAudit
+  onOpenGitignoreAudit,
+  onNavigateToLanding
 }) => {
   const isMac = useMemo(() => {
     return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -242,8 +244,20 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Main Header Bar (Responsive Brand + Toolbar) */}
         <div className="w-full flex flex-wrap 2xl:flex-nowrap items-center justify-between py-2.5 sm:py-3.5 gap-2.5 sm:gap-3 border-b border-[#1A1A1A]">
           {/* Brand Logo & Meta */}
-          <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-b from-[#1C1C1C] to-[#0A0A0A] border border-[#333] hover:border-[#FF3E00]/60 rounded-lg flex items-center justify-center text-[#FF3E00] shrink-0 shadow-[0_0_15px_rgba(255,62,0,0.15)] relative group transition-all">
+          <div 
+            onClick={onNavigateToLanding || (() => setActiveTab('dashboard'))}
+            className="flex items-center gap-2.5 sm:gap-3.5 shrink-0 cursor-pointer select-none group"
+            title="Ir para a Página Inicial de Apresentação do SecScan"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                if (onNavigateToLanding) onNavigateToLanding();
+                else setActiveTab('dashboard');
+              }
+            }}
+          >
+            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-b from-[#1C1C1C] to-[#0A0A0A] border border-[#333] group-hover:border-[#FF3E00]/60 rounded-lg flex items-center justify-center text-[#FF3E00] shrink-0 shadow-[0_0_15px_rgba(255,62,0,0.15)] relative transition-all">
               <ShieldAlert className="w-5 h-5 sm:w-6 sm:h-6 text-[#FF3E00] drop-shadow-[0_0_6px_rgba(255,62,0,0.5)] transition-transform group-hover:scale-110" />
               <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                 <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
@@ -257,7 +271,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div>
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <div className="flex items-center">
-                  <span className="font-black text-lg sm:text-2xl tracking-tight text-white uppercase">
+                  <span className="font-black text-lg sm:text-2xl tracking-tight text-white uppercase group-hover:text-zinc-100 transition-colors">
                     SECSCAN
                   </span>
                   <span className="text-[#FF3E00] font-black tracking-tight text-lg sm:text-2xl uppercase ml-1.5 drop-shadow-[0_0_8px_rgba(255,62,0,0.4)]">
@@ -390,6 +404,19 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Language Switcher */}
             <LanguageSwitcher />
+
+            {/* Landing Page Button */}
+            {onNavigateToLanding && (
+              <button
+                id="btn-header-landing"
+                onClick={onNavigateToLanding}
+                className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-[#121217] hover:bg-[#1E1E28] border border-[#2B2B38] hover:border-[#FF3E00]/60 transition-all cursor-pointer shadow-xs"
+                title="Voltar para a Página Inicial de Apresentação do SecScan"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-[#FF3E00] shrink-0" />
+                <span>Página Inicial</span>
+              </button>
+            )}
 
             {/* Command Palette Button */}
             {onOpenCommandPalette && (

@@ -1146,11 +1146,14 @@ function escapeRegex(s: string): string {
 }
 
 function matchCase(source: string, replacement: string): string {
+  if (!source || !replacement || typeof source !== 'string' || typeof replacement !== 'string') {
+    return replacement || source || '';
+  }
   if (source === source.toUpperCase() && source !== source.toLowerCase()) {
     return replacement.toUpperCase();
   }
-  if (source[0] === source[0].toUpperCase() && source[1] === source[1]?.toLowerCase()) {
-    return replacement[0].toUpperCase() + replacement.slice(1);
+  if (source[0] && source[0] === source[0].toUpperCase() && (!source[1] || source[1] === source[1]?.toLowerCase())) {
+    return (replacement[0] ? replacement[0].toUpperCase() : '') + replacement.slice(1);
   }
   return replacement;
 }
@@ -1206,10 +1209,14 @@ export function translateString(str: string, targetLang: SupportedLanguage): str
     if (UNSAFE_SHORT_WORDS.has(lower)) {
       return word;
     }
-    const entry = WORD_DICTIONARY[lower];
-    if (entry) {
-      const repl = targetLang === 'en' ? entry.en : entry.es;
-      return matchCase(word, repl);
+    if (Object.prototype.hasOwnProperty.call(WORD_DICTIONARY, lower)) {
+      const entry = WORD_DICTIONARY[lower];
+      if (entry && typeof entry === 'object') {
+        const repl = targetLang === 'en' ? entry.en : entry.es;
+        if (typeof repl === 'string') {
+          return matchCase(word, repl);
+        }
+      }
     }
     return word;
   });
@@ -1259,32 +1266,36 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
       let node = walker.nextNode() as Text | null;
       while (node) {
-        const parent = node.parentElement;
-        if (parent) {
-          // Strictly skip code blocks, syntax highlighters, scripts, and marked areas
-          if (!parent.closest('pre, code, kbd, script, style, noscript, textarea, .prism-code, .monaco-editor, #code-snippet-pre, [data-no-translate="true"]')) {
-            const currentVal = node.nodeValue;
-            if (currentVal && currentVal.trim()) {
-              // Store pristine original text directly on the node instance
-              let originalVal = (node as any).__origPtText || originalTextNodeMap.get(node);
-              if (!originalVal) {
-                originalVal = currentVal;
-                (node as any).__origPtText = originalVal;
-                originalTextNodeMap.set(node, originalVal);
-              }
-
-              if (targetLang === 'pt') {
-                if (node.nodeValue !== originalVal) {
-                  node.nodeValue = originalVal;
+        try {
+          const parent = node.parentElement;
+          if (parent) {
+            // Strictly skip code blocks, syntax highlighters, scripts, and marked areas
+            if (!parent.closest('pre, code, kbd, script, style, noscript, textarea, .prism-code, .monaco-editor, #code-snippet-pre, [data-no-translate="true"]')) {
+              const currentVal = node.nodeValue;
+              if (currentVal && currentVal.trim()) {
+                // Store pristine original text directly on the node instance
+                let originalVal = (node as any).__origPtText || originalTextNodeMap.get(node);
+                if (!originalVal) {
+                  originalVal = currentVal;
+                  (node as any).__origPtText = originalVal;
+                  originalTextNodeMap.set(node, originalVal);
                 }
-              } else {
-                const translated = translateString(originalVal, targetLang);
-                if (node.nodeValue !== translated) {
-                  node.nodeValue = translated;
+
+                if (targetLang === 'pt') {
+                  if (node.nodeValue !== originalVal) {
+                    node.nodeValue = originalVal;
+                  }
+                } else {
+                  const translated = translateString(originalVal, targetLang);
+                  if (translated && node.nodeValue !== translated) {
+                    node.nodeValue = translated;
+                  }
                 }
               }
             }
           }
+        } catch {
+          // Gracefully continue to next node if any error occurs on a specific node
         }
         node = walker.nextNode() as Text | null;
       }
@@ -1292,35 +1303,39 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       // 2. Walk Element Attributes: title, placeholder, aria-label
       const elements = root.querySelectorAll('[title], [placeholder], [aria-label]');
       for (let i = 0; i < elements.length; i++) {
-        const el = elements[i];
-        if (el.closest('pre, code, kbd, script, style, noscript, textarea, .prism-code, .monaco-editor, #code-snippet-pre, [data-no-translate="true"]')) continue;
+        try {
+          const el = elements[i];
+          if (el.closest('pre, code, kbd, script, style, noscript, textarea, .prism-code, .monaco-editor, #code-snippet-pre, [data-no-translate="true"]')) continue;
 
-        let stored = (el as any).__origAttrs || originalAttrMap.get(el);
-        if (!stored) {
-          stored = {};
-          if (el.hasAttribute('title')) stored.title = el.getAttribute('title') || '';
-          if (el.hasAttribute('placeholder')) stored.placeholder = el.getAttribute('placeholder') || '';
-          if (el.hasAttribute('aria-label')) stored['aria-label'] = el.getAttribute('aria-label') || '';
-          (el as any).__origAttrs = stored;
-          originalAttrMap.set(el, stored);
-        }
+          let stored = (el as any).__origAttrs || originalAttrMap.get(el);
+          if (!stored) {
+            stored = {};
+            if (el.hasAttribute('title')) stored.title = el.getAttribute('title') || '';
+            if (el.hasAttribute('placeholder')) stored.placeholder = el.getAttribute('placeholder') || '';
+            if (el.hasAttribute('aria-label')) stored['aria-label'] = el.getAttribute('aria-label') || '';
+            (el as any).__origAttrs = stored;
+            originalAttrMap.set(el, stored);
+          }
 
-        const attrs = ['title', 'placeholder', 'aria-label'] as const;
-        for (let j = 0; j < attrs.length; j++) {
-          const attr = attrs[j];
-          if (stored[attr] !== undefined && stored[attr].trim()) {
-            const original = stored[attr];
-            if (targetLang === 'pt') {
-              if (el.getAttribute(attr) !== original) {
-                el.setAttribute(attr, original);
-              }
-            } else {
-              const translated = translateString(original, targetLang);
-              if (el.getAttribute(attr) !== translated) {
-                el.setAttribute(attr, translated);
+          const attrs = ['title', 'placeholder', 'aria-label'] as const;
+          for (let j = 0; j < attrs.length; j++) {
+            const attr = attrs[j];
+            if (stored[attr] !== undefined && stored[attr].trim()) {
+              const original = stored[attr];
+              if (targetLang === 'pt') {
+                if (el.getAttribute(attr) !== original) {
+                  el.setAttribute(attr, original);
+                }
+              } else {
+                const translated = translateString(original, targetLang);
+                if (translated && el.getAttribute(attr) !== translated) {
+                  el.setAttribute(attr, translated);
+                }
               }
             }
           }
+        } catch {
+          // Gracefully continue to next element
         }
       }
 
