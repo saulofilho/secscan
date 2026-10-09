@@ -1,6 +1,6 @@
 # Relatório de Auditoria e Testes Completos — SecScan AppSec Suite
 
-> **Data de Execução:** 2026-10-04T15:04:03.387Z  
+> **Data de Execução:** 2026-10-09T13:06:50.770Z  
 > **Ambiente:** Node.js v20 (Linux x86_64) | SecScan AppSec Suite v2.5.0  
 > **Repositório de Demonstração / Teste:** FinTech Core & Enterprise Payment Portal (`SAMPLE_FILES`)  
 > **Resultado Consolidado:** **TODOS OS TESTES APROVADOS (100% SUCCESS RATE)**  
@@ -17,7 +17,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 | **Funcionalidades Aprovadas** | `20` | **PASSED** |
 | **Funcionalidades com Falha** | `0` | **NONE** |
 | **Total de Asserções Executadas** | `90` | **90 Aprovadas** |
-| **Tempo Total de Execução** | `2384 ms` | **Ultra-Rápido** |
+| **Tempo Total de Execução** | `2394 ms` | **Ultra-Rápido** |
 | **Padrão SARIF Validado** | `OASIS SARIF v2.1.0` | **GitHub Security Ready** |
 | **Quality Gate da Amostra** | `FAILED (CRITICAL RISK)` | **Bloqueio Efetivo Ativado** |
 
@@ -27,26 +27,26 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 
 | # | ID do Teste | Módulo / Funcionalidade | Categoria | Asserções | Duração | Status |
 |---|---|---|---|:---:|:---:|:---:|
-| 1 | `FEAT-01-SAST-CORE` | **Core SAST Scanner & Shannon Entropy Engine** | SAST & Secrets | 8/8 | 298ms | **✅ PASSED** |
-| 2 | `FEAT-02-SARIF-EXPORT` | **OASIS SARIF 2.1.0 Export & Severity Translation** | Export & CI/CD | 16/16 | 257ms | **✅ PASSED** |
-| 3 | `FEAT-03-MULTI-EXPORT` | **Multi-Format Exporters (JSON, CSV, Markdown, PDF)** | Export Engine | 5/5 | 260ms | **✅ PASSED** |
-| 4 | `FEAT-04-OPA-REGO` | **Policy-as-Code Engine (Open Policy Agent - OPA Rego)** | Governance & CI/CD Gate | 3/3 | 256ms | **✅ PASSED** |
+| 1 | `FEAT-01-SAST-CORE` | **Core SAST Scanner & Shannon Entropy Engine** | SAST & Secrets | 8/8 | 297ms | **✅ PASSED** |
+| 2 | `FEAT-02-SARIF-EXPORT` | **OASIS SARIF 2.1.0 Export & Severity Translation** | Export & CI/CD | 16/16 | 256ms | **✅ PASSED** |
+| 3 | `FEAT-03-MULTI-EXPORT` | **Multi-Format Exporters (JSON, CSV, Markdown, PDF)** | Export Engine | 5/5 | 256ms | **✅ PASSED** |
+| 4 | `FEAT-04-OPA-REGO` | **Policy-as-Code Engine (Open Policy Agent - OPA Rego)** | Governance & CI/CD Gate | 3/3 | 262ms | **✅ PASSED** |
 | 5 | `FEAT-05-SCA-DEPENDENCIES` | **Software Composition Analysis (SCA) & CVE Inspector** | Supply Chain Security | 5/5 | 1ms | **✅ PASSED** |
 | 6 | `FEAT-06-IAC-CONTAINER` | **Infrastructure as Code (IaC) & Container Security Scanner** | Cloud & Infrastructure | 5/5 | 3ms | **✅ PASSED** |
 | 7 | `FEAT-07-OWASP-API` | **OWASP API Security Top 10 Audit Engine** | API Security | 3/3 | 1ms | **✅ PASSED** |
-| 8 | `FEAT-08-THREAT-MODEL` | **Automated Threat Modeling & STRIDE Matrix Generator** | Threat Modeling | 3/3 | 261ms | **✅ PASSED** |
-| 9 | `FEAT-09-SBOM-GEN` | **Software Bill of Materials (SBOM) - CycloneDX & SPDX** | Supply Chain & Compliance | 5/5 | 1ms | **✅ PASSED** |
-| 10 | `FEAT-10-AUTO-REMEDIATION` | **Automated Remediation & Unified Diff Patch Generator** | Remediation Engine | 4/4 | 254ms | **✅ PASSED** |
-| 11 | `FEAT-11-JS-MINER` | **JS Miner & PortSwigger LinkFinder Engine** | Reconnaissance & Surface Analysis | 4/4 | 0ms | **✅ PASSED** |
-| 12 | `FEAT-12-DATA-FLOW` | **Data Flow Graph & Source-to-Sink Taint Engine** | Advanced Static Analysis | 3/3 | 256ms | **✅ PASSED** |
+| 8 | `FEAT-08-THREAT-MODEL` | **Automated Threat Modeling & STRIDE Matrix Generator** | Threat Modeling | 3/3 | 258ms | **✅ PASSED** |
+| 9 | `FEAT-09-SBOM-GEN` | **Software Bill of Materials (SBOM) - CycloneDX & SPDX** | Supply Chain & Compliance | 5/5 | 2ms | **✅ PASSED** |
+| 10 | `FEAT-10-AUTO-REMEDIATION` | **Automated Remediation & Unified Diff Patch Generator** | Remediation Engine | 4/4 | 256ms | **✅ PASSED** |
+| 11 | `FEAT-11-JS-MINER` | **JS Miner & PortSwigger LinkFinder Engine** | Reconnaissance & Surface Analysis | 4/4 | 1ms | **✅ PASSED** |
+| 12 | `FEAT-12-DATA-FLOW` | **Data Flow Graph & Source-to-Sink Taint Engine** | Advanced Static Analysis | 3/3 | 262ms | **✅ PASSED** |
 | 13 | `FEAT-13-JWT-INSPECTOR` | **JWT Token Security Inspector & Alg: None Analyzer** | Auth & Cryptography | 4/4 | 0ms | **✅ PASSED** |
 | 14 | `FEAT-14-SSRF-VALIDATOR` | **SSRF Attack Surface & Cloud Metadata Validator** | Web Security | 3/3 | 1ms | **✅ PASSED** |
-| 15 | `FEAT-15-HEADERS-DAST` | **HTTP Security Headers Audit & DAST Fuzzer Simulator** | DAST & Web Hardening | 4/4 | 0ms | **✅ PASSED** |
-| 16 | `FEAT-16-CLOUD-IAM` | **Cloud IAM Least-Privilege & Wildcard Permission Auditor** | Cloud IAM | 2/2 | 1ms | **✅ PASSED** |
-| 17 | `FEAT-17-ASOC-SLA` | **ASOC SLA Tracking & Mean-Time-To-Remediate (MTTR)** | Security Operations & Governance | 3/3 | 256ms | **✅ PASSED** |
-| 18 | `FEAT-18-COMPLIANCE` | **Regulatory Compliance Readiness Engine (PCI-DSS, LGPD, GDPR, HIPAA, SOC 2)** | Governance, Risk & Compliance | 3/3 | 259ms | **✅ PASSED** |
-| 19 | `FEAT-19-ZERO-TRUST-GITIGNORE` | **Zero-Trust Workspace Blocker & .gitignore Auditor** | Zero-Trust & Push Protection | 3/3 | 8ms | **✅ PASSED** |
-| 20 | `FEAT-20-I18N-TRILINGUAL` | **Trilingual Translation Engine (PT, EN, ES)** | Internationalization & UX | 4/4 | 11ms | **✅ PASSED** |
+| 15 | `FEAT-15-HEADERS-DAST` | **HTTP Security Headers Audit & DAST Fuzzer Simulator** | DAST & Web Hardening | 4/4 | 1ms | **✅ PASSED** |
+| 16 | `FEAT-16-CLOUD-IAM` | **Cloud IAM Least-Privilege & Wildcard Permission Auditor** | Cloud IAM | 2/2 | 0ms | **✅ PASSED** |
+| 17 | `FEAT-17-ASOC-SLA` | **ASOC SLA Tracking & Mean-Time-To-Remediate (MTTR)** | Security Operations & Governance | 3/3 | 259ms | **✅ PASSED** |
+| 18 | `FEAT-18-COMPLIANCE` | **Regulatory Compliance Readiness Engine (PCI-DSS, LGPD, GDPR, HIPAA, SOC 2)** | Governance, Risk & Compliance | 3/3 | 254ms | **✅ PASSED** |
+| 19 | `FEAT-19-ZERO-TRUST-GITIGNORE` | **Zero-Trust Workspace Blocker & .gitignore Auditor** | Zero-Trust & Push Protection | 3/3 | 7ms | **✅ PASSED** |
+| 20 | `FEAT-20-I18N-TRILINGUAL` | **Trilingual Translation Engine (PT, EN, ES)** | Internationalization & UX | 4/4 | 16ms | **✅ PASSED** |
 
 ---
 
@@ -55,7 +55,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 1. Core SAST Scanner & Shannon Entropy Engine (`FEAT-01-SAST-CORE`)
 - **Categoria:** `SAST & Secrets`
 - **Status:** **PASSED** (8 asserções validadas)
-- **Tempo de Execução:** `298 ms`
+- **Tempo de Execução:** `297 ms`
 - **Resumo do Teste:** Detectou 17 achados (3 críticos, 5 altos), 2 arquivos ignorados. Risk Score: 97/100 [CRITICAL].
 - **Evidências e Métricas Estruturadas:**
 ```json
@@ -76,7 +76,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 2. OASIS SARIF 2.1.0 Export & Severity Translation (`FEAT-02-SARIF-EXPORT`)
 - **Categoria:** `Export & CI/CD`
 - **Status:** **PASSED** (16 asserções validadas)
-- **Tempo de Execução:** `257 ms`
+- **Tempo de Execução:** `256 ms`
 - **Resumo do Teste:** SARIF v2.1.0 validado com sucesso. Mapeamento de severidades verificado (CRITICAL/HIGH -> error, WARNING/MEDIUM -> warning, LOW/INFO -> note). Payload completo gerado (29.2 KB).
 - **Evidências e Métricas Estruturadas:**
 ```json
@@ -93,7 +93,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 3. Multi-Format Exporters (JSON, CSV, Markdown, PDF) (`FEAT-03-MULTI-EXPORT`)
 - **Categoria:** `Export Engine`
 - **Status:** **PASSED** (5 asserções validadas)
-- **Tempo de Execução:** `260 ms`
+- **Tempo de Execução:** `256 ms`
 - **Resumo do Teste:** Todos os formatos de relatório (JSON: 132.9KB, CSV: 3.8KB, Markdown: 8.2KB) gerados e validados.
 - **Evidências e Métricas Estruturadas:**
 ```json
@@ -107,7 +107,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 4. Policy-as-Code Engine (Open Policy Agent - OPA Rego) (`FEAT-04-OPA-REGO`)
 - **Categoria:** `Governance & CI/CD Gate`
 - **Status:** **PASSED** (3 asserções validadas)
-- **Tempo de Execução:** `256 ms`
+- **Tempo de Execução:** `262 ms`
 - **Resumo do Teste:** Avaliou 7 políticas Rego. 7 violações bloqueantes identificadas. Veredito: FAILED_BLOCKING.
 - **Evidências e Métricas Estruturadas:**
 ```json
@@ -175,7 +175,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 8. Automated Threat Modeling & STRIDE Matrix Generator (`FEAT-08-THREAT-MODEL`)
 - **Categoria:** `Threat Modeling`
 - **Status:** **PASSED** (3 asserções validadas)
-- **Tempo de Execução:** `261 ms`
+- **Tempo de Execução:** `258 ms`
 - **Resumo do Teste:** Gerou 28 ameaças STRIDE baseadas no código do repositório. ASVS Compliance: 33%.
 - **Evidências e Métricas Estruturadas:**
 ```json
@@ -189,7 +189,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 9. Software Bill of Materials (SBOM) - CycloneDX & SPDX (`FEAT-09-SBOM-GEN`)
 - **Categoria:** `Supply Chain & Compliance`
 - **Status:** **PASSED** (5 asserções validadas)
-- **Tempo de Execução:** `1 ms`
+- **Tempo de Execução:** `2 ms`
 - **Resumo do Teste:** Gerou artefatos SBOM CycloneDX v1.5 e SPDX v2.3 com 12 componentes e hashes de integridade.
 - **Evidências e Métricas Estruturadas:**
 ```json
@@ -203,7 +203,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 10. Automated Remediation & Unified Diff Patch Generator (`FEAT-10-AUTO-REMEDIATION`)
 - **Categoria:** `Remediation Engine`
 - **Status:** **PASSED** (4 asserções validadas)
-- **Tempo de Execução:** `254 ms`
+- **Tempo de Execução:** `256 ms`
 - **Resumo do Teste:** Gerador de auto-remediação testado com sucesso. Produziu patches unified diff e variáveis de ambiente seguras.
 - **Evidências e Métricas Estruturadas:**
 ```json
@@ -216,7 +216,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 11. JS Miner & PortSwigger LinkFinder Engine (`FEAT-11-JS-MINER`)
 - **Categoria:** `Reconnaissance & Surface Analysis`
 - **Status:** **PASSED** (4 asserções validadas)
-- **Tempo de Execução:** `0 ms`
+- **Tempo de Execução:** `1 ms`
 - **Resumo do Teste:** Minerou bundle JavaScript. Extraiu 6 rotas de API, 2 recursos de nuvem e 5 sinks de injeção DOM.
 - **Evidências e Métricas Estruturadas:**
 ```json
@@ -231,7 +231,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 12. Data Flow Graph & Source-to-Sink Taint Engine (`FEAT-12-DATA-FLOW`)
 - **Categoria:** `Advanced Static Analysis`
 - **Status:** **PASSED** (3 asserções validadas)
-- **Tempo de Execução:** `256 ms`
+- **Tempo de Execução:** `262 ms`
 - **Resumo do Teste:** Construiu grafo de fluxo com 28 nós e 15 links. Rastreados 12 endpoints e 5 sinks.
 - **Evidências e Métricas Estruturadas:**
 ```json
@@ -274,7 +274,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 15. HTTP Security Headers Audit & DAST Fuzzer Simulator (`FEAT-15-HEADERS-DAST`)
 - **Categoria:** `DAST & Web Hardening`
 - **Status:** **PASSED** (4 asserções validadas)
-- **Tempo de Execução:** `0 ms`
+- **Tempo de Execução:** `1 ms`
 - **Resumo do Teste:** Headers HTTP avaliados (Score: 0/100, 4 headers críticos ausentes). Fuzzer DAST avaliou endpoint: veredito VULNERABLE.
 - **Evidências e Métricas Estruturadas:**
 ```json
@@ -289,7 +289,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 16. Cloud IAM Least-Privilege & Wildcard Permission Auditor (`FEAT-16-CLOUD-IAM`)
 - **Categoria:** `Cloud IAM`
 - **Status:** **PASSED** (2 asserções validadas)
-- **Tempo de Execução:** `1 ms`
+- **Tempo de Execução:** `0 ms`
 - **Resumo do Teste:** Auditoria IAM detectou 8 riscos de escalonamento e wildcard. Risk Score: 0/100 [NON_COMPLIANT].
 - **Evidências e Métricas Estruturadas:**
 ```json
@@ -303,7 +303,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 17. ASOC SLA Tracking & Mean-Time-To-Remediate (MTTR) (`FEAT-17-ASOC-SLA`)
 - **Categoria:** `Security Operations & Governance`
 - **Status:** **PASSED** (3 asserções validadas)
-- **Tempo de Execução:** `256 ms`
+- **Tempo de Execução:** `259 ms`
 - **Resumo do Teste:** Inventário ASOC estruturado com 17 itens. MTTR Médio: 34.5h. SLA Compliance: 71%.
 - **Evidências e Métricas Estruturadas:**
 ```json
@@ -317,7 +317,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 18. Regulatory Compliance Readiness Engine (PCI-DSS, LGPD, GDPR, HIPAA, SOC 2) (`FEAT-18-COMPLIANCE`)
 - **Categoria:** `Governance, Risk & Compliance`
 - **Status:** **PASSED** (3 asserções validadas)
-- **Tempo de Execução:** `259 ms`
+- **Tempo de Execução:** `254 ms`
 - **Resumo do Teste:** Avaliou 5 frameworks de conformidade. Overall Compliance Score: 13%. Total de controles violados identificados.
 - **Evidências e Métricas Estruturadas:**
 ```json
@@ -331,7 +331,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 19. Zero-Trust Workspace Blocker & .gitignore Auditor (`FEAT-19-ZERO-TRUST-GITIGNORE`)
 - **Categoria:** `Zero-Trust & Push Protection`
 - **Status:** **PASSED** (3 asserções validadas)
-- **Tempo de Execução:** `8 ms`
+- **Tempo de Execução:** `7 ms`
 - **Resumo do Teste:** Validador Zero-Trust bloqueou segredos em arquivos de workspace. Auditor de .gitignore apontou 6 categorias críticas ausentes.
 - **Evidências e Métricas Estruturadas:**
 ```json
@@ -345,7 +345,7 @@ Foram executadas **20 baterias de testes automatizados**, cobrindo ponta a ponta
 ### 20. Trilingual Translation Engine (PT, EN, ES) (`FEAT-20-I18N-TRILINGUAL`)
 - **Categoria:** `Internationalization & UX`
 - **Status:** **PASSED** (4 asserções validadas)
-- **Tempo de Execução:** `11 ms`
+- **Tempo de Execução:** `16 ms`
 - **Resumo do Teste:** Motor i18n testado nas 3 línguas. Substituição de compostos com preservação de tokens e dicionário contextual 100% funcionais.
 - **Evidências e Métricas Estruturadas:**
 ```json

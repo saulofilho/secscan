@@ -29,7 +29,8 @@ import {
   FileCode2,
   Database,
   ArrowRight,
-  Target
+  Target,
+  Flame
 } from 'lucide-react';
 import {
   ScanFinding,
@@ -50,6 +51,7 @@ import {
   searchIocReputation,
   exportCtiToStix21
 } from '../lib/cyberThreatIntelEngine';
+import { ThreatHeatmap } from './ThreatHeatmap';
 
 interface CyberThreatIntelHubViewProps {
   findings: ScanFinding[];
@@ -59,7 +61,7 @@ interface CyberThreatIntelHubViewProps {
   onLogAudit?: (event: AuditLogEvent) => void;
 }
 
-type CtiSubTab = 'TAGGED_FINDINGS' | 'OTX_PULSES' | 'THREAT_ACTORS' | 'IOC_LOOKUP' | 'STIX_EXPORT';
+type CtiSubTab = 'THREAT_HEATMAP' | 'TAGGED_FINDINGS' | 'OTX_PULSES' | 'THREAT_ACTORS' | 'IOC_LOOKUP' | 'STIX_EXPORT';
 
 export const CyberThreatIntelHubView: React.FC<CyberThreatIntelHubViewProps> = ({
   findings = [],
@@ -69,7 +71,7 @@ export const CyberThreatIntelHubView: React.FC<CyberThreatIntelHubViewProps> = (
   onLogAudit
 }) => {
   // Navigation & Sub-tabs
-  const [activeTab, setActiveTab] = useState<CtiSubTab>('TAGGED_FINDINGS');
+  const [activeTab, setActiveTab] = useState<CtiSubTab>('THREAT_HEATMAP');
 
   // Live feeds state
   const [feeds, setFeeds] = useState<ThreatIntelFeedStatus[]>(INITIAL_THREAT_FEEDS);
@@ -310,6 +312,21 @@ export const CyberThreatIntelHubView: React.FC<CyberThreatIntelHubViewProps> = (
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             <button
+              id="btn-nav-threat-heatmap"
+              type="button"
+              onClick={() => setActiveTab('THREAT_HEATMAP')}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 font-mono text-xs uppercase tracking-wider border transition-all cursor-pointer ${
+                activeTab === 'THREAT_HEATMAP'
+                  ? 'bg-red-500/20 text-red-300 border-red-500/60 font-bold'
+                  : 'bg-[#141414] hover:bg-[#202020] text-white border-[#333]'
+              }`}
+              title="Abrir Mapa de Calor de Ameaças & Sobreposição CISA KEV / OTX"
+            >
+              <Flame className="w-4 h-4 text-[#FF3E00]" />
+              <span>Mapa de Calor</span>
+            </button>
+
+            <button
               id="btn-sync-cti-feeds"
               type="button"
               onClick={handleManualSyncFeeds}
@@ -359,6 +376,20 @@ export const CyberThreatIntelHubView: React.FC<CyberThreatIntelHubViewProps> = (
         {/* Sub-tabs Navigation */}
         <div className="flex flex-wrap items-center justify-between gap-3 mt-6 pt-5 border-t border-[#1C1C1C]">
           <div className="flex items-center bg-[#121212] p-1 border border-[#262626] flex-wrap">
+            <button
+              id="btn-subtab-threat-heatmap"
+              type="button"
+              onClick={() => setActiveTab('THREAT_HEATMAP')}
+              className={`px-3.5 py-1.5 text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeTab === 'THREAT_HEATMAP'
+                  ? 'bg-[#00FF41] text-black font-black'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Flame className="w-3.5 h-3.5 text-[#FF3E00]" />
+              <span>Mapa de Calor (Heatmap)</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setActiveTab('TAGGED_FINDINGS')}
@@ -433,6 +464,18 @@ export const CyberThreatIntelHubView: React.FC<CyberThreatIntelHubViewProps> = (
           </div>
         </div>
       </div>
+
+      {/* SUB-TAB 0: VISUAL THREAT HEATMAP OVERLAY */}
+      {activeTab === 'THREAT_HEATMAP' && (
+        <ThreatHeatmap
+          findings={findings}
+          actors={actors}
+          pulses={pulses}
+          onSelectFinding={onSelectFinding}
+          onNavigateToScanner={onNavigateToScanner}
+          onApplyTags={handleApplyTagsToWorkspace}
+        />
+      )}
 
       {/* SUB-TAB 1: TAGGED FINDINGS */}
       {activeTab === 'TAGGED_FINDINGS' && (
