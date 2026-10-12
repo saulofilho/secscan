@@ -45,7 +45,9 @@ import {
   Cpu,
   Search,
   TrendingDown,
-  X
+  X,
+  Share2,
+  Check
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
 import { useLanguage } from '../lib/i18nContext';
@@ -102,6 +104,33 @@ export const Header: React.FC<HeaderProps> = ({
 
   const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI'>('ALL');
   const [toolSearchTerm, setToolSearchTerm] = useState('');
+  const [isCopiedShare, setIsCopiedShare] = useState(false);
+
+  const handleShareLink = async () => {
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+    const shareData = {
+      title: 'SecScan AppSec Suite',
+      text: 'SecScan AppSec Suite - Plataforma Avançada de Cibersegurança, Threat Heatmap & SAST',
+      url: shareUrl,
+    };
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch {
+        // Fallback to clipboard
+      }
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setIsCopiedShare(true);
+        setTimeout(() => setIsCopiedShare(false), 2500);
+      } catch {
+        // Fallback
+      }
+    }
+  };
 
   // Global shortcut '/' to focus tool search
   useEffect(() => {
@@ -550,6 +579,38 @@ export const Header: React.FC<HeaderProps> = ({
               className="h-8 w-8 rounded flex items-center justify-center text-[#777] hover:text-white bg-[#0F0F0F] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#444] transition-colors cursor-pointer shrink-0"
             >
               <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Share Site Link with Thumbnail Card Preview */}
+            <button
+              id="btn-header-share-link"
+              onClick={handleShareLink}
+              title={
+                isCopiedShare
+                  ? (language === 'pt' ? 'Link copiado com sucesso!' : 'Link copied to clipboard!')
+                  : (language === 'pt' ? 'Compartilhar link com preview/thumb da imagem (WhatsApp, X, Discord)' : 'Share link with thumbnail card (WhatsApp, X, Discord)')
+              }
+              className={`h-8 px-2.5 rounded flex items-center gap-1.5 text-xs font-mono transition-all cursor-pointer shrink-0 border ${
+                isCopiedShare
+                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/60'
+                  : 'bg-[#0F0F0F] text-zinc-300 hover:text-white hover:bg-[#1A1A1A] border-[#2A2A2A] hover:border-[#00FF41]/40'
+              }`}
+            >
+              {isCopiedShare ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-[10.5px] font-bold text-emerald-300">
+                    {language === 'pt' ? 'Copiado!' : 'Copied!'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-3.5 h-3.5 text-[#00FF41]" />
+                  <span className="hidden xl:inline text-[10.5px] font-bold">
+                    {language === 'pt' ? 'Compartilhar' : 'Share'}
+                  </span>
+                </>
+              )}
             </button>
 
             {/* Primary Action: Run Scan */}

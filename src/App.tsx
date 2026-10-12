@@ -598,6 +598,25 @@ export default function App() {
   // Run on first load
   useEffect(() => {
     executeScan(files, rules, ignorePatterns);
+
+    // Sync client-side OpenGraph and Twitter card thumbnail URLs with dynamic origin
+    if (typeof window !== 'undefined') {
+      try {
+        const origin = window.location.origin;
+        const ogImg = document.querySelector('meta[property="og:image"]');
+        if (ogImg) ogImg.setAttribute('content', `${origin}/thumb.jpg`);
+        const ogImgSec = document.querySelector('meta[property="og:image:secure_url"]');
+        if (ogImgSec) ogImgSec.setAttribute('content', `${origin}/thumb.jpg`);
+        const twImg = document.querySelector('meta[name="twitter:image"]');
+        if (twImg) twImg.setAttribute('content', `${origin}/thumb.jpg`);
+        const ogUrl = document.querySelector('meta[property="og:url"]');
+        if (ogUrl) ogUrl.setAttribute('content', window.location.href);
+        const linkImg = document.querySelector('link[rel="image_src"]');
+        if (linkImg) linkImg.setAttribute('href', `${origin}/thumb.jpg`);
+      } catch {
+        // Safe fallback in sandboxed contexts
+      }
+    }
   }, []);
 
   // Persist rules in safe storage

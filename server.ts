@@ -999,6 +999,89 @@ ${endpointsFound.slice(0, 10).map((ep, i) => `export function handleRoute_${i}(r
   });
 
 
+  // Explicitly serve static public assets (including /thumb.jpg, /og-image.jpg for social crawlers)
+  const sendThumb = (req: express.Request, res: express.Response) => {
+    const thumbCandidates = [
+      path.join(process.cwd(), 'public', 'thumb.jpg'),
+      path.join(process.cwd(), 'public', 'og-image.jpg'),
+      path.join(process.cwd(), 'thumb.jpg'),
+      path.join(process.cwd(), 'og-image.jpg'),
+    ];
+    for (const filePath of thumbCandidates) {
+      if (fs.existsSync(filePath)) {
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.sendFile(filePath);
+      }
+    }
+    return res.status(404).send('Image not found');
+  };
+
+  app.get('/thumb.jpg', sendThumb);
+  app.get('/og-image.jpg', sendThumb);
+  app.get('/thumb.png', (req, res) => {
+    const pngPath = path.join(process.cwd(), 'public', 'thumb.png');
+    if (fs.existsSync(pngPath)) {
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.sendFile(pngPath);
+    }
+    return sendThumb(req, res);
+  });
+  app.get('/og-image.png', (req, res) => {
+    const pngPath = path.join(process.cwd(), 'public', 'og-image.png');
+    if (fs.existsSync(pngPath)) {
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.sendFile(pngPath);
+    }
+    return sendThumb(req, res);
+  });
+
+  const publicDir = path.join(process.cwd(), 'public');
+  if (fs.existsSync(publicDir)) {
+    app.use(express.static(publicDir));
+  }
+
+  const injectSocialMetadata = (rawHtml: string, req: express.Request) => {
+    const host = req.get('host') || 'localhost:3000';
+    const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+    const absoluteThumbUrl = `${proto}://${host}/thumb.jpg`;
+    const absoluteAppUrl = `${proto}://${host}${req.originalUrl}`;
+
+    return rawHtml
+      .replace(/content="\/thumb\.jpg"/g, `content="${absoluteThumbUrl}"`)
+      .replace(/href="\/thumb\.jpg"/g, `href="${absoluteThumbUrl}"`)
+      .replace(/content="\/og-image\.jpg"/g, `content="${absoluteThumbUrl}"`)
+      .replace(/href="\/og-image\.jpg"/g, `href="${absoluteThumbUrl}"`)
+      .replace(/content="\/"/g, `content="${absoluteAppUrl}"`)
+      .replace(/<meta property="og:url" content="[^"]*"\s*\/>|<meta property="og:url"\s*\/>/g, `<meta property="og:url" content="${absoluteAppUrl}" />`);
+  };
+
+  // Intercept social crawlers (WhatsApp, Telegram, Facebook, Twitter, LinkedIn, Discord, Slack)
+  const isSocialCrawler = (userAgent: string = '') => {
+    return /facebookexternalhit|WhatsApp|Twitterbot|Pinterest|LinkedInBot|TelegramBot|Slackbot|Discordbot|SkypeUriPreview/i.test(userAgent);
+  };
+
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && (req.path === '/' || req.path === '/index.html') && isSocialCrawler(req.get('user-agent'))) {
+      const devIndexPath = path.join(process.cwd(), 'index.html');
+      const prodIndexPath = path.join(process.cwd(), 'dist', 'index.html');
+      const targetPath = fs.existsSync(prodIndexPath) ? prodIndexPath : devIndexPath;
+      if (fs.existsSync(targetPath)) {
+        try {
+          const html = fs.readFileSync(targetPath, 'utf-8');
+          const transformed = injectSocialMetadata(html, req);
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          return res.send(transformed);
+        } catch {
+          // fallback to standard next
+        }
+      }
+    }
+    next();
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -1010,7 +1093,14 @@ ${endpointsFound.slice(0, 10).map((ep, i) => `export function handleRoute_${i}(r
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const indexPath = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        const html = fs.readFileSync(indexPath, 'utf-8');
+        const transformed = injectSocialMetadata(html, req);
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        return res.send(transformed);
+      }
+      res.sendFile(indexPath);
     });
   }
 
