@@ -81,6 +81,8 @@ import { ToolGuideModal } from './components/ToolGuideModal';
 import { LandingPage } from './components/LandingPage';
 import { UrlIngestModal } from './components/UrlIngestModal';
 import { GitignoreAuditModal } from './components/GitignoreAuditModal';
+import { AnalyticsDashboardModal } from './components/AnalyticsDashboardModal';
+import { sendAnalyticsEvent } from './lib/analyticsTracker';
 import { auditGitignoreSecurity } from './lib/gitignoreAuditor';
 import { useLanguage } from './lib/i18nContext';
 
@@ -164,6 +166,7 @@ export default function App() {
   const [toolGuideTargetTab, setToolGuideTargetTab] = useState<string>('compliance');
   const [showGitignoreModal, setShowGitignoreModal] = useState<boolean>(false);
   const [showUrlIngestModal, setShowUrlIngestModal] = useState<boolean>(false);
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState<boolean>(false);
   const [shortcutToast, setShortcutToast] = useState<{ message: string; key?: string } | null>(null);
 
   // Policy-as-Code (Open Policy Agent - OPA Rego) State
@@ -617,7 +620,15 @@ export default function App() {
         // Safe fallback in sandboxed contexts
       }
     }
+
+    // Send initial pageview event
+    sendAnalyticsEvent({ type: 'pageview', path: window.location.pathname });
   }, []);
+
+  // Track tab changes in analytics telemetry
+  useEffect(() => {
+    sendAnalyticsEvent({ type: 'tab_view', path: window.location.pathname, tab: activeTab });
+  }, [activeTab]);
 
   // Persist rules in safe storage
   useEffect(() => {
@@ -1415,6 +1426,7 @@ export default function App() {
         onOpenGitignoreAudit={() => setShowGitignoreModal(true)}
         onNavigateToLanding={handleNavigateToLanding}
         onOpenUrlIngest={() => setShowUrlIngestModal(true)}
+        onOpenAnalytics={() => setShowAnalyticsModal(true)}
       />
 
       {/* Main Container Content */}
@@ -2679,6 +2691,12 @@ export default function App() {
         isOpen={showUrlIngestModal}
         onClose={() => setShowUrlIngestModal(false)}
         onIngestSuccess={handleIngestUrlFiles}
+      />
+
+      {/* Analytics & Visitor Telemetry Dashboard Modal */}
+      <AnalyticsDashboardModal
+        isOpen={showAnalyticsModal}
+        onClose={() => setShowAnalyticsModal(false)}
       />
 
       {/* Non-intrusive Shortcut Toast Feedback */}

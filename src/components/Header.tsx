@@ -47,7 +47,8 @@ import {
   TrendingDown,
   X,
   Share2,
-  Check
+  Check,
+  BarChart3
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
 import { useLanguage } from '../lib/i18nContext';
@@ -73,6 +74,7 @@ interface HeaderProps {
   onOpenGitignoreAudit?: () => void;
   onNavigateToLanding?: () => void;
   onOpenUrlIngest?: () => void;
+  onOpenAnalytics?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -94,7 +96,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenToolGuide,
   onOpenGitignoreAudit,
   onNavigateToLanding,
-  onOpenUrlIngest
+  onOpenUrlIngest,
+  onOpenAnalytics
 }) => {
   const isMac = useMemo(() => {
     return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -612,6 +615,22 @@ export const Header: React.FC<HeaderProps> = ({
                 </>
               )}
             </button>
+
+            {/* Analytics & Visitor Telemetry Button */}
+            {onOpenAnalytics && (
+              <button
+                id="btn-header-open-analytics"
+                onClick={onOpenAnalytics}
+                title={language === 'pt' ? 'Painel de Analytics & Visitantes em Tempo Real' : 'Real-time Analytics & Visitors Dashboard'}
+                className="h-8 px-2.5 rounded flex items-center gap-1.5 text-xs font-mono transition-all cursor-pointer shrink-0 border bg-[#0F0F0F] text-zinc-300 hover:text-white hover:bg-[#1A1A1A] border-[#2A2A2A] hover:border-emerald-500/50"
+              >
+                <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden lg:inline text-[10.5px] font-bold">
+                  Analytics
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              </button>
+            )}
 
             {/* Primary Action: Run Scan */}
             <button
