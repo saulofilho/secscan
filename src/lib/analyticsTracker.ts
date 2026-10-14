@@ -57,6 +57,54 @@ export interface WeeklyHeatmapData {
   };
 }
 
+export interface SessionTabEngagement {
+  tabId: string;
+  name: string;
+  category: 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI';
+  dwellSeconds: number;
+  formattedDuration: string;
+  interactionCount: number;
+  sessionEngagementScore: number;
+  adoptionRate: number;
+  heatLevel: 0 | 1 | 2 | 3 | 4;
+  rank: number;
+  isHotspot: boolean;
+}
+
+export interface UserSessionHeatmapData {
+  tabs: SessionTabEngagement[];
+  topEngagedFeature: {
+    tabId: string;
+    name: string;
+    category: string;
+    formattedDuration: string;
+    interactions: number;
+    score: number;
+  };
+  mostFrequentStartingTab: string;
+  mostFrequentExitTab: string;
+  avgTabsExploredPerSession: number;
+  sessionFunnelStages: {
+    stage: string;
+    name: string;
+    description: string;
+    avgTimeSeconds: number;
+    formattedTime: string;
+    dropoffPercent: number;
+    retentionPercent: number;
+    primaryTabs: string[];
+    heatIntensity: number;
+  }[];
+  categoryDistribution: {
+    category: 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI';
+    label: string;
+    dwellSeconds: number;
+    percentage: number;
+    tabCount: number;
+    color: string;
+  }[];
+}
+
 export interface SessionMetrics {
   averageDurationSeconds: number;
   formattedAverageDuration: string;
@@ -81,6 +129,7 @@ export interface AnalyticsSummary {
   dailyTrend?: AnalyticsTimelinePoint[];
   weeklyHeatmap?: WeeklyHeatmapData;
   sessionMetrics?: SessionMetrics;
+  userSessionHeatmap?: UserSessionHeatmapData;
   recentEvents: {
     id: string;
     timestamp: number;
@@ -146,6 +195,50 @@ export function formatDurationHuman(seconds: number): string {
     return `${h}h ${m}m ${s}s`;
   }
   return `${m}m ${s.toString().padStart(2, '0')}s`;
+}
+
+const SESSION_TAB_TRACK_KEY = 'secscan_session_tab_dwell';
+
+export interface LocalTabRecord {
+  tabId: string;
+  dwellSeconds: number;
+  interactions: number;
+  lastVisited: number;
+}
+
+export function getLocalSessionTabEngagement(): Record<string, LocalTabRecord> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = sessionStorage.getItem(SESSION_TAB_TRACK_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function recordLocalTabSessionActivity(tabId: string, addSeconds: number = 0, addInteraction: boolean = false): void {
+  if (typeof window === 'undefined' || !tabId) return;
+  try {
+    const data = getLocalSessionTabEngagement();
+    const current = data[tabId] || { tabId, dwellSeconds: 0, interactions: 0, lastVisited: Date.now() };
+    current.dwellSeconds += addSeconds;
+    if (addInteraction) {
+      current.interactions += 1;
+    }
+    current.lastVisited = Date.now();
+    data[tabId] = current;
+    sessionStorage.setItem(SESSION_TAB_TRACK_KEY, JSON.stringify(data));
+  } catch {
+    // Fail silently
+  }
+}
+
+export function resetLocalTabSessionEngagement(): void {
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.removeItem(SESSION_TAB_TRACK_KEY);
+    } catch {}
+  }
 }
 
 export function getOrCreateVisitorId(): string {

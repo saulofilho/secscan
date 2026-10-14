@@ -1045,7 +1045,24 @@ ${endpointsFound.slice(0, 10).map((ep, i) => `export function handleRoute_${i}(r
     ];
     const browsers = ['Chrome', 'Safari', 'Firefox', 'Edge'];
     const oss = ['Windows', 'macOS', 'Linux', 'iOS', 'Android'];
-    const tabs = ['scanner', 'ctihub', 'soccommand', 'refactoring', 'dataflow', 'rules'];
+
+    // Weighted SecScan feature pool for realistic single-session heat distribution
+    const seedWeightedTabs = [
+      'scanner', 'scanner', 'scanner', 'scanner',
+      'dataflow', 'dataflow', 'dataflow',
+      'soccommand', 'soccommand', 'soccommand',
+      'ctihub', 'ctihub',
+      'autoremediation', 'autoremediation',
+      'refactoring', 'refactoring',
+      'endpoints', 'endpoints',
+      'apisecurity', 'apisecurity',
+      'iac', 'iac',
+      'dashboard', 'dashboard',
+      'threatmodel', 'llmsecurity',
+      'compliance', 'securityonion',
+      'crowdstrike', 'sbom', 'rules',
+      'jsminer', 'iast', 'waf', 'nmap'
+    ];
 
     // Generate realistic distribution across 7 days for rich heatmap & timeline
     for (let i = 0; i < 168; i++) {
@@ -1079,13 +1096,14 @@ ${endpointsFound.slice(0, 10).map((ep, i) => `export function handleRoute_${i}(r
       const os = oss[Math.floor(Math.random() * oss.length)];
       const isMobile = os === 'iOS' || os === 'Android';
       const vid = 'vid_seed_' + (i % 38);
+      const pickedTab = seedWeightedTabs[Math.floor(Math.random() * seedWeightedTabs.length)];
 
       analyticsEvents.push({
         id: `seed_evt_${i}`,
         timestamp: ts,
         type: i % 4 === 0 ? 'pageview' : 'tab_view',
         path: '/',
-        tab: tabs[Math.floor(Math.random() * tabs.length)],
+        tab: pickedTab,
         referrer: refItem.ref,
         referrerCategory: refItem.cat,
         visitorId: vid,
@@ -1620,6 +1638,338 @@ ${endpointsFound.slice(0, 10).map((ep, i) => `export function handleRoute_${i}(r
         engagedSessionsCount: Math.max(1, Math.round(countedSessions * 0.82)),
       };
 
+      // 6. User Session Heatmap (UI Tabs & Security Feature Engagement throughout a single session)
+      const SECSCAN_FEATURE_REGISTRY: { id: string; name: string; category: 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI' }[] = [
+        // CODE_SAST
+        { id: 'scanner', name: 'Scanner SAST & AST', category: 'CODE_SAST' },
+        { id: 'dataflow', name: 'Data Flow Taint Graph', category: 'CODE_SAST' },
+        { id: 'endpoints', name: 'API Surface & Endpoints', category: 'CODE_SAST' },
+        { id: 'jsminer', name: 'JS Miner & Secrets', category: 'CODE_SAST' },
+        { id: 'autoremediation', name: '1-Click Auto Remediation', category: 'CODE_SAST' },
+        { id: 'refactoring', name: 'AI Security Refactoring', category: 'CODE_SAST' },
+        { id: 'sca', name: 'SCA Dependency Audit', category: 'CODE_SAST' },
+        { id: 'iast', name: 'IAST Runtime Hooks', category: 'CODE_SAST' },
+        { id: 'entropy', name: 'High-Entropy Secret Detection', category: 'CODE_SAST' },
+
+        // CLOUD_INFRA
+        { id: 'iac', name: 'IaC Security & Misconfigs', category: 'CLOUD_INFRA' },
+        { id: 'containerscan', name: 'Container CIS Benchmark', category: 'CLOUD_INFRA' },
+        { id: 'cloudiam', name: 'Cloud IAM Policy Audit', category: 'CLOUD_INFRA' },
+        { id: 'edr', name: 'eBPF Endpoint Detection', category: 'CLOUD_INFRA' },
+        { id: 'ngfw', name: 'Next-Gen Firewall / IPS', category: 'CLOUD_INFRA' },
+        { id: 'idsips', name: 'Suricata IDS DPI', category: 'CLOUD_INFRA' },
+
+        // API_DAST
+        { id: 'apisecurity', name: 'OWASP API Security Top 10', category: 'API_DAST' },
+        { id: 'dast', name: 'DAST Active Dynamic Scan', category: 'API_DAST' },
+        { id: 'headers', name: 'HTTP Security Headers', category: 'API_DAST' },
+        { id: 'jwtinspector', name: 'JWT Token Inspector', category: 'API_DAST' },
+        { id: 'ssrfvalidator', name: 'SSRF Gateway Validator', category: 'API_DAST' },
+
+        // SOC_EDR
+        { id: 'soccommand', name: 'SOC Command Center Live', category: 'SOC_EDR' },
+        { id: 'securityonion', name: 'Security Onion Alerts', category: 'SOC_EDR' },
+        { id: 'crowdstrike', name: 'CrowdStrike Falcon Sensor', category: 'SOC_EDR' },
+        { id: 'nmap', name: 'Network Recon & Nmap', category: 'SOC_EDR' },
+        { id: 'nikto', name: 'Nikto Web Server Audit', category: 'SOC_EDR' },
+        { id: 'waf', name: 'ModSecurity WAF Rules', category: 'SOC_EDR' },
+
+        // GOV_AI
+        { id: 'dashboard', name: 'Executive SecOps Dashboard', category: 'GOV_AI' },
+        { id: 'ctihub', name: 'CTI Threat Intel & Radar', category: 'GOV_AI' },
+        { id: 'llmsecurity', name: 'OWASP Top 10 for LLMs', category: 'GOV_AI' },
+        { id: 'threatmodel', name: 'STRIDE Threat Modeling', category: 'GOV_AI' },
+        { id: 'compliance', name: 'SOC2 & ISO27001 Compliance', category: 'GOV_AI' },
+        { id: 'policyascode', name: 'OPA Rego Policy Engine', category: 'GOV_AI' },
+        { id: 'sbom', name: 'CycloneDX SBOM Generator', category: 'GOV_AI' },
+        { id: 'asocsla', name: 'ASOC SLA & MTTR Tracking', category: 'GOV_AI' },
+        { id: 'rules', name: 'SAST Custom Rules Engine', category: 'GOV_AI' },
+      ];
+
+      const tabSessionStats = new Map<string, {
+        tabId: string;
+        sessionVisits: Set<string>;
+        totalInteractions: number;
+        totalDwellSeconds: number;
+      }>();
+
+      SECSCAN_FEATURE_REGISTRY.forEach(feat => {
+        tabSessionStats.set(feat.id, {
+          tabId: feat.id,
+          sessionVisits: new Set<string>(),
+          totalInteractions: 0,
+          totalDwellSeconds: 0,
+        });
+      });
+
+      const sessionFirstTabs: string[] = [];
+      const sessionLastTabs: string[] = [];
+      const tabsPerSessionCounts: number[] = [];
+
+      const visitorEventsWithDetails = new Map<string, { timestamp: number; tab?: string }[]>();
+      analyticsEvents.forEach(e => {
+        const list = visitorEventsWithDetails.get(e.visitorId) || [];
+        list.push({ timestamp: e.timestamp, tab: e.tab });
+        visitorEventsWithDetails.set(e.visitorId, list);
+      });
+
+      let sessionCounter = 0;
+      visitorEventsWithDetails.forEach((events, vid) => {
+        events.sort((a, b) => a.timestamp - b.timestamp);
+        let currSessionId = `sess_${vid}_${sessionCounter++}`;
+        let sessionTabsSet = new Set<string>();
+        let sessionEventsList: { timestamp: number; tab?: string }[] = [];
+
+        for (let i = 0; i < events.length; i++) {
+          const ev = events[i];
+          const prevEv = sessionEventsList[sessionEventsList.length - 1];
+
+          if (prevEv && ev.timestamp - prevEv.timestamp > 30 * 60 * 1000) {
+            if (sessionEventsList.length > 0) {
+              const firstT = sessionEventsList[0].tab;
+              const lastT = sessionEventsList[sessionEventsList.length - 1].tab;
+              if (firstT) sessionFirstTabs.push(firstT);
+              if (lastT) sessionLastTabs.push(lastT);
+              tabsPerSessionCounts.push(sessionTabsSet.size);
+            }
+
+            currSessionId = `sess_${vid}_${sessionCounter++}`;
+            sessionTabsSet = new Set<string>();
+            sessionEventsList = [ev];
+          } else {
+            sessionEventsList.push(ev);
+          }
+
+          if (ev.tab) {
+            sessionTabsSet.add(ev.tab);
+            let stat = tabSessionStats.get(ev.tab);
+            if (!stat) {
+              stat = {
+                tabId: ev.tab,
+                sessionVisits: new Set<string>(),
+                totalInteractions: 0,
+                totalDwellSeconds: 0,
+              };
+              tabSessionStats.set(ev.tab, stat);
+            }
+            stat.sessionVisits.add(currSessionId);
+            stat.totalInteractions++;
+
+            const nextEv = events[i + 1];
+            let dwell = 120;
+            if (nextEv && nextEv.timestamp - ev.timestamp <= 30 * 60 * 1000) {
+              dwell = Math.max(30, Math.min(600, Math.floor((nextEv.timestamp - ev.timestamp) / 1000)));
+            }
+            stat.totalDwellSeconds += dwell;
+          }
+        }
+
+        if (sessionEventsList.length > 0) {
+          const firstT = sessionEventsList[0].tab;
+          const lastT = sessionEventsList[sessionEventsList.length - 1].tab;
+          if (firstT) sessionFirstTabs.push(firstT);
+          if (lastT) sessionLastTabs.push(lastT);
+          tabsPerSessionCounts.push(sessionTabsSet.size);
+        }
+      });
+
+      const totalCalculatedSessions = Math.max(1, countedSessions);
+      const registryMap = new Map(SECSCAN_FEATURE_REGISTRY.map(f => [f.id, f]));
+      let maxEngagementMetric = 1;
+
+      const rawTabEngagements: {
+        tabId: string;
+        name: string;
+        category: 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI';
+        dwellSeconds: number;
+        interactionCount: number;
+        adoptionRate: number;
+        rawScore: number;
+      }[] = [];
+
+      tabSessionStats.forEach((stat, tabId) => {
+        const feat = registryMap.get(tabId) || {
+          id: tabId,
+          name: tabId.charAt(0).toUpperCase() + tabId.slice(1),
+          category: 'GOV_AI' as const,
+        };
+
+        const sessionCount = stat.sessionVisits.size;
+        const adoptionRate = Math.min(100, Math.round((sessionCount / totalCalculatedSessions) * 100));
+        const avgDwell = sessionCount > 0 ? Math.round(stat.totalDwellSeconds / sessionCount) : 0;
+        const rawScore = stat.totalInteractions * 4 + avgDwell * 0.35;
+        if (rawScore > maxEngagementMetric) {
+          maxEngagementMetric = rawScore;
+        }
+
+        rawTabEngagements.push({
+          tabId,
+          name: feat.name,
+          category: feat.category,
+          dwellSeconds: avgDwell,
+          interactionCount: stat.totalInteractions,
+          adoptionRate,
+          rawScore,
+        });
+      });
+
+      rawTabEngagements.sort((a, b) => b.rawScore - a.rawScore);
+
+      const sessionTabs = rawTabEngagements.map((item, idx) => {
+        const scorePct = maxEngagementMetric > 0 ? Math.round((item.rawScore / maxEngagementMetric) * 100) : 0;
+        let heatLevel: 0 | 1 | 2 | 3 | 4 = 0;
+        if (item.interactionCount > 0 || item.dwellSeconds > 0) {
+          if (scorePct >= 75) heatLevel = 4;
+          else if (scorePct >= 50) heatLevel = 3;
+          else if (scorePct >= 25) heatLevel = 2;
+          else heatLevel = 1;
+        }
+
+        const m = Math.floor(item.dwellSeconds / 60);
+        const s = item.dwellSeconds % 60;
+        const formattedDuration = `${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`;
+
+        return {
+          tabId: item.tabId,
+          name: item.name,
+          category: item.category,
+          dwellSeconds: item.dwellSeconds,
+          formattedDuration,
+          interactionCount: item.interactionCount,
+          sessionEngagementScore: scorePct,
+          adoptionRate: item.adoptionRate,
+          heatLevel,
+          rank: idx + 1,
+          isHotspot: idx < 4 || scorePct >= 70,
+        };
+      });
+
+      const topEngagedFeature = sessionTabs[0] ? {
+        tabId: sessionTabs[0].tabId,
+        name: sessionTabs[0].name,
+        category: sessionTabs[0].category,
+        formattedDuration: sessionTabs[0].formattedDuration,
+        interactions: sessionTabs[0].interactionCount,
+        score: sessionTabs[0].sessionEngagementScore,
+      } : {
+        tabId: 'scanner',
+        name: 'Scanner SAST & AST',
+        category: 'CODE_SAST',
+        formattedDuration: '04m 15s',
+        interactions: 42,
+        score: 100,
+      };
+
+      const startTabCounts = new Map<string, number>();
+      sessionFirstTabs.forEach(t => startTabCounts.set(t, (startTabCounts.get(t) || 0) + 1));
+      let topStartTab = 'dashboard';
+      let maxStartCount = 0;
+      startTabCounts.forEach((cnt, t) => {
+        if (cnt > maxStartCount) {
+          maxStartCount = cnt;
+          topStartTab = t;
+        }
+      });
+
+      const exitTabCounts = new Map<string, number>();
+      sessionLastTabs.forEach(t => exitTabCounts.set(t, (exitTabCounts.get(t) || 0) + 1));
+      let topExitTab = 'refactoring';
+      let maxExitCount = 0;
+      exitTabCounts.forEach((cnt, t) => {
+        if (cnt > maxExitCount) {
+          maxExitCount = cnt;
+          topExitTab = t;
+        }
+      });
+
+      const avgTabsExplored = tabsPerSessionCounts.length > 0 
+        ? Math.round((tabsPerSessionCounts.reduce((a, b) => a + b, 0) / tabsPerSessionCounts.length) * 10) / 10 
+        : 4.6;
+
+      const catTotals: Record<string, { dwell: number; count: number; color: string; label: string }> = {
+        CODE_SAST: { dwell: 0, count: 0, color: '#00FF41', label: 'Code SAST & Taint' },
+        SOC_EDR: { dwell: 0, count: 0, color: '#38BDF8', label: 'SOC & EDR Live' },
+        API_DAST: { dwell: 0, count: 0, color: '#F59E0B', label: 'API Security & DAST' },
+        CLOUD_INFRA: { dwell: 0, count: 0, color: '#A855F7', label: 'Cloud & Container Infra' },
+        GOV_AI: { dwell: 0, count: 0, color: '#EC4899', label: 'Governança & AI Security' },
+      };
+
+      let grandTotalCategoryDwell = 0;
+      sessionTabs.forEach(t => {
+        if (catTotals[t.category]) {
+          const weight = t.dwellSeconds * Math.max(1, t.interactionCount);
+          catTotals[t.category].dwell += weight;
+          catTotals[t.category].count++;
+          grandTotalCategoryDwell += weight;
+        }
+      });
+
+      const categoryDistribution = Object.entries(catTotals).map(([cat, data]) => ({
+        category: cat as any,
+        label: data.label,
+        dwellSeconds: data.dwell,
+        percentage: grandTotalCategoryDwell > 0 ? Math.round((data.dwell / grandTotalCategoryDwell) * 100) : 20,
+        tabCount: data.count,
+        color: data.color,
+      })).sort((a, b) => b.percentage - a.percentage);
+
+      const sessionFunnelStages = [
+        {
+          stage: '1. Ingest & Visão Geral',
+          name: 'Entrada & Overview de Riscos',
+          description: 'Abertura do projeto, visualização do score de segurança e scanner inicial',
+          avgTimeSeconds: 145,
+          formattedTime: '02m 25s',
+          dropoffPercent: 12,
+          retentionPercent: 88,
+          primaryTabs: ['dashboard', 'scanner'],
+          heatIntensity: 92,
+        },
+        {
+          stage: '2. Inspeção Profunda de Código',
+          name: 'Análise de Taint Flow & Superfície',
+          description: 'Exploração de fluxos de dados vulneráveis, endpoints e segredos expostos',
+          avgTimeSeconds: 198,
+          formattedTime: '03m 18s',
+          dropoffPercent: 18,
+          retentionPercent: 72,
+          primaryTabs: ['dataflow', 'endpoints', 'jsminer', 'ctihub'],
+          heatIntensity: 85,
+        },
+        {
+          stage: '3. Remediação & Correção',
+          name: 'Correção de Falhas & Policy',
+          description: 'Aplicação de correções 1-click, refatoração de código e políticas OPA',
+          avgTimeSeconds: 164,
+          formattedTime: '02m 44s',
+          dropoffPercent: 25,
+          retentionPercent: 54,
+          primaryTabs: ['autoremediation', 'refactoring', 'policyascode'],
+          heatIntensity: 78,
+        },
+        {
+          stage: '4. SecOps & Relatório Final',
+          name: 'Comando SOC, Compliance & SBOM',
+          description: 'Monitoramento em tempo real, validação de conformidade SOC2 e exportação',
+          avgTimeSeconds: 130,
+          formattedTime: '02m 10s',
+          dropoffPercent: 35,
+          retentionPercent: 44,
+          primaryTabs: ['soccommand', 'compliance', 'sbom', 'securityonion'],
+          heatIntensity: 68,
+        },
+      ];
+
+      const userSessionHeatmap: any = {
+        tabs: sessionTabs,
+        topEngagedFeature,
+        mostFrequentStartingTab: topStartTab,
+        mostFrequentExitTab: topExitTab,
+        avgTabsExploredPerSession: avgTabsExplored,
+        sessionFunnelStages,
+        categoryDistribution,
+      };
+
       return res.json({
         activeVisitorsNow,
         totalPageViews,
@@ -1636,6 +1986,7 @@ ${endpointsFound.slice(0, 10).map((ep, i) => `export function handleRoute_${i}(r
         dailyTrend,
         weeklyHeatmap,
         sessionMetrics,
+        userSessionHeatmap,
         recentEvents,
       });
     } catch (err: any) {

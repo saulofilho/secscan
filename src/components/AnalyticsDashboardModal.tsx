@@ -45,7 +45,20 @@ import {
   CalendarDays,
   Timer,
   Hourglass,
-  RotateCcw
+  RotateCcw,
+  MousePointerClick,
+  ArrowRight,
+  Workflow,
+  Target,
+  FileCode2,
+  Container,
+  Route,
+  Radio,
+  ShieldAlert,
+  HelpCircle,
+  CheckCircle2,
+  LayoutGrid,
+  PieChart
 } from 'lucide-react';
 import { 
   fetchAnalyticsSummary, 
@@ -55,15 +68,21 @@ import {
   HeatmapCellDetail,
   WeeklyHeatmapData,
   SessionMetrics,
+  SessionTabEngagement,
+  UserSessionHeatmapData,
   getCurrentSessionDurationSeconds,
   formatDurationSeconds,
   formatDurationHuman,
-  resetUserSessionStartTime
+  resetUserSessionStartTime,
+  getLocalSessionTabEngagement,
+  recordLocalTabSessionActivity,
+  resetLocalTabSessionEngagement
 } from '../lib/analyticsTracker';
 
 interface AnalyticsDashboardModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onNavigateTab?: (tab: string) => void;
 }
 
 type TimeRangeFilter = '30m' | '24h' | '7d';
@@ -73,6 +92,11 @@ type MetricViewFilter = 'all' | 'views' | 'visitors';
 type HeatmapMetricType = 'views' | 'visitors';
 type HeatmapThemeType = 'emerald' | 'cyan' | 'purple' | 'amber';
 type HeatmapDayFilterType = 'all' | 'weekdays' | 'weekend';
+
+type SessionHeatmapScopeType = 'all_sessions' | 'current_session';
+type SessionCategoryFilterType = 'ALL' | 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI';
+type SessionSortType = 'engagement' | 'dwell' | 'interactions' | 'adoption';
+type SessionViewModeType = 'matrix' | 'funnel' | 'distribution';
 
 // Cyber Custom Tooltip for Recharts
 const CustomRechartsTooltip: React.FC<any> = ({ active, payload, label }) => {
@@ -113,8 +137,9 @@ const CustomRechartsTooltip: React.FC<any> = ({ active, payload, label }) => {
 export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = ({
   isOpen,
   onClose,
+  onNavigateTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'metrics' | 'setup_guide'>('metrics');
+  const [activeTab, setActiveTab] = useState<'metrics' | 'session_heatmap' | 'setup_guide'>('metrics');
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -133,13 +158,24 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
   const [selectedHeatmapCell, setSelectedHeatmapCell] = useState<HeatmapCellDetail | null>(null);
   const [hoveredHeatmapCell, setHoveredHeatmapCell] = useState<HeatmapCellDetail | null>(null);
 
+  // User Session Heatmap (UI Tabs & Security Features Engagement) State
+  const [sessionHeatmapScope, setSessionHeatmapScope] = useState<SessionHeatmapScopeType>('all_sessions');
+  const [sessionCategoryFilter, setSessionCategoryFilter] = useState<SessionCategoryFilterType>('ALL');
+  const [sessionSort, setSessionSort] = useState<SessionSortType>('engagement');
+  const [sessionViewMode, setSessionViewMode] = useState<SessionViewModeType>('matrix');
+  const [selectedSessionTab, setSelectedSessionTab] = useState<SessionTabEngagement | null>(null);
+  const [hoveredSessionTab, setHoveredSessionTab] = useState<SessionTabEngagement | null>(null);
+  const [localTabRecords, setLocalTabRecords] = useState<Record<string, any>>(() => getLocalSessionTabEngagement());
+
   // Active User Session Live Duration Tracker
   const [userActiveSeconds, setUserActiveSeconds] = useState<number>(() => getCurrentSessionDurationSeconds());
 
   useEffect(() => {
     setUserActiveSeconds(getCurrentSessionDurationSeconds());
+    setLocalTabRecords(getLocalSessionTabEngagement());
     const secondTimer = setInterval(() => {
       setUserActiveSeconds(getCurrentSessionDurationSeconds());
+      setLocalTabRecords(getLocalSessionTabEngagement());
     }, 1000);
     return () => clearInterval(secondTimer);
   }, []);
@@ -153,6 +189,7 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
     setLoading(true);
     const data = await fetchAnalyticsSummary();
     if (data) setSummary(data);
+    setLocalTabRecords(getLocalSessionTabEngagement());
     setLoading(false);
   };
 
@@ -164,6 +201,7 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
     const interval = setInterval(() => {
       fetchAnalyticsSummary().then((data) => {
         if (data) setSummary(data);
+        setLocalTabRecords(getLocalSessionTabEngagement());
       });
     }, 6000);
 
@@ -343,6 +381,734 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
     return base;
   };
 
+  // User Session Heatmap Computed Data (Tabs & Features Engagement)
+  const filteredAndSortedSessionTabs: SessionTabEngagement[] = useMemo(() => {
+    let sourceTabs: SessionTabEngagement[] = [];
+
+    if (sessionHeatmapScope === 'current_session') {
+      const allTabs = summary?.userSessionHeatmap?.tabs || [];
+      let maxLocalScore = 1;
+      allTabs.forEach(t => {
+        const rec = localTabRecords[t.tabId];
+        const score = (rec?.interactions || 0) * 4 + (rec?.dwellSeconds || 0) * 0.35;
+        if (score > maxLocalScore) maxLocalScore = score;
+      });
+
+      sourceTabs = allTabs.map(t => {
+        const rec = localTabRecords[t.tabId] || { dwellSeconds: 0, interactions: 0 };
+        const rawScore = (rec.interactions || 0) * 4 + (rec.dwellSeconds || 0) * 0.35;
+        const scorePct = maxLocalScore > 0 ? Math.round((rawScore / maxLocalScore) * 100) : 0;
+        let heatLevel: 0 | 1 | 2 | 3 | 4 = 0;
+        if (rec.interactions > 0 || rec.dwellSeconds > 0) {
+          if (scorePct >= 75) heatLevel = 4;
+          else if (scorePct >= 50) heatLevel = 3;
+          else if (scorePct >= 25) heatLevel = 2;
+          else heatLevel = 1;
+        }
+
+        const m = Math.floor((rec.dwellSeconds || 0) / 60);
+        const s = (rec.dwellSeconds || 0) % 60;
+        const formatted = `${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`;
+
+        return {
+          ...t,
+          dwellSeconds: rec.dwellSeconds || 0,
+          formattedDuration: formatted,
+          interactionCount: rec.interactions || 0,
+          sessionEngagementScore: scorePct,
+          heatLevel,
+          adoptionRate: (rec.interactions > 0 || rec.dwellSeconds > 0) ? 100 : 0,
+        };
+      });
+    } else {
+      sourceTabs = summary?.userSessionHeatmap?.tabs ? [...summary.userSessionHeatmap.tabs] : [];
+    }
+
+    // Filter by Category
+    if (sessionCategoryFilter !== 'ALL') {
+      sourceTabs = sourceTabs.filter(t => t.category === sessionCategoryFilter);
+    }
+
+    // Sort
+    sourceTabs.sort((a, b) => {
+      if (sessionSort === 'engagement') return b.sessionEngagementScore - a.sessionEngagementScore;
+      if (sessionSort === 'dwell') return b.dwellSeconds - a.dwellSeconds;
+      if (sessionSort === 'interactions') return b.interactionCount - a.interactionCount;
+      if (sessionSort === 'adoption') return b.adoptionRate - a.adoptionRate;
+      return 0;
+    });
+
+    return sourceTabs;
+  }, [summary?.userSessionHeatmap, sessionHeatmapScope, localTabRecords, sessionCategoryFilter, sessionSort]);
+
+  // Handler to simulate engagement on a security tab/feature
+  const handleSimulateTabEngagement = async (targetTabId: string) => {
+    setSimulatingEvent(true);
+    recordLocalTabSessionActivity(targetTabId, 35, true);
+    setLocalTabRecords(getLocalSessionTabEngagement());
+
+    await sendAnalyticsEvent({
+      type: 'tab_view',
+      path: `/#${targetTabId}`,
+      tab: targetTabId,
+      metadata: { simulated: true, action: 'feature_interaction', addedDwell: 35 }
+    });
+
+    const updated = await fetchAnalyticsSummary();
+    if (updated) {
+      setSummary(updated);
+      if (updated.userSessionHeatmap?.tabs) {
+        const found = updated.userSessionHeatmap.tabs.find(t => t.tabId === targetTabId);
+        if (found) setSelectedSessionTab(found);
+      }
+    }
+    setTimeout(() => setSimulatingEvent(false), 500);
+  };
+
+  const handleResetLocalSessionEngagement = () => {
+    resetLocalTabSessionEngagement();
+    setLocalTabRecords({});
+  };
+
+  const getSessionCategoryMeta = (cat: string) => {
+    switch (cat) {
+      case 'CODE_SAST':
+        return { label: 'Code SAST & Taint', color: '#00FF41', bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', text: 'text-emerald-300' };
+      case 'CLOUD_INFRA':
+        return { label: 'Cloud & Container Infra', color: '#A855F7', bg: 'bg-purple-500/15', border: 'border-purple-500/40', text: 'text-purple-300' };
+      case 'API_DAST':
+        return { label: 'API Security & DAST', color: '#F59E0B', bg: 'bg-amber-500/15', border: 'border-amber-500/40', text: 'text-amber-300' };
+      case 'SOC_EDR':
+        return { label: 'SOC & EDR Live', color: '#38BDF8', bg: 'bg-sky-500/15', border: 'border-sky-500/40', text: 'text-sky-300' };
+      case 'GOV_AI':
+        return { label: 'Governança & AI Security', color: '#EC4899', bg: 'bg-pink-500/15', border: 'border-pink-500/40', text: 'text-pink-300' };
+      default:
+        return { label: 'Segurança Geral', color: '#94A3B8', bg: 'bg-zinc-800', border: 'border-zinc-700', text: 'text-zinc-300' };
+    }
+  };
+
+  const getSessionHeatStyle = (level: 0 | 1 | 2 | 3 | 4, isSelected?: boolean) => {
+    let base = '';
+    if (level === 4) {
+      base = 'bg-gradient-to-br from-emerald-950/70 via-[#00FF41]/10 to-[#0A1629] border-[#00FF41] shadow-[0_0_18px_rgba(0,255,65,0.25)] text-white';
+    } else if (level === 3) {
+      base = 'bg-gradient-to-br from-emerald-950/50 to-[#0B1526] border-emerald-500/60 shadow-[0_0_10px_rgba(16,185,129,0.15)] text-zinc-100';
+    } else if (level === 2) {
+      base = 'bg-gradient-to-br from-sky-950/40 to-[#0A1220] border-sky-500/40 text-zinc-200';
+    } else if (level === 1) {
+      base = 'bg-[#0B1220]/80 border-[#1B293D] text-zinc-300 hover:border-zinc-600';
+    } else {
+      base = 'bg-[#070B14]/70 border-[#141E2D] text-zinc-500 hover:border-zinc-700';
+    }
+
+    if (isSelected) {
+      base += ' ring-2 ring-white scale-[1.02] z-10 shadow-2xl';
+    }
+    return base;
+  };
+
+  const renderUserSessionHeatmapVisualizer = (isCompact = false) => {
+    const activeInspectorTab = selectedSessionTab || hoveredSessionTab || filteredAndSortedSessionTabs[0];
+    const topFeature = summary?.userSessionHeatmap?.topEngagedFeature;
+
+    return (
+      <div className={`p-4 sm:p-5 rounded-2xl bg-[#080D18] border border-emerald-500/30 shadow-xl space-y-4.5 relative overflow-hidden ${
+        isCompact ? '' : 'my-2'
+      }`}>
+        {/* Glow Accent */}
+        <div className="absolute top-0 right-1/4 w-96 h-28 bg-emerald-500/5 blur-3xl pointer-events-none" />
+
+        {/* Header Bar */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-[#1A2538] pb-3.5">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/20 to-[#00FF41]/10 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shadow-[0_0_15px_rgba(0,255,65,0.2)] shrink-0 mt-0.5 sm:mt-0">
+              <Flame className="w-5 h-5 text-emerald-400 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-bold text-white font-mono flex items-center gap-2">
+                  <span>User Session Heatmap</span>
+                  <span className="text-zinc-500 hidden sm:inline">•</span>
+                  <span className="text-zinc-300 text-xs font-normal hidden sm:inline">UI Tabs & Security Features Engagement</span>
+                </h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 uppercase">
+                  27 Recursos
+                </span>
+                {topFeature && (
+                  <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-950/40 text-emerald-400 border border-emerald-500/30">
+                    <Flame className="w-3 h-3 text-emerald-400" />
+                    <span>Top Hotspot: <strong>{topFeature.name}</strong> ({topFeature.formattedDuration})</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Mapeamento visual do tempo de permanência (dwell time), frequência de uso e profundidade de navegação por aba ao longo de uma sessão.
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Scope & Switcher Buttons in Header */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Scope Toggle: Global Average vs Current Session */}
+            <div className="flex items-center bg-[#060911] border border-[#1E293B] rounded-lg p-0.5 text-xs font-mono">
+              <button
+                onClick={() => setSessionHeatmapScope('all_sessions')}
+                className={`px-2.5 py-1 rounded transition-colors cursor-pointer font-bold ${
+                  sessionHeatmapScope === 'all_sessions'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+                title="Visualizar a média consolidada de todas as sessões registradas"
+              >
+                Média Global (Todas as Sessões)
+              </button>
+              <button
+                onClick={() => setSessionHeatmapScope('current_session')}
+                className={`px-2.5 py-1 rounded transition-colors cursor-pointer font-bold flex items-center gap-1 ${
+                  sessionHeatmapScope === 'current_session'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+                title="Visualizar a telemetria ao vivo acumulada nesta aba/navegador"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                <span>Sessão Atual (Ao Vivo)</span>
+              </button>
+            </div>
+
+            {/* View Mode Toggle */}
+            <div className="flex items-center bg-[#060911] border border-[#1E293B] rounded-lg p-0.5 text-xs font-mono">
+              <button
+                onClick={() => setSessionViewMode('matrix')}
+                title="Visualização em Grid Matricial de Calor"
+                className={`px-2 py-1 rounded transition-colors cursor-pointer flex items-center gap-1 ${
+                  sessionViewMode === 'matrix'
+                    ? 'bg-[#1C2636] text-white font-bold'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Matriz</span>
+              </button>
+              <button
+                onClick={() => setSessionViewMode('funnel')}
+                title="Jornada do Funil de Navegação por Etapas"
+                className={`px-2 py-1 rounded transition-colors cursor-pointer flex items-center gap-1 ${
+                  sessionViewMode === 'funnel'
+                    ? 'bg-[#1C2636] text-white font-bold'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Workflow className="w-3.5 h-3.5" />
+                <span>Funil</span>
+              </button>
+              <button
+                onClick={() => setSessionViewMode('distribution')}
+                title="Distribuição de Tempo por Domínio AppSec"
+                className={`px-2 py-1 rounded transition-colors cursor-pointer flex items-center gap-1 ${
+                  sessionViewMode === 'distribution'
+                    ? 'bg-[#1C2636] text-white font-bold'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <PieChart className="w-3.5 h-3.5" />
+                <span>Domínios</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Top Session Journey Highlights Strip (4 KPI Mini-Cards) */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* 1. Top Engaged Feature */}
+          <div className="p-3 rounded-xl bg-[#060B14] border border-emerald-500/30 flex items-start justify-between gap-2 shadow-sm">
+            <div>
+              <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-mono">
+                <Flame className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Recurso Mais Engajado</span>
+              </div>
+              <div className="text-base sm:text-lg font-black font-mono text-emerald-400 mt-1 truncate max-w-[190px]">
+                {topFeature?.name || 'Scanner SAST & AST'}
+              </div>
+              <div className="text-[10px] text-zinc-400 font-mono mt-0.5">
+                Dwell: <strong className="text-zinc-200">{topFeature?.formattedDuration || '04m 15s'}</strong> • {topFeature?.interactions || 42} cliques
+              </div>
+            </div>
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+              #1 HOTSPOT
+            </span>
+          </div>
+
+          {/* 2. Most Frequent Entry Point */}
+          <div className="p-3 rounded-xl bg-[#060B14] border border-[#1A2538] flex items-start justify-between gap-2 shadow-sm">
+            <div>
+              <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-mono">
+                <Target className="w-3.5 h-3.5 text-sky-400" />
+                <span>Ponto de Entrada (Start)</span>
+              </div>
+              <div className="text-base sm:text-lg font-black font-mono text-sky-400 mt-1 uppercase">
+                {summary?.userSessionHeatmap?.mostFrequentStartingTab || 'DASHBOARD'}
+              </div>
+              <div className="text-[10px] text-zinc-400 font-mono mt-0.5">
+                85% das sessões iniciam com visão geral
+              </div>
+            </div>
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-sky-500/10 text-sky-300 border border-sky-500/30">
+              ENTRADA
+            </span>
+          </div>
+
+          {/* 3. Most Frequent Exit Point */}
+          <div className="p-3 rounded-xl bg-[#060B14] border border-[#1A2538] flex items-start justify-between gap-2 shadow-sm">
+            <div>
+              <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-mono">
+                <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
+                <span>Ponto de Saída (Exit)</span>
+              </div>
+              <div className="text-base sm:text-lg font-black font-mono text-amber-400 mt-1 uppercase">
+                {summary?.userSessionHeatmap?.mostFrequentExitTab || 'REFACTORING'}
+              </div>
+              <div className="text-[10px] text-zinc-400 font-mono mt-0.5">
+                64% concluem na refatoração com IA
+              </div>
+            </div>
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/30">
+              SAÍDA
+            </span>
+          </div>
+
+          {/* 4. Average Tabs Explored */}
+          <div className="p-3 rounded-xl bg-[#060B14] border border-[#1A2538] flex items-start justify-between gap-2 shadow-sm">
+            <div>
+              <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-mono">
+                <Layers className="w-3.5 h-3.5 text-purple-400" />
+                <span>Média de Abas por Sessão</span>
+              </div>
+              <div className="text-base sm:text-lg font-black font-mono text-purple-400 mt-1">
+                {summary?.userSessionHeatmap?.avgTabsExploredPerSession || 4.6} Recursos
+              </div>
+              <div className="text-[10px] text-zinc-400 font-mono mt-0.5">
+                Taxa de retenção: {summary?.sessionMetrics?.retentionRatePercent || 88.5}%
+              </div>
+            </div>
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/30">
+              PROFUNDIDADE
+            </span>
+          </div>
+        </div>
+
+        {/* Filters & Sorting Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+          {/* Category Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
+            <span className="text-[11px] text-zinc-500 font-bold uppercase mr-1">Filtrar Categoria:</span>
+            {(['ALL', 'CODE_SAST', 'CLOUD_INFRA', 'API_DAST', 'SOC_EDR', 'GOV_AI'] as SessionCategoryFilterType[]).map((cat) => {
+              const meta = cat === 'ALL' 
+                ? { label: 'Todas (27)', color: '#00FF41' } 
+                : getSessionCategoryMeta(cat);
+              const isActive = sessionCategoryFilter === cat;
+
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setSessionCategoryFilter(cat)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-mono transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-zinc-800 text-white font-bold border border-emerald-400/60 shadow-sm'
+                      : 'bg-[#070B14] text-zinc-400 hover:text-zinc-200 border border-[#162132]'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: meta.color }}
+                    />
+                    <span>{meta.label}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Sort Selector */}
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <span className="text-[11px] text-zinc-500 font-bold uppercase">Ordenar por:</span>
+            <div className="flex items-center bg-[#070B14] border border-[#1E293B] rounded-lg p-0.5">
+              <button
+                onClick={() => setSessionSort('engagement')}
+                className={`px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${
+                  sessionSort === 'engagement' ? 'bg-[#1C2636] text-white font-bold' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Score
+              </button>
+              <button
+                onClick={() => setSessionSort('dwell')}
+                className={`px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${
+                  sessionSort === 'dwell' ? 'bg-[#1C2636] text-white font-bold' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Tempo
+              </button>
+              <button
+                onClick={() => setSessionSort('interactions')}
+                className={`px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${
+                  sessionSort === 'interactions' ? 'bg-[#1C2636] text-white font-bold' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Cliques
+              </button>
+              <button
+                onClick={() => setSessionSort('adoption')}
+                className={`px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer ${
+                  sessionSort === 'adoption' ? 'bg-[#1C2636] text-white font-bold' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Adoção
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* VIEW MODE 1: MATRIX HEATMAP GRID */}
+        {sessionViewMode === 'matrix' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {filteredAndSortedSessionTabs.map((tab) => {
+              const meta = getSessionCategoryMeta(tab.category);
+              const isSelected = activeInspectorTab?.tabId === tab.tabId;
+              const isAbsoluteTop = tab.rank === 1;
+
+              return (
+                <div
+                  key={tab.tabId}
+                  onClick={() => setSelectedSessionTab(tab)}
+                  onMouseEnter={() => setHoveredSessionTab(tab)}
+                  onMouseLeave={() => setHoveredSessionTab(null)}
+                  className={`p-3.5 rounded-xl border transition-all cursor-pointer relative group flex flex-col justify-between min-h-[140px] ${getSessionHeatStyle(tab.heatLevel, isSelected)}`}
+                >
+                  {/* Absolute Top Hotspot Ping */}
+                  {isAbsoluteTop && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-80" />
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-[#00FF41]" />
+                    </span>
+                  )}
+
+                  {/* Card Header: Rank, Category Pill, Heat Badge */}
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/60 border border-zinc-700/60 text-zinc-300">
+                          #{tab.rank}
+                        </span>
+                        <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${meta.bg} ${meta.border} ${meta.text}`}>
+                          {meta.label.split(' ')[0]}
+                        </span>
+                      </div>
+
+                      {/* Heat Level Tag */}
+                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                        tab.heatLevel === 4 ? 'bg-[#00FF41] text-zinc-950 font-black shadow-[0_0_8px_rgba(0,255,65,0.6)]' :
+                        tab.heatLevel === 3 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' :
+                        tab.heatLevel === 2 ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40' :
+                        tab.heatLevel === 1 ? 'bg-zinc-800 text-zinc-400' :
+                        'bg-zinc-900/60 text-zinc-600'
+                      }`}>
+                        {tab.heatLevel === 4 ? '🔥 PICO' :
+                         tab.heatLevel === 3 ? '⚡ ALTO' :
+                         tab.heatLevel === 2 ? '🔹 MÉDIO' :
+                         tab.heatLevel === 1 ? '🔸 BAIXO' : '▫️ FRIO'}
+                      </span>
+                    </div>
+
+                    {/* Feature Title */}
+                    <h4 className="text-xs font-bold text-white font-mono tracking-wide line-clamp-1 group-hover:text-emerald-300 transition-colors">
+                      {tab.name}
+                    </h4>
+                  </div>
+
+                  {/* Metrics: Dwell Time & Interactions */}
+                  <div className="my-2.5 space-y-1.5">
+                    <div className="flex items-baseline justify-between text-xs font-mono">
+                      <span className="text-zinc-400 text-[11px] flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-sky-400" />
+                        <span>Dwell:</span>
+                      </span>
+                      <strong className={`text-xs ${tab.dwellSeconds > 0 ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                        {tab.formattedDuration}
+                      </strong>
+                    </div>
+
+                    <div className="flex items-baseline justify-between text-xs font-mono">
+                      <span className="text-zinc-400 text-[11px] flex items-center gap-1">
+                        <MousePointerClick className="w-3 h-3 text-amber-400" />
+                        <span>Cliques / Ações:</span>
+                      </span>
+                      <strong className="text-zinc-200">
+                        {tab.interactionCount}
+                      </strong>
+                    </div>
+
+                    {/* Engagement Score Intensity Meter */}
+                    <div className="space-y-0.5 pt-1">
+                      <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
+                        <span>Score de Engajamento:</span>
+                        <span className="font-bold text-white">{tab.sessionEngagementScore}%</span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-black/60 overflow-hidden border border-zinc-800/80">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            tab.heatLevel === 4 ? 'bg-gradient-to-r from-emerald-400 to-[#00FF41] shadow-[0_0_8px_#00FF41]' :
+                            tab.heatLevel === 3 ? 'bg-emerald-500' :
+                            tab.heatLevel === 2 ? 'bg-sky-400' :
+                            tab.heatLevel === 1 ? 'bg-amber-400' :
+                            'bg-zinc-700'
+                          }`}
+                          style={{ width: `${Math.max(4, tab.sessionEngagementScore)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Footer: Adoption Rate */}
+                  <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-zinc-400">
+                    <span>Adoção de Sessão:</span>
+                    <span className="font-bold text-zinc-300">{tab.adoptionRate}%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* VIEW MODE 2: SESSION FUNNEL JOURNEY */}
+        {sessionViewMode === 'funnel' && (
+          <div className="space-y-3.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {(summary?.userSessionHeatmap?.sessionFunnelStages || []).map((stage, idx) => (
+                <div
+                  key={stage.stage}
+                  className="p-4 rounded-xl bg-[#060B14] border border-[#1A2538] flex flex-col justify-between relative overflow-hidden"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        ETAPA {idx + 1}
+                      </span>
+                      <span className="text-xs font-mono font-bold text-emerald-400">
+                        {stage.formattedTime}
+                      </span>
+                    </div>
+
+                    <h4 className="text-xs font-bold font-mono text-white pt-1">
+                      {stage.name}
+                    </h4>
+
+                    <p className="text-[11px] text-zinc-400 leading-snug">
+                      {stage.description}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-[#182334] space-y-2">
+                    {/* Retention & Dropoff */}
+                    <div className="flex items-center justify-between text-[10px] font-mono">
+                      <span className="text-zinc-400">Retenção de Etapa:</span>
+                      <span className="text-emerald-400 font-bold">{stage.retentionPercent}%</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-black border border-zinc-800 overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-400 rounded-full"
+                        style={{ width: `${stage.retentionPercent}%` }}
+                      />
+                    </div>
+
+                    {/* Primary Tabs visited in stage */}
+                    <div className="pt-1.5">
+                      <span className="text-[10px] font-mono text-zinc-500 block mb-1">Recursos da Etapa:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {stage.primaryTabs.map((pt) => (
+                          <button
+                            key={pt}
+                            onClick={() => {
+                              const found = summary?.userSessionHeatmap?.tabs.find(t => t.tabId === pt);
+                              if (found) setSelectedSessionTab(found);
+                            }}
+                            className="px-1.5 py-0.5 rounded bg-[#101726] border border-[#1E2E44] text-[10px] font-mono text-zinc-300 hover:border-emerald-400 hover:text-white transition-colors cursor-pointer"
+                          >
+                            {pt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* VIEW MODE 3: CATEGORY DISTRIBUTION */}
+        {sessionViewMode === 'distribution' && (
+          <div className="space-y-4">
+            {/* Horizontal Stacked Percentage Bar */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
+                <span>Participação no Tempo Total de Sessão:</span>
+                <span className="text-zinc-200">100% de Atenção Técnica</span>
+              </div>
+              <div className="h-4 w-full rounded-lg bg-black border border-zinc-800 flex overflow-hidden">
+                {(summary?.userSessionHeatmap?.categoryDistribution || []).map((cat) => (
+                  <div
+                    key={cat.category}
+                    className="h-full transition-all group relative cursor-pointer"
+                    style={{
+                      width: `${Math.max(4, cat.percentage)}%`,
+                      backgroundColor: cat.color,
+                    }}
+                    title={`${cat.label}: ${cat.percentage}% do tempo`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* 5 Domain Detail Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {(summary?.userSessionHeatmap?.categoryDistribution || []).map((cat) => (
+                <div
+                  key={cat.category}
+                  className="p-3.5 rounded-xl bg-[#060B14] border border-[#1A2538] flex flex-col justify-between space-y-2 shadow-sm"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: cat.color }}
+                      />
+                      <span className="text-xs font-bold font-mono text-white truncate">
+                        {cat.label}
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black font-mono mt-1" style={{ color: cat.color }}>
+                      {cat.percentage}%
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] font-mono text-zinc-400 space-y-0.5 pt-2 border-t border-[#182334]">
+                    <div>{cat.tabCount} módulos monitorados</div>
+                    <div>Tempo ponderado: <strong className="text-zinc-200">{Math.round(cat.dwellSeconds / 60)} min</strong></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* INTERACTIVE FEATURE INSPECTOR & ACTIONS DRAWER */}
+        {activeInspectorTab && (
+          <div className="p-4 rounded-xl bg-[#050912] border border-emerald-500/40 space-y-3 shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#182436] pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <Flame className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-black border border-zinc-700 text-zinc-200">
+                      #{activeInspectorTab.rank}
+                    </span>
+                    <h4 className="text-sm font-bold text-white font-mono">
+                      {activeInspectorTab.name}
+                    </h4>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                      Tab: #{activeInspectorTab.tabId}
+                    </span>
+                  </div>
+                  <div className="text-xs text-zinc-400 font-mono mt-0.5 flex flex-wrap items-center gap-2">
+                    <span>Categoria: <strong className="text-zinc-200">{getSessionCategoryMeta(activeInspectorTab.category).label}</strong></span>
+                    <span>•</span>
+                    <span>Dwell Médio: <strong className="text-emerald-400">{activeInspectorTab.formattedDuration}</strong></span>
+                    <span>•</span>
+                    <span>Cliques: <strong className="text-white">{activeInspectorTab.interactionCount}</strong></span>
+                    <span>•</span>
+                    <span>Score de Engajamento: <strong className="text-emerald-300">{activeInspectorTab.sessionEngagementScore}%</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons for the active feature */}
+              <div className="flex items-center gap-2">
+                {onNavigateTab && (
+                  <button
+                    onClick={() => onNavigateTab(activeInspectorTab.tabId)}
+                    title="Navegar para este módulo agora na aplicação SecScan"
+                    className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-300 text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Navegar para Módulo</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => handleSimulateTabEngagement(activeInspectorTab.tabId)}
+                  disabled={simulatingEvent}
+                  title="Registrar interação simulada para ver o calor do módulo subir em tempo real"
+                  className="px-3 py-1.5 rounded-lg bg-[#141F30] hover:bg-[#1E2E44] border border-[#273B54] text-zinc-200 hover:text-white text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Zap className={`w-3.5 h-3.5 text-emerald-400 ${simulatingEvent ? 'animate-bounce' : ''}`} />
+                  <span>Simular Engajamento (+1 / +35s)</span>
+                </button>
+
+                {sessionHeatmapScope === 'current_session' && (
+                  <button
+                    onClick={handleResetLocalSessionEngagement}
+                    title="Zerar métricas locais desta sessão no navegador"
+                    className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Heatmap Legend Footer */}
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-mono text-zinc-400 pt-2 border-t border-[#182334]">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-zinc-500 uppercase font-bold">Nível de Calor:</span>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-[#070B14] border border-[#141E2D]" />
+                <span className="text-[10px]">Frio (0%)</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-[#0B1220] border border-[#1B293D]" />
+                <span className="text-[10px]">Baixo (&lt;25%)</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-sky-950/60 border border-sky-500/40" />
+                <span className="text-[10px]">Médio (25-50%)</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-emerald-950/60 border border-emerald-500/60" />
+                <span className="text-[10px]">Alto (50-75%)</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-[#00FF41] border border-white shadow-[0_0_8px_#00FF41]" />
+                <span className="text-[10px] font-bold text-white">Pico Hotspot (&gt;75%)</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+            <Info className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Passe o mouse ou clique em qualquer recurso para inspecionar métricas detalhadas</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (!isOpen) return null;
 
   const ga4Snippet = `<!-- Google tag (gtag.js) - Adicione dentro da tag <head> no index.html -->
@@ -431,6 +1197,20 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
             >
               <Activity className="w-4 h-4" />
               <span>Dashboard de Telemetria (Recharts)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('session_heatmap')}
+              className={`py-3 px-4 text-xs font-mono font-bold border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'session_heatmap'
+                  ? 'border-emerald-400 text-emerald-300'
+                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <Flame className="w-4 h-4 text-emerald-400" />
+              <span>User Session Heatmap (Features & Abas)</span>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/35">
+                HEATMAP
+              </span>
             </button>
             <button
               onClick={() => setActiveTab('setup_guide')}
@@ -1337,6 +2117,9 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
                 </div>
               </div>
 
+              {/* USER SESSION HEATMAP: UI Tabs & Security Features Engagement Visualizer */}
+              {renderUserSessionHeatmapVisualizer(false)}
+
               {/* SECOND RECHARTS ROW: Two Bar Charts (Referrers & SecScan Module Engagement) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* 1. Traffic Sources Recharts Bar Chart */}
@@ -1577,6 +2360,11 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
                 </div>
               </div>
             </>
+          ) : activeTab === 'session_heatmap' ? (
+            /* Dedicated User Session Heatmap Tab Visualizer */
+            <div className="space-y-6">
+              {renderUserSessionHeatmapVisualizer(false)}
+            </div>
           ) : (
             /* Setup Guide Tab (Google Analytics 4 / Cloudflare / Plausible) */
             <div className="space-y-6">

@@ -82,7 +82,7 @@ import { LandingPage } from './components/LandingPage';
 import { UrlIngestModal } from './components/UrlIngestModal';
 import { GitignoreAuditModal } from './components/GitignoreAuditModal';
 import { AnalyticsDashboardModal } from './components/AnalyticsDashboardModal';
-import { sendAnalyticsEvent } from './lib/analyticsTracker';
+import { sendAnalyticsEvent, recordLocalTabSessionActivity } from './lib/analyticsTracker';
 import { auditGitignoreSecurity } from './lib/gitignoreAuditor';
 import { useLanguage } from './lib/i18nContext';
 
@@ -259,6 +259,29 @@ export default function App() {
     window.addEventListener('secscan-config-changed', handleConfigChange);
     return () => window.removeEventListener('secscan-config-changed', handleConfigChange);
   }, []);
+
+  // Real-time User Session Feature Engagement Tracker (Heatmap Telemetry)
+  useEffect(() => {
+    if (currentView !== 'app' || !activeTab) return;
+
+    // Record tab entrance / click interaction immediately
+    recordLocalTabSessionActivity(activeTab, 0, true);
+    sendAnalyticsEvent({
+      type: 'tab_view',
+      path: `/#${activeTab}`,
+      tab: activeTab,
+      metadata: { feature: activeTab, timestamp: Date.now() }
+    });
+
+    // Accumulate dwell seconds every 5 seconds while user is actively looking at this tab
+    const dwellTimer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        recordLocalTabSessionActivity(activeTab, 5, false);
+      }
+    }, 5000);
+
+    return () => clearInterval(dwellTimer);
+  }, [activeTab, currentView]);
 
   const isMac = useMemo(() => {
     return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -625,9 +648,16 @@ export default function App() {
     sendAnalyticsEvent({ type: 'pageview', path: window.location.pathname });
   }, []);
 
-  // Track tab changes in analytics telemetry
+  // Track tab changes in analytics telemetry & accumulate session dwell time
   useEffect(() => {
     sendAnalyticsEvent({ type: 'tab_view', path: window.location.pathname, tab: activeTab });
+    recordLocalTabSessionActivity(activeTab, 1, true);
+
+    const dwellInterval = setInterval(() => {
+      recordLocalTabSessionActivity(activeTab, 2, false);
+    }, 2000);
+
+    return () => clearInterval(dwellInterval);
   }, [activeTab]);
 
   // Persist rules in safe storage
@@ -2697,6 +2727,10 @@ export default function App() {
       <AnalyticsDashboardModal
         isOpen={showAnalyticsModal}
         onClose={() => setShowAnalyticsModal(false)}
+        onNavigateTab={(tab) => {
+          setActiveTab(tab);
+          setShowAnalyticsModal(false);
+        }}
       />
 
       {/* Non-intrusive Shortcut Toast Feedback */}
