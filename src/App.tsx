@@ -82,7 +82,7 @@ import { LandingPage } from './components/LandingPage';
 import { UrlIngestModal } from './components/UrlIngestModal';
 import { GitignoreAuditModal } from './components/GitignoreAuditModal';
 import { AnalyticsDashboardModal } from './components/AnalyticsDashboardModal';
-import { sendAnalyticsEvent, recordLocalTabSessionActivity } from './lib/analyticsTracker';
+import { sendAnalyticsEvent, recordLocalTabSessionActivity, recordSecurityAuditLog } from './lib/analyticsTracker';
 import { auditGitignoreSecurity } from './lib/gitignoreAuditor';
 import { useLanguage } from './lib/i18nContext';
 
@@ -271,6 +271,41 @@ export default function App() {
       path: `/#${activeTab}`,
       tab: activeTab,
       metadata: { feature: activeTab, timestamp: Date.now() }
+    });
+
+    // Record Security Tool Audit Log
+    const toolMetaMap: Record<string, { name: string; category: any; action: string; severity: any }> = {
+      dashboard: { name: 'Dashboard Executivo', category: 'CORE_ENGINE', action: 'Visualização de Métricas Gerais', severity: 'INFO' },
+      scanner: { name: 'Scanner SAST & AST', category: 'CODE_SAST', action: 'Acesso ao Scanner Estático', severity: 'INFO' },
+      'threat-matrix': { name: 'Threat Modeling & Matrix STRIDE', category: 'SOC_EDR', action: 'Inspeção de Matriz de Ameaças', severity: 'HIGH' },
+      'ast-explorer': { name: 'AST Syntax Tree Explorer', category: 'CODE_SAST', action: 'Navegação por Nós Sintáticos', severity: 'INFO' },
+      secrets: { name: 'Detector de Segredos & Credenciais', category: 'CODE_SAST', action: 'Auditoria de Chaves & Tokens', severity: 'CRITICAL' },
+      infra: { name: 'Auditor de Infraestrutura Cloud (IaC)', category: 'CLOUD_INFRA', action: 'Inspeção de Dockerfile & Terraform', severity: 'HIGH' },
+      dast: { name: 'DAST & API Fuzzer', category: 'API_DAST', action: 'Fuzzing Dinâmico de Endpoints', severity: 'MEDIUM' },
+      soc: { name: 'SOC Command Center & EDR', category: 'SOC_EDR', action: 'Monitoramento de Incidentes SOC', severity: 'AUDIT' },
+      remediation: { name: 'Assistente de Remediação com IA', category: 'GOV_AI', action: 'Auditoria de Correção Automática', severity: 'SUCCESS' },
+      cicd: { name: 'CI/CD Security Gate', category: 'CORE_ENGINE', action: 'Validação de Políticas de Build', severity: 'SUCCESS' },
+      taint: { name: 'Taint Flow Data Graph', category: 'CODE_SAST', action: 'Rastreamento de Taint Analysis', severity: 'HIGH' },
+      sca: { name: 'Software Composition Analysis (SCA)', category: 'CODE_SAST', action: 'Auditoria de Dependências & CVEs', severity: 'MEDIUM' },
+      container: { name: 'Container Security Scanner', category: 'CLOUD_INFRA', action: 'Inspeção de Imagens Docker', severity: 'HIGH' },
+      compliance: { name: 'Compliance & Regulamentações', category: 'GOV_AI', action: 'Auditoria de Conformidade LGPD', severity: 'AUDIT' },
+      'exploit-sim': { name: 'Simulador de Exploit & PoC', category: 'API_DAST', action: 'Validação Controlada de Payloads', severity: 'CRITICAL' },
+      rules: { name: 'Motor de Regras Customizadas', category: 'CORE_ENGINE', action: 'Edição de Regras do Motor', severity: 'INFO' },
+      reports: { name: 'Central de Relatórios Executivos', category: 'GOV_AI', action: 'Exportação de Relatórios SARIF/PDF', severity: 'SUCCESS' },
+    };
+    const meta = toolMetaMap[activeTab] || {
+      name: `Módulo SecScan [${activeTab}]`,
+      category: 'CORE_ENGINE',
+      action: 'Acesso a Ferramenta Especializada',
+      severity: 'INFO',
+    };
+    recordSecurityAuditLog({
+      toolId: activeTab,
+      toolName: meta.name,
+      action: meta.action,
+      severity: meta.severity,
+      category: meta.category,
+      details: `Interação do operador com a ferramenta ${meta.name} via interface SecScan`,
     });
 
     // Accumulate dwell seconds every 5 seconds while user is actively looking at this tab
@@ -2731,6 +2766,9 @@ export default function App() {
           setActiveTab(tab);
           setShowAnalyticsModal(false);
         }}
+        scanHistory={scanHistory}
+        currentReport={report}
+        onTriggerScan={() => executeScan(files, rules, ignorePatterns)}
       />
 
       {/* Non-intrusive Shortcut Toast Feedback */}

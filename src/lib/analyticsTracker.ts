@@ -113,6 +113,38 @@ export interface SessionMetrics {
   engagedSessionsCount: number;
 }
 
+export interface ScanEfficiencyDataPoint {
+  id: string;
+  scanIndex: number;
+  timestamp: number;
+  timeLabel: string;
+  durationMs: number;
+  durationSec: number;
+  findingsCount: number;
+  filesCount: number;
+  linesOfCode?: number;
+  throughput: number; // findings / second
+  efficiencyRating: 'ULTRA_FAST' | 'OPTIMAL' | 'MODERATE' | 'DEEP_AUDIT';
+  engineMode: 'AST_REGEX' | 'TAINT_FLOW' | 'FULL_ASOC';
+  isCurrentSession?: boolean;
+  projectName?: string;
+  criticalFindings: number;
+  highFindings: number;
+}
+
+export interface ScanEfficiencySummary {
+  dataPoints: ScanEfficiencyDataPoint[];
+  avgDurationMs: number;
+  avgDurationFormatted: string;
+  avgFindingsCount: number;
+  avgThroughput: number;
+  totalScansEvaluated: number;
+  subSecondPercent: number;
+  correlationLabel: string;
+  fastestScanMs: number;
+  highestFindingCount: number;
+}
+
 export interface AnalyticsSummary {
   activeVisitorsNow: number;
   totalPageViews: number;
@@ -130,6 +162,7 @@ export interface AnalyticsSummary {
   weeklyHeatmap?: WeeklyHeatmapData;
   sessionMetrics?: SessionMetrics;
   userSessionHeatmap?: UserSessionHeatmapData;
+  scanEfficiency?: ScanEfficiencySummary;
   recentEvents: {
     id: string;
     timestamp: number;
@@ -143,6 +176,25 @@ export interface AnalyticsSummary {
     country: string;
     referrer: string;
   }[];
+  securityAuditLogs?: SecurityAuditLogItem[];
+}
+
+export interface SecurityAuditLogItem {
+  id: string;
+  timestamp: number;
+  timeLabel: string;
+  timeAgo: string;
+  toolId: string;
+  toolName: string;
+  action: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO' | 'SUCCESS' | 'AUDIT';
+  category: 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI' | 'CORE_ENGINE';
+  details: string;
+  user: string;
+  hash: string;
+  executionMs?: number;
+  findingsCount?: number;
+  metadata?: Record<string, any>;
 }
 
 const VISITOR_ID_KEY = 'secscan_anonymous_vid';
@@ -301,5 +353,218 @@ export async function fetchAnalyticsSummary(): Promise<AnalyticsSummary | null> 
   } catch (err) {
     console.warn('Erro ao carregar resumo de analytics:', err);
     return null;
+  }
+}
+// -------------------------------------------------------------
+// Security Tool Audit Logs Telemetry & Persistence
+// -------------------------------------------------------------
+export const SECURITY_AUDIT_LOGS_KEY = 'secscan_security_audit_logs';
+
+export function generateSeedSecurityAuditLogs(): SecurityAuditLogItem[] {
+  const now = Date.now();
+  const formatTime = (offsetMs: number) => {
+    const d = new Date(now - offsetMs);
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+  const formatTimeAgo = (seconds: number) => {
+    if (seconds < 60) return `Há ${seconds}s`;
+    const m = Math.floor(seconds / 60);
+    return `Há ${m}m`;
+  };
+
+  return [
+    {
+      id: 'audit_init_01',
+      timestamp: now - 18 * 1000,
+      timeLabel: formatTime(18 * 1000),
+      timeAgo: formatTimeAgo(18),
+      toolId: 'sast_scanner',
+      toolName: 'Scanner SAST & AST',
+      action: 'Varredura de Código Executada',
+      severity: 'HIGH',
+      category: 'CODE_SAST',
+      details: '14 vulnerabilidades detectadas em 18 arquivos (3 Altas CWE-89, CWE-79)',
+      user: 'Operador SecScan (Sessão Atual)',
+      hash: '0x8f2a1b9c',
+      executionMs: 280,
+      findingsCount: 14,
+    },
+    {
+      id: 'audit_init_02',
+      timestamp: now - 45 * 1000,
+      timeLabel: formatTime(45 * 1000),
+      timeAgo: formatTimeAgo(45),
+      toolId: 'threat_matrix',
+      toolName: 'Threat Modeling & Matrix STRIDE',
+      action: 'Inspeção de Vetores de Ataque',
+      severity: 'CRITICAL',
+      category: 'SOC_EDR',
+      details: 'Vetor Elevation of Privilege avaliado com risco CVSS 9.2 em rotas /api/admin',
+      user: 'Operador SecScan (Sessão Atual)',
+      hash: '0x3c7d4e11',
+      findingsCount: 3,
+    },
+    {
+      id: 'audit_init_03',
+      timestamp: now - 92 * 1000,
+      timeLabel: formatTime(92 * 1000),
+      timeAgo: formatTimeAgo(92),
+      toolId: 'secrets_scanner',
+      toolName: 'Detector de Credenciais & Segredos',
+      action: 'Análise Heurística de Entropia',
+      severity: 'CRITICAL',
+      category: 'CODE_SAST',
+      details: '1 chave de API de alta entropia identificada no código-fonte',
+      user: 'Operador SecScan (Sessão Atual)',
+      hash: '0xa19f55b2',
+      executionMs: 145,
+      findingsCount: 1,
+    },
+    {
+      id: 'audit_init_04',
+      timestamp: now - 140 * 1000,
+      timeLabel: formatTime(140 * 1000),
+      timeAgo: formatTimeAgo(140),
+      toolId: 'soc_command',
+      toolName: 'SOC Command Center',
+      action: 'Verificação de Integridade de Regras',
+      severity: 'SUCCESS',
+      category: 'SOC_EDR',
+      details: 'Regras de bloqueio WAF e assinaturas ASOC sincronizadas com sucesso',
+      user: 'Operador SecScan (Sessão Atual)',
+      hash: '0x7e22bc40',
+      executionMs: 90,
+    },
+    {
+      id: 'audit_init_05',
+      timestamp: now - 210 * 1000,
+      timeLabel: formatTime(210 * 1000),
+      timeAgo: formatTimeAgo(210),
+      toolId: 'ast_explorer',
+      toolName: 'AST Syntax Tree Explorer',
+      action: 'Parsing de Árvore Sintática',
+      severity: 'AUDIT',
+      category: 'CODE_SAST',
+      details: 'Grafo AST de TypeScript/JavaScript compilado e mapeado para nós CallExpression',
+      user: 'Operador SecScan (Sessão Atual)',
+      hash: '0x99a0b12e',
+      executionMs: 310,
+    },
+    {
+      id: 'audit_init_06',
+      timestamp: now - 290 * 1000,
+      timeLabel: formatTime(290 * 1000),
+      timeAgo: formatTimeAgo(290),
+      toolId: 'remediation_ai',
+      toolName: 'Assistente de Remediação com IA',
+      action: 'Geração de Patch Seguro',
+      severity: 'SUCCESS',
+      category: 'GOV_AI',
+      details: 'Patch parametrizado gerado para neutralizar injeção de comandos CWE-78',
+      user: 'Operador SecScan (Sessão Atual)',
+      hash: '0x5b3318dc',
+      executionMs: 620,
+    },
+    {
+      id: 'audit_init_07',
+      timestamp: now - 360 * 1000,
+      timeLabel: formatTime(360 * 1000),
+      timeAgo: formatTimeAgo(360),
+      toolId: 'cicd_gate',
+      toolName: 'CI/CD Security Gate',
+      action: 'Avaliação de Política de Deploy',
+      severity: 'HIGH',
+      category: 'CORE_ENGINE',
+      details: 'Pipeline bloqueado preventivamente: threshold de severidade alta atingido (Score: 68/100)',
+      user: 'Operador SecScan (Sessão Atual)',
+      hash: '0x10f3c5aa',
+    },
+    {
+      id: 'audit_init_08',
+      timestamp: now - 480 * 1000,
+      timeLabel: formatTime(480 * 1000),
+      timeAgo: formatTimeAgo(480),
+      toolId: 'dast_fuzzer',
+      toolName: 'DAST & API Fuzzer',
+      action: 'Sonda Dinâmica de Headers',
+      severity: 'MEDIUM',
+      category: 'API_DAST',
+      details: 'Cabeçalhos HSTS e Content-Security-Policy auditados com ausência de diretiva estrita',
+      user: 'Operador SecScan (Sessão Atual)',
+      hash: '0x4e6b7719',
+      executionMs: 410,
+    },
+  ];
+}
+
+export function getLocalSecurityAuditLogs(): SecurityAuditLogItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = sessionStorage.getItem(SECURITY_AUDIT_LOGS_KEY);
+    if (!raw) {
+      const initial = generateSeedSecurityAuditLogs();
+      sessionStorage.setItem(SECURITY_AUDIT_LOGS_KEY, JSON.stringify(initial));
+      return initial;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return generateSeedSecurityAuditLogs();
+  }
+}
+
+export function recordSecurityAuditLog(entry: {
+  toolId: string;
+  toolName: string;
+  action: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO' | 'SUCCESS' | 'AUDIT';
+  category?: 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI' | 'CORE_ENGINE';
+  details: string;
+  executionMs?: number;
+  findingsCount?: number;
+  metadata?: Record<string, any>;
+}): SecurityAuditLogItem {
+  const now = Date.now();
+  const d = new Date(now);
+  const timeLabel = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const hash = Math.random().toString(16).substring(2, 10);
+
+  const logItem: SecurityAuditLogItem = {
+    id: `audit_${now}_${Math.random().toString(36).substring(2, 6)}`,
+    timestamp: now,
+    timeLabel,
+    timeAgo: 'Agora',
+    toolId: entry.toolId,
+    toolName: entry.toolName,
+    action: entry.action,
+    severity: entry.severity,
+    category: entry.category || 'CORE_ENGINE',
+    details: entry.details,
+    user: 'Operador SecScan (Sessão Atual)',
+    hash: `0x${hash}`,
+    executionMs: entry.executionMs,
+    findingsCount: entry.findingsCount,
+    metadata: entry.metadata,
+  };
+
+  if (typeof window !== 'undefined') {
+    try {
+      const existing = getLocalSecurityAuditLogs();
+      const updated = [logItem, ...existing.filter(i => i.id !== logItem.id).slice(0, 49)];
+      sessionStorage.setItem(SECURITY_AUDIT_LOGS_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('secscan-audit-log-added', { detail: logItem }));
+    } catch {
+      // safe fallback
+    }
+  }
+
+  return logItem;
+}
+
+export function clearLocalSecurityAuditLogs(): void {
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.removeItem(SECURITY_AUDIT_LOGS_KEY);
+      window.dispatchEvent(new CustomEvent('secscan-audit-log-cleared'));
+    } catch {}
   }
 }
