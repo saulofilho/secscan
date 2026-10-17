@@ -7,7 +7,7 @@
 [![Quality Gate](https://img.shields.io/badge/Quality%20Gate-Max%20Risk%20Score%20(0--100)-FF3E00)](README.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-**SecScan AppSec Suite** é uma plataforma avançada e modular de **Análise Estática de Segurança de Aplicações (SAST)**, auditoria de código JavaScript/TypeScript, detecção de segredos de alta entropia e inteligência de superfície de ataque. Desenvolvida para engenheiros de DevSecOps, AppSec, pesquisadores de Bug Bounty e desenvolvedores full-stack, a suíte reúne um motor de **Risk Score Cumulativo do Workspace (0-100)** para Quality Gates, painel de evolução temporal com gráficos Recharts (**SecScan Trend Dashboard**), grafo de fluxo de dados (**DataFlow Taint Analysis**), auditoria de rotas (**OWASP API Security & LinkFinder**), validação contra metadados de nuvem (**SSRF & Webhook Validator**), avaliação declarativa (**Policy-as-Code OPA Rego**) e uma base unificada de remediação com links oficiais para **OWASP**, **Snyk Learn** e **MITRE CWE** diretamente nos cards de achados.
+**SecScan AppSec Suite** é uma plataforma avançada e modular de **Análise Estática de Segurança de Aplicações (SAST)**, auditoria de código JavaScript/TypeScript, detecção de segredos de alta entropia e inteligência de superfície de ataque. Desenvolvida para engenheiros de DevSecOps, AppSec, pesquisadores de Bug Bounty e desenvolvedores full-stack, a suíte reúne um motor de **Risk Score Cumulativo do Workspace (0-100)** para Quality Gates, painel de evolução temporal com gráficos Recharts (**SecScan Trend Dashboard**), painel de **Logs de Auditoria de Segurança com detecção de anomalias estatísticas e gráfico de frequência**, grafo de fluxo de dados (**DataFlow Taint Analysis**), auditoria de rotas (**OWASP API Security & LinkFinder**), validação contra metadados de nuvem (**SSRF & Webhook Validator**), avaliação declarativa (**Policy-as-Code OPA Rego**) e uma base unificada de remediação com links oficiais para **OWASP**, **Snyk Learn** e **MITRE CWE** diretamente nos cards de achados.
 
 ---
 
@@ -410,6 +410,48 @@ O SecScan serve como suíte preparatória e de auditoria de código para program
 | **Roubo de Contas (Account Takeover)** | *JWT & Token Forensics*, *DAST Fuzzer* | Tokens sem assinatura (`alg: none`), chaves fracas HMAC e endpoints de autenticação sem rate limiting. |
 | **Funcionalidades Financeiras / Cashback** | *Policy-as-Code*, *LinkFinder*, *Custom Rules* | Mapeamento de endpoints de crédito/débito, validação de tipos de dados (`amount < 0`) e regras de concorrência. |
 | **Misconfigurations de Servidor & Infra** | *IaC Security*, *Security Headers*, *WAF Suite* | Ausência de CSP/HSTS, Dockerfile executando como root e privilégios excessivos em políticas IAM. |
+
+---
+
+### 30. 🛡️ Telemetria, Analytics & Painel de Logs de Auditoria de Segurança (com Detecção de Anomalias)
+
+- **O que é e Como Funciona:** Painel integrado de telemetria e auditoria operacional (`AnalyticsDashboardModal`) que monitora em tempo real todas as atividades, acessos e execuções realizadas pelos usuários nas ferramentas de segurança da plataforma SecScan. Combina rastreamento contínuo de eventos, consolidação estatística, visualizações interativas com **Recharts** e inteligência de detecção de anomalias para identificar desvios operacionais ou potenciais ações adversárias/maliciosas na sessão.
+
+- **Recursos Principais do Módulo:**
+  - **Painel Lateral de Logs de Auditoria de Segurança:**
+    - Registro cronológico imutável com carimbo de data/hora (`HH:MM:SS`), tempo decorrido relativo e identificação da ferramenta acessada.
+    - Metadados completos por evento: categoria AppSec (`CODE_SAST`, `CLOUD_INFRA`, `API_DAST`, `SOC_EDR`, `GOV_AI`, `CORE_ENGINE`), ação executada, nível de severidade (`CRITICAL`, `HIGH`, `MEDIUM`, `AUDIT`, `SUCCESS`), detalhes técnicos e hash criptográfico SHA-256 de integridade.
+    - Atalho rápido de navegação em cada registro para abrir imediatamente a ferramenta auditada no SecScan.
+  - **Barra de Pesquisa & Filtros Inteligentes:**
+    - Campo de busca em tempo real com suporte a consultas combinadas por nome da ferramenta, palavra-chave, ação ou identificador de vulnerabilidade (ex.: `SAST`, `STRIDE`, `CWE-89`, `SQL Injection`, `Segredos`, `Docker`).
+    - Chips de palavras-chave rápidas para filtragem em 1 clique (`SAST`, `STRIDE`, `Segredos`, `SOC`, `Remediação`, `DAST`, `CI/CD`).
+    - Filtros por nível de severidade e menu suspenso de ferramentas específicas catalogadas.
+  - **Visualização de Gráfico de Linhas (Frequência ao Longo do Tempo):**
+    - Gráfico interativo com **Recharts** exibindo a cadência e o volume de interações por intervalo temporal.
+    - Modos de métrica selecionáveis: *Ambas* (Total + Críticas), *Total de Interações* (linha ciano neon) e *Apenas Críticas/Altas* (linha pontilhada vermelha).
+    - **Filtro Temporal Interativo:** Clique em qualquer ponto do gráfico de linhas para isolar e filtrar instantaneamente a listagem de logs para a janela de tempo correspondente.
+    - Barra de métricas rápidas com **Pico de Frequência**, **Média de Eventos por Janela** e **Horário Mais Ativo**.
+    - Controle de visualização para recolher ou expandir o gráfico sob demanda para otimizar espaço vertical.
+  - **🚨 Indicador Visual de Anomalia & Detecção de Picos Suspeitos:**
+    - **Baseline Estatística Dinâmica:** Cálculo contínuo da média ($\mu$) e desvio padrão ($\sigma$) para definir dinamicamente o limiar de anomalia ($\text{Threshold} = \max(\lceil \mu + 1.5\sigma \rceil, 3)$).
+    - **Identificação de Picos Maliciosos:** Alerta automático sobre surtos inesperados de tráfego ou rajadas concentradas de requisições a ferramentas sensíveis (*Detector de Segredos*, *Threat Modeling STRIDE*, *DAST Fuzzer* e *SOC Command Center*).
+    - **Ponto com Beacon Pulsante:** Os pontos anômalos no gráfico de linhas são destacados com anéis concêntricos pulsantes (`animate-ping`) em vermelho/âmbar, diferenciando-os de acessos normais.
+    - **Linha de Referência de Threshold (`ReferenceLine`):** Linha pontilhada transversal vermelha marcando a fronteira entre o tráfego nominal e os limites de anomalia.
+    - **Banner de Alerta SOC:** Notificação contextual destacando a hipótese da ameaça (ex.: *Possível Reconhecimento Malicioso / Enumeração de Segredos & Escalação de Privilégios*) com botão de ação direta **Inspecionar Pico**.
+    - **Tooltip Forense de Risco:** Cartão com Score de Risco SOC (0–100%), justificativa quantitativa e lista de ferramentas envolvidas no surto.
+    - **Simulação em 1-Clique (`+ Simular Pico`):** Disparo de burst sintético para demonstrar e validar os alertas de anomalia em tempo real.
+  - **Métricas Globais de Telemetria:**
+    - Cronômetro ao vivo do tempo ativo da sessão com cálculo do tempo médio de permanência dos usuários.
+    - Mapa de calor de engajamento por abas e recursos (*User Session Heatmap*).
+    - Gráfico de dispersão de eficiência do motor de varredura (*Engine Efficiency Scatter Plot* — Duração vs. Achados).
+
+- **Como Usar no Sistema:**
+  1. No cabeçalho da aplicação ou menu de ferramentas, clique em **"Telemetria & Analytics"** para abrir o modal.
+  2. O painel lateral **"Logs de Auditoria de Segurança"** estará visível à direita (com opção de alternar via botão no topo ou rodapé).
+  3. Utilize a **Barra de Pesquisa** para buscar eventos por ferramenta (`SAST`, `STRIDE`, `DAST`, etc.) ou termos específicos de vulnerabilidades.
+  4. Analise o **Gráfico de Linhas de Frequência** para inspecionar a cadência temporal de uso das ferramentas.
+  5. Se houver picos fora da curva, observe o **ponto pulsante vermelho (Beacon)** e a linha de threshold, clique em **"Inspecionar Pico"** no banner de alerta SOC para filtrar os logs daquela janela temporal e investigar os detalhes do incidente.
+  6. Para testar o comportamento dos alertas de intrusão, clique no botão **`+ Simular Pico`** no cabeçalho do gráfico.
 
 ---
 
