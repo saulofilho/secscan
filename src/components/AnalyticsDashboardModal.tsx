@@ -15,7 +15,8 @@ import {
   CartesianGrid,
   Tooltip as RechartsTooltip,
   Legend,
-  Cell
+  Cell,
+  ReferenceLine
 } from 'recharts';
 import { 
   BarChart3, 
@@ -69,7 +70,10 @@ import {
   Terminal,
   SlidersHorizontal,
   ChevronRight,
-  Filter
+  ChevronDown,
+  ChevronUp,
+  Filter,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   fetchAnalyticsSummary, 
@@ -211,8 +215,12 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
   const [auditLogs, setAuditLogs] = useState<SecurityAuditLogItem[]>(() => getLocalSecurityAuditLogs());
   const [auditSearchQuery, setAuditSearchQuery] = useState<string>('');
   const [auditSeverityFilter, setAuditSeverityFilter] = useState<'ALL' | 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'AUDIT' | 'SUCCESS'>('ALL');
+  const [auditToolFilter, setAuditToolFilter] = useState<string>('ALL');
   const [selectedAuditLog, setSelectedAuditLog] = useState<SecurityAuditLogItem | null>(null);
   const [copiedAuditLogs, setCopiedAuditLogs] = useState<boolean>(false);
+  const [showAuditLineChart, setShowAuditLineChart] = useState<boolean>(true);
+  const [auditChartMetricMode, setAuditChartMetricMode] = useState<'both' | 'total' | 'critical'>('both');
+  const [selectedTimeBucket, setSelectedTimeBucket] = useState<{ start: number; end: number; label: string } | null>(null);
 
   useEffect(() => {
     setUserActiveSeconds(getCurrentSessionDurationSeconds());
@@ -269,6 +277,30 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
     setAuditLogs(prev => [newLog, ...prev.filter(l => l.id !== newLog.id)].slice(0, 50));
   };
 
+  const handleSimulateAnomalySpike = () => {
+    const maliciousBurst = [
+      { toolId: 'secrets_detector', toolName: 'Detector de Credenciais & Segredos', action: 'Scan Massivo de Chaves API', severity: 'CRITICAL' as const, category: 'CODE_SAST' as const, details: 'Tentativa anormal de enumeração de credenciais em 128 arquivos' },
+      { toolId: 'threat_matrix', toolName: 'Threat Modeling & Matrix STRIDE', action: 'Probe de Vetores de Ataque', severity: 'CRITICAL' as const, category: 'SOC_EDR' as const, details: 'Exploração sequencial de escalonamento de privilégio CVE-2024-XXXX' },
+      { toolId: 'dast_fuzzer', toolName: 'DAST & API Fuzzer', action: 'Injeção Agressiva de Payloads', severity: 'HIGH' as const, category: 'API_DAST' as const, details: 'Burst de 50 requisições fuzzing com payloads OWASP Top 10' },
+      { toolId: 'soc_command', toolName: 'SOC Command Center & EDR', action: 'Disparo de Alerta de Anomalia', severity: 'AUDIT' as const, category: 'SOC_EDR' as const, details: 'Pico repentino de requisições maliciosas registrado na sessão' },
+      { toolId: 'sast_scanner', toolName: 'Scanner SAST & AST', action: 'Varredura Forçada de AST', severity: 'HIGH' as const, category: 'CODE_SAST' as const, details: 'Multi-threading não autorizado em endpoints administrativos' },
+    ];
+    const newItems: SecurityAuditLogItem[] = [];
+    maliciousBurst.forEach(item => {
+      const log = recordSecurityAuditLog({
+        toolId: item.toolId,
+        toolName: item.toolName,
+        action: item.action,
+        severity: item.severity,
+        category: item.category,
+        details: item.details,
+        executionMs: Math.floor(Math.random() * 200) + 40,
+      });
+      newItems.push(log);
+    });
+    setAuditLogs(prev => [...newItems, ...prev.filter(l => !newItems.some(n => n.id === l.id))].slice(0, 50));
+  };
+
   const handleCopyAuditLogs = () => {
     const text = auditLogs.map(log => `[${log.timeLabel}] [${log.severity}] Ferramenta: ${log.toolName} | Ação: ${log.action} | Detalhes: ${log.details} | Hash: ${log.hash}`).join('\n');
     navigator.clipboard.writeText(text);
@@ -282,22 +314,197 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
     setSelectedAuditLog(null);
   };
 
+  const availableAuditTools = useMemo(() => {
+    return Array.from(new Set(auditLogs.map(l => l.toolName))).sort();
+  }, [auditLogs]);
+
   const filteredAuditLogs = useMemo(() => {
     return auditLogs.filter(log => {
+      // Filter by Severity
       if (auditSeverityFilter !== 'ALL' && log.severity !== auditSeverityFilter) {
         return false;
       }
+      // Filter by Tool Name
+      if (auditToolFilter !== 'ALL' && log.toolName !== auditToolFilter) {
+        return false;
+      }
+      // Filter by Selected Line Chart Time Bucket
+      if (selectedTimeBucket) {
+        if (log.timestamp < selectedTimeBucket.start || log.timestamp >= selectedTimeBucket.end) {
+          return false;
+        }
+      }
+      // Filter by Search Query (supports multiple keywords / tokens)
       if (auditSearchQuery.trim()) {
-        const q = auditSearchQuery.toLowerCase();
-        const matchTool = log.toolName.toLowerCase().includes(q);
-        const matchAction = log.action.toLowerCase().includes(q);
-        const matchDetails = log.details.toLowerCase().includes(q);
-        const matchTime = log.timeLabel.toLowerCase().includes(q);
-        if (!matchTool && !matchAction && !matchDetails && !matchTime) return false;
+        const tokens = auditSearchQuery.toLowerCase().trim().split(/\s+/);
+        const corpus = `${log.toolName} ${log.action} ${log.details} ${log.category} ${log.severity} ${log.hash} ${log.timeLabel}`.toLowerCase();
+        const matchesAll = tokens.every(token => corpus.includes(token));
+        if (!matchesAll) return false;
       }
       return true;
     });
-  }, [auditLogs, auditSeverityFilter, auditSearchQuery]);
+  }, [auditLogs, auditSeverityFilter, auditToolFilter, auditSearchQuery, selectedTimeBucket]);
+
+  // Frequency of Interactions Over Time (Line Chart Data Aggregation)
+  const auditTimelineFrequency = useMemo(() => {
+    // Determine active source logs: if the user filtered by search keyword, tool, or severity, calculate frequency for that filtered view
+    const sourceLogs = (auditSearchQuery.trim() || auditToolFilter !== 'ALL' || auditSeverityFilter !== 'ALL')
+      ? auditLogs.filter(log => {
+          if (auditSeverityFilter !== 'ALL' && log.severity !== auditSeverityFilter) return false;
+          if (auditToolFilter !== 'ALL' && log.toolName !== auditToolFilter) return false;
+          if (auditSearchQuery.trim()) {
+            const tokens = auditSearchQuery.toLowerCase().trim().split(/\s+/);
+            const corpus = `${log.toolName} ${log.action} ${log.details} ${log.category} ${log.severity} ${log.hash} ${log.timeLabel}`.toLowerCase();
+            return tokens.every(token => corpus.includes(token));
+          }
+          return true;
+        })
+      : auditLogs;
+
+    if (sourceLogs.length === 0) return [];
+
+    const now = Date.now();
+    const timestamps = sourceLogs.map(l => l.timestamp);
+    const minTime = Math.min(...timestamps);
+    const maxTime = Math.max(...timestamps, now);
+    const totalSpanMs = Math.max(maxTime - minTime, 60000 * 5); // At least 5 mins window
+
+    // Determine bucket duration (1 min, 2 min, 5 min, etc.)
+    let bucketMs = 60000; // 1 min default
+    if (totalSpanMs > 1000 * 60 * 60 * 6) {
+      bucketMs = 60000 * 30; // 30 min buckets
+    } else if (totalSpanMs > 1000 * 60 * 60) {
+      bucketMs = 60000 * 10; // 10 min buckets
+    } else if (totalSpanMs > 1000 * 60 * 20) {
+      bucketMs = 60000 * 2; // 2 min buckets
+    } else {
+      bucketMs = 60000; // 1 min buckets
+    }
+
+    const startBucket = Math.floor(minTime / bucketMs) * bucketMs;
+    const endBucket = Math.floor(maxTime / bucketMs) * bucketMs;
+
+    const bucketsMap = new Map<number, {
+      bucketStart: number;
+      bucketEnd: number;
+      timeLabel: string;
+      total: number;
+      critical: number;
+      high: number;
+      critAndHigh: number;
+      tools: Set<string>;
+      actions: string[];
+    }>();
+
+    // Create intervals across time span (between 6 and 14 points for compact display)
+    const step = Math.max(bucketMs, Math.ceil((endBucket - startBucket) / 14) * bucketMs);
+    for (let t = startBucket; t <= endBucket + step; t += step) {
+      const d = new Date(t);
+      const timeLabel = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      bucketsMap.set(t, {
+        bucketStart: t,
+        bucketEnd: t + step,
+        timeLabel,
+        total: 0,
+        critical: 0,
+        high: 0,
+        critAndHigh: 0,
+        tools: new Set(),
+        actions: [],
+      });
+    }
+
+    // Assign logs to buckets
+    sourceLogs.forEach(log => {
+      for (const [, bData] of bucketsMap.entries()) {
+        if (log.timestamp >= bData.bucketStart && log.timestamp < bData.bucketEnd) {
+          bData.total += 1;
+          if (log.severity === 'CRITICAL') bData.critical += 1;
+          else if (log.severity === 'HIGH') bData.high += 1;
+          bData.critAndHigh = bData.critical + bData.high;
+          bData.tools.add(log.toolName);
+          if (bData.actions.length < 2) bData.actions.push(log.action);
+          break;
+        }
+      }
+    });
+
+    // Calculate baseline mean and standard deviation for anomaly detection
+    const bucketArray = Array.from(bucketsMap.values());
+    const totals = bucketArray.map(b => b.total);
+    const mean = totals.length > 0 ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
+    const variance = totals.length > 0 ? totals.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / totals.length : 0;
+    const stdDev = Math.sqrt(variance);
+
+    // Dynamic anomaly threshold: unexpected surge threshold (at least 3 events, or mean + 1.5 * stdDev)
+    const anomalyThreshold = Math.max(Math.ceil(mean + 1.5 * stdDev), 3);
+
+    return bucketArray.map(b => {
+      // Anomaly heuristics: volume surge or concentrated critical tool interaction burst
+      const isVolumeSpike = b.total >= anomalyThreshold;
+      const isCriticalSpike = b.critAndHigh >= 2 && b.total >= 2;
+      const isAnomaly = isVolumeSpike || isCriticalSpike;
+
+      let anomalyRisk: 'CRITICAL' | 'SUSPICIOUS' | 'NORMAL' = 'NORMAL';
+      let anomalyScore = 0;
+      let anomalyReason = '';
+      let suggestedThreat = '';
+
+      if (isAnomaly) {
+        anomalyScore = Math.min(Math.round((b.total / Math.max(mean, 0.5)) * 32 + (b.critAndHigh * 18)), 99);
+        if (anomalyScore >= 68 || isCriticalSpike) {
+          anomalyRisk = 'CRITICAL';
+          suggestedThreat = 'Possível Reconhecimento Malicioso / Enumeração de Segredos & Escalação de Privilégios';
+          anomalyReason = `Pico anômalo de ${b.total} acessos (${(b.total / Math.max(mean, 0.5)).toFixed(1)}x a média). Alta concentração de ferramentas de ameaças e credenciais.`;
+        } else {
+          anomalyRisk = 'SUSPICIOUS';
+          suggestedThreat = 'Pico Inesperado de Requisições / Fuzzing Automatizado';
+          anomalyReason = `Volume anormal de requisições (${b.total} acessos vs média ${mean.toFixed(1)}). Possível script de varredura automatizada.`;
+        }
+      }
+
+      return {
+        ...b,
+        isAnomaly,
+        anomalyRisk,
+        anomalyScore,
+        anomalyReason,
+        suggestedThreat,
+        anomalyThreshold,
+        meanFrequency: Number(mean.toFixed(1)),
+        toolNames: Array.from(b.tools),
+        toolSummary: Array.from(b.tools).slice(0, 2).join(', ') + (b.tools.size > 2 ? ` (+${b.tools.size - 2})` : '')
+      };
+    });
+  }, [auditLogs, auditSeverityFilter, auditToolFilter, auditSearchQuery]);
+
+  const auditFrequencyStats = useMemo(() => {
+    if (auditTimelineFrequency.length === 0) {
+      return { peak: 0, avg: '0.0', mostActiveTime: '--', anomalyCount: 0, highestRiskPoint: null as any, threshold: 3 };
+    }
+    let peak = 0;
+    let mostActiveTime = '--';
+    let sum = 0;
+    let anomalyCount = 0;
+    let highestRiskPoint: any = null;
+
+    for (const point of auditTimelineFrequency) {
+      sum += point.total;
+      if (point.total > peak) {
+        peak = point.total;
+        mostActiveTime = point.timeLabel;
+      }
+      if (point.isAnomaly) {
+        anomalyCount++;
+        if (!highestRiskPoint || point.anomalyScore > highestRiskPoint.anomalyScore) {
+          highestRiskPoint = point;
+        }
+      }
+    }
+    const avg = (sum / auditTimelineFrequency.length).toFixed(1);
+    const threshold = auditTimelineFrequency[0]?.anomalyThreshold || 3;
+    return { peak, avg, mostActiveTime, anomalyCount, highestRiskPoint, threshold };
+  }, [auditTimelineFrequency]);
 
   const handleResetSessionTimer = () => {
     resetUserSessionStartTime();
@@ -2009,54 +2216,496 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
           </div>
         </div>
 
-        {/* Search & Severity Filter Bar */}
-        <div className="p-3 border-b border-[#1E293B] bg-[#070C16] space-y-2 shrink-0">
+        {/* Search & Tool/Keyword Filter Bar */}
+        <div className="p-3 border-b border-[#1E293B] bg-[#070C16] space-y-2.5 shrink-0">
+          {/* Header Label + Results Count */}
+          <div className="flex items-center justify-between text-[11px] font-mono">
+            <span className="text-zinc-300 font-bold flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5 text-sky-400" />
+              <span>Barra de Pesquisa de Auditoria</span>
+            </span>
+            <span className="text-[10px] text-zinc-400">
+              {filteredAuditLogs.length} de {auditLogs.length} logs
+            </span>
+          </div>
+
+          {/* Search Input Box */}
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={auditSearchQuery}
               onChange={(e) => setAuditSearchQuery(e.target.value)}
-              placeholder="Buscar ferramenta, ação, CVE..."
-              className="w-full bg-[#050811] border border-[#1D2A3F] rounded-lg pl-8 pr-7 py-1.5 text-xs font-mono text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-sky-500/70"
+              placeholder="Buscar por ferramenta (ex: SAST, STRIDE) ou palavra-chave..."
+              className="w-full bg-[#050811] border border-[#1D2A3F] rounded-lg pl-8 pr-8 py-2 text-xs font-mono text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-sky-500/80 focus:ring-1 focus:ring-sky-500/30 transition-all shadow-inner"
             />
             {auditSearchQuery && (
               <button
                 onClick={() => setAuditSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                title="Limpar pesquisa"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white p-0.5 rounded cursor-pointer transition-colors"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
-          {/* Severity Pills */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-0.5 text-[10px] font-mono no-scrollbar">
-            {(['ALL', 'CRITICAL', 'HIGH', 'AUDIT', 'SUCCESS'] as const).map((sev) => {
-              const label = sev === 'ALL' ? `Todos (${auditLogs.length})` :
-                            sev === 'CRITICAL' ? `Crítico (${critCount})` :
-                            sev === 'HIGH' ? `Alto (${highCount})` :
-                            sev === 'AUDIT' ? 'Audit' : 'Sucesso';
-              const isSelected = auditSeverityFilter === sev;
-              return (
+          {/* Quick Keyword & Tool Shortcuts */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
+              <span className="flex items-center gap-1">
+                <SlidersHorizontal className="w-3 h-3 text-sky-400" />
+                <span>Palavras-chave Rápidas:</span>
+              </span>
+              {(auditSearchQuery || auditToolFilter !== 'ALL' || auditSeverityFilter !== 'ALL') && (
                 <button
-                  key={sev}
-                  onClick={() => setAuditSeverityFilter(sev)}
-                  className={`px-2 py-0.5 rounded transition-all cursor-pointer whitespace-nowrap ${
-                    isSelected
-                      ? sev === 'CRITICAL' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50 font-bold'
-                        : sev === 'HIGH' ? 'bg-orange-500/20 text-orange-300 border border-orange-500/50 font-bold'
-                        : sev === 'AUDIT' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/50 font-bold'
-                        : sev === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 font-bold'
-                        : 'bg-zinc-800 text-white border border-zinc-600 font-bold'
-                      : 'bg-[#0A101C] text-zinc-400 hover:text-zinc-200 border border-[#172437]'
-                  }`}
+                  onClick={() => {
+                    setAuditSearchQuery('');
+                    setAuditToolFilter('ALL');
+                    setAuditSeverityFilter('ALL');
+                  }}
+                  className="text-sky-400 hover:text-sky-300 hover:underline cursor-pointer font-bold"
                 >
-                  {label}
+                  Limpar Filtros
                 </button>
-              );
-            })}
+              )}
+            </div>
+
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[10px] font-mono no-scrollbar">
+              {[
+                { label: 'SAST', query: 'SAST' },
+                { label: 'STRIDE', query: 'STRIDE' },
+                { label: 'Segredos', query: 'Segredos' },
+                { label: 'SOC', query: 'SOC' },
+                { label: 'Remediação', query: 'Remediação' },
+                { label: 'DAST', query: 'DAST' },
+                { label: 'IaC/Docker', query: 'Infraestrutura' },
+                { label: 'CI/CD', query: 'CI/CD' },
+                { label: 'CWE-89', query: 'CWE-89' }
+              ].map((chip) => {
+                const isActive = auditSearchQuery.toLowerCase() === chip.query.toLowerCase();
+                return (
+                  <button
+                    key={chip.label}
+                    onClick={() => {
+                      if (isActive) {
+                        setAuditSearchQuery('');
+                      } else {
+                        setAuditSearchQuery(chip.query);
+                      }
+                    }}
+                    className={`px-2 py-0.5 rounded border transition-all cursor-pointer whitespace-nowrap ${
+                      isActive
+                        ? 'bg-sky-500/20 text-sky-300 border-sky-500/60 font-bold shadow-sm'
+                        : 'bg-[#0A101C] text-zinc-400 hover:text-zinc-200 border-[#172437] hover:border-zinc-700'
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          {/* Tool Dropdown & Severity Filter Selector */}
+          <div className="flex flex-col gap-2 pt-1 border-t border-[#152132]">
+            {/* Tool Specific Dropdown */}
+            <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+              <Filter className="w-3 h-3 text-sky-400 shrink-0" />
+              <select
+                value={auditToolFilter}
+                onChange={(e) => setAuditToolFilter(e.target.value)}
+                className="w-full bg-[#050811] border border-[#1A2637] rounded px-2 py-1 text-[10px] font-mono text-zinc-200 focus:outline-none focus:border-sky-500/70"
+              >
+                <option value="ALL">Todas as Ferramentas ({availableAuditTools.length})</option>
+                {availableAuditTools.map((tool) => (
+                  <option key={tool} value={tool}>{tool}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Severity Pills */}
+            <div className="flex items-center gap-1 overflow-x-auto text-[10px] font-mono no-scrollbar">
+              {(['ALL', 'CRITICAL', 'HIGH', 'AUDIT', 'SUCCESS'] as const).map((sev) => {
+                const label = sev === 'ALL' ? `Todos (${auditLogs.length})` :
+                              sev === 'CRITICAL' ? `Crit (${critCount})` :
+                              sev === 'HIGH' ? `Alto (${highCount})` :
+                              sev === 'AUDIT' ? 'Audit' : 'OK';
+                const isSelected = auditSeverityFilter === sev;
+                return (
+                  <button
+                    key={sev}
+                    onClick={() => setAuditSeverityFilter(sev)}
+                    className={`px-1.5 py-0.5 rounded transition-all cursor-pointer whitespace-nowrap ${
+                      isSelected
+                        ? sev === 'CRITICAL' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50 font-bold'
+                          : sev === 'HIGH' ? 'bg-orange-500/20 text-orange-300 border border-orange-500/50 font-bold'
+                          : sev === 'AUDIT' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/50 font-bold'
+                          : sev === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 font-bold'
+                          : 'bg-zinc-800 text-white border border-zinc-600 font-bold'
+                        : 'bg-[#0A101C] text-zinc-500 hover:text-zinc-300 border border-[#172437]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Line Chart: Frequency of Interactions Over Time (Visualização de Gráfico de Linhas) */}
+        <div className="border-b border-[#1E293B] bg-[#060A14] flex flex-col shrink-0">
+          {/* Header of the Line Chart Section */}
+          <div className="px-3 py-2 flex items-center justify-between border-b border-[#131D2D] bg-[#080D18]">
+            <div className="flex items-center gap-2 min-w-0">
+              <TrendingUp className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
+                  Frequência ao Longo do Tempo
+                  {selectedTimeBucket && (
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300 border border-sky-500/40">
+                      Filtrando {selectedTimeBucket.label}
+                    </span>
+                  )}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Quick Anomaly Simulation Button */}
+              <button
+                onClick={handleSimulateAnomalySpike}
+                title="Simular pico anômalo de acessos a ferramentas de segurança (injetar burst de tráfego)"
+                className="px-1.5 py-0.5 rounded bg-rose-950/60 hover:bg-rose-900/70 border border-rose-500/50 text-rose-300 hover:text-white transition-colors cursor-pointer text-[9px] font-mono flex items-center gap-1 shadow-sm"
+              >
+                <AlertTriangle className="w-2.5 h-2.5 text-rose-400" />
+                <span>+ Simular Pico</span>
+              </button>
+
+              {/* Metric filter buttons */}
+              {showAuditLineChart && (
+                <div className="flex items-center bg-[#050811] rounded border border-[#1A2637] p-0.5 text-[9px] font-mono">
+                  <button
+                    onClick={() => setAuditChartMetricMode('both')}
+                    className={`px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+                      auditChartMetricMode === 'both' ? 'bg-sky-500/30 text-sky-200 font-bold' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                    title="Exibir linha de total e linha de críticas"
+                  >
+                    Ambas
+                  </button>
+                  <button
+                    onClick={() => setAuditChartMetricMode('total')}
+                    className={`px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+                      auditChartMetricMode === 'total' ? 'bg-sky-500/30 text-sky-200 font-bold' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                    title="Apenas total de interações"
+                  >
+                    Total
+                  </button>
+                  <button
+                    onClick={() => setAuditChartMetricMode('critical')}
+                    className={`px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+                      auditChartMetricMode === 'critical' ? 'bg-rose-500/30 text-rose-200 font-bold' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                    title="Apenas interações críticas ou de alto impacto"
+                  >
+                    Críticas
+                  </button>
+                </div>
+              )}
+
+              {/* Collapse / Expand Toggle Button */}
+              <button
+                onClick={() => setShowAuditLineChart(!showAuditLineChart)}
+                title={showAuditLineChart ? "Recolher gráfico de frequência" : "Expandir gráfico de frequência"}
+                className="p-1 rounded bg-[#0A101C] hover:bg-[#121A2A] border border-[#1A273A] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+              >
+                {showAuditLineChart ? (
+                  <ChevronUp className="w-3 h-3" />
+                ) : (
+                  <ChevronDown className="w-3 h-3" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {showAuditLineChart && (
+            <div className="p-3 space-y-2.5">
+              {/* Anomaly Detection SOC Banner */}
+              {auditFrequencyStats.anomalyCount > 0 ? (
+                <div className="p-2 rounded-lg bg-gradient-to-r from-rose-950/70 via-rose-900/40 to-[#0B101D] border border-rose-500/50 text-[10px] font-mono text-rose-200 flex items-center justify-between gap-2 shadow-[0_0_12px_rgba(244,63,94,0.2)]">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-5 h-5 rounded bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0">
+                      <AlertTriangle className="w-3 h-3 text-rose-400 animate-pulse" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-white tracking-wide">
+                          Pico Inesperado Detectado ({auditFrequencyStats.anomalyCount} anomalia{auditFrequencyStats.anomalyCount > 1 ? 's' : ''})
+                        </span>
+                        <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-rose-500/30 text-rose-300 border border-rose-500/50 animate-ping">
+                          ALERTA SOC
+                        </span>
+                      </div>
+                      <p className="text-[9px] text-rose-300/90 truncate leading-tight">
+                        {auditFrequencyStats.highestRiskPoint?.suggestedThreat || 'Volume anormal sugere reconhecimento malicioso ou tentativa de enumeração.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {auditFrequencyStats.highestRiskPoint && (
+                    <button
+                      onClick={() => {
+                        setSelectedTimeBucket({
+                          start: auditFrequencyStats.highestRiskPoint.bucketStart,
+                          end: auditFrequencyStats.highestRiskPoint.bucketEnd,
+                          label: auditFrequencyStats.highestRiskPoint.timeLabel,
+                        });
+                      }}
+                      className="px-2 py-1 rounded bg-rose-500/30 hover:bg-rose-500/50 border border-rose-400 text-white font-bold cursor-pointer text-[9px] transition-colors shrink-0 whitespace-nowrap shadow-sm"
+                    >
+                      Inspecionar Pico
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="px-2.5 py-1 rounded bg-[#070D18] border border-[#142133] text-[9px] font-mono text-zinc-400 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span>Padrão de tráfego nominal (Sem anomalias ativas)</span>
+                  </span>
+                  <span className="text-[8px] text-zinc-500">Threshold: {auditFrequencyStats.threshold} acessos/janela</span>
+                </div>
+              )}
+
+              {/* Active Time Bucket Filter Notice */}
+              {selectedTimeBucket && (
+                <div className="flex items-center justify-between px-2.5 py-1 rounded bg-sky-950/60 border border-sky-500/40 text-[10px] font-mono text-sky-200">
+                  <span className="flex items-center gap-1.5 truncate">
+                    <Clock className="w-3 h-3 text-sky-400 shrink-0" />
+                    <span>Janela selecionada: <strong>{selectedTimeBucket.label}</strong></span>
+                  </span>
+                  <button
+                    onClick={() => setSelectedTimeBucket(null)}
+                    className="text-sky-300 hover:text-white underline cursor-pointer ml-2 shrink-0 font-bold"
+                  >
+                    Limpar
+                  </button>
+                </div>
+              )}
+
+              {/* Recharts LineChart */}
+              <div className="h-[135px] w-full">
+                {auditTimelineFrequency.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-[10px] font-mono text-zinc-500">
+                    Sem dados temporais suficientes
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={auditTimelineFrequency}
+                      margin={{ top: 8, right: 8, left: -28, bottom: 0 }}
+                      onClick={(e: any) => {
+                        if (e && e.activePayload && e.activePayload[0]) {
+                          const d = e.activePayload[0].payload;
+                          if (selectedTimeBucket && selectedTimeBucket.label === d.timeLabel) {
+                            setSelectedTimeBucket(null);
+                          } else {
+                            setSelectedTimeBucket({
+                              start: d.bucketStart,
+                              end: d.bucketEnd,
+                              label: d.timeLabel,
+                            });
+                          }
+                        }
+                      }}
+                    >
+                      <CartesianGrid stroke="#152132" strokeDasharray="2 2" vertical={false} />
+                      <XAxis
+                        dataKey="timeLabel"
+                        stroke="#475569"
+                        fontSize={8}
+                        tickLine={false}
+                        axisLine={{ stroke: '#1E293B' }}
+                      />
+                      <YAxis
+                        stroke="#475569"
+                        fontSize={8}
+                        allowDecimals={false}
+                        tickLine={false}
+                        axisLine={{ stroke: '#1E293B' }}
+                        domain={[0, (dataMax: number) => Math.max(dataMax + 1, auditFrequencyStats.threshold + 1, 2)]}
+                      />
+                      {/* Visual Anomaly Threshold Reference Line */}
+                      <ReferenceLine
+                        y={auditFrequencyStats.threshold}
+                        stroke="#EF4444"
+                        strokeDasharray="3 3"
+                        strokeOpacity={0.65}
+                        label={{
+                          value: `Limite Anomalia (${auditFrequencyStats.threshold})`,
+                          fill: '#EF4444',
+                          fontSize: 7.5,
+                          position: 'insideTopLeft'
+                        }}
+                      />
+                      <RechartsTooltip
+                        content={({ active, payload }: any) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-[#050811] border border-sky-500/50 rounded-lg p-2.5 shadow-2xl text-[10px] font-mono z-50 max-w-[260px]">
+                                {data.isAnomaly && (
+                                  <div className="p-1.5 rounded bg-rose-950/80 border border-rose-500/60 mb-2 space-y-1">
+                                    <div className="flex items-center gap-1.5 text-rose-300 font-bold text-[10px]">
+                                      <AlertTriangle className="w-3 h-3 text-rose-400 animate-pulse shrink-0" />
+                                      <span>🚨 PICO ANÔMALO DETECTADO</span>
+                                    </div>
+                                    <div className="text-[9px] text-rose-200 leading-tight">
+                                      <strong>Atividade Suspeita:</strong> {data.suggestedThreat}
+                                    </div>
+                                    <div className="text-[8.5px] text-zinc-300/90 leading-tight">
+                                      {data.anomalyReason}
+                                    </div>
+                                    <div className="flex items-center justify-between text-[8.5px] text-rose-300/90 pt-1 border-t border-rose-500/30">
+                                      <span>Risco: <strong className="text-rose-400">{data.anomalyScore}/100</strong></span>
+                                      <span className="text-amber-400 font-bold uppercase">Spike Inesperado</span>
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="flex items-center justify-between gap-3 border-b border-[#1A2637] pb-1 mb-1 text-zinc-300">
+                                  <span className="font-bold flex items-center gap-1 text-sky-300">
+                                    <Clock className="w-2.5 h-2.5" />
+                                    {data.timeLabel}
+                                  </span>
+                                  <span className="text-[9px] text-zinc-500">Clique p/ filtrar</span>
+                                </div>
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center justify-between gap-3 text-zinc-300">
+                                    <span className="flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                                      Total de Acessos:
+                                    </span>
+                                    <strong className="text-white font-mono">{data.total}</strong>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-3 text-rose-300">
+                                    <span className="flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                      Críticas/Altas:
+                                    </span>
+                                    <strong className="font-mono">{data.critAndHigh}</strong>
+                                  </div>
+                                  {data.toolSummary && (
+                                    <div className="pt-1 mt-1 border-t border-[#131E2F] text-[9px] text-zinc-400">
+                                      {data.toolSummary}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      {(auditChartMetricMode === 'both' || auditChartMetricMode === 'total') && (
+                        <Line
+                          type="monotone"
+                          dataKey="total"
+                          stroke="#38BDF8"
+                          strokeWidth={2}
+                          dot={(dotProps: any) => {
+                            const { cx, cy, payload } = dotProps;
+                            if (cx == null || cy == null || !payload) return null;
+                            if (payload.isAnomaly) {
+                              const isCrit = payload.anomalyRisk === 'CRITICAL';
+                              const strokeColor = isCrit ? '#EF4444' : '#F59E0B';
+                              const fillColor = isCrit ? '#991B1B' : '#B45309';
+                              return (
+                                <g key={`anomaly-point-${payload.bucketStart}`}>
+                                  <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={10}
+                                    fill="none"
+                                    stroke={strokeColor}
+                                    strokeWidth={1.5}
+                                    opacity={0.8}
+                                    className="animate-ping origin-center"
+                                  />
+                                  <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={6.5}
+                                    fill={fillColor}
+                                    fillOpacity={0.4}
+                                    stroke={strokeColor}
+                                    strokeWidth={2}
+                                  />
+                                  <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={3}
+                                    fill="#FFFFFF"
+                                    stroke={strokeColor}
+                                    strokeWidth={1}
+                                  />
+                                </g>
+                              );
+                            }
+                            return (
+                              <circle
+                                key={`norm-dot-${payload.bucketStart}`}
+                                cx={cx}
+                                cy={cy}
+                                r={2.5}
+                                fill="#38BDF8"
+                                stroke="#070B14"
+                                strokeWidth={1}
+                              />
+                            );
+                          }}
+                          activeDot={{ r: 5, fill: '#0284C7', stroke: '#38BDF8', strokeWidth: 1.5 }}
+                          name="Total de Interações"
+                        />
+                      )}
+                      {(auditChartMetricMode === 'both' || auditChartMetricMode === 'critical') && (
+                        <Line
+                          type="monotone"
+                          dataKey="critAndHigh"
+                          stroke="#F43F5E"
+                          strokeWidth={2}
+                          strokeDasharray={auditChartMetricMode === 'both' ? '3 3' : undefined}
+                          dot={{ r: 2.5, fill: '#F43F5E', stroke: '#070B14', strokeWidth: 1 }}
+                          activeDot={{ r: 4.5, fill: '#E11D48', stroke: '#F43F5E', strokeWidth: 1.5 }}
+                          name="Críticas / Altas"
+                        />
+                      )}
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              {/* Sub-chart telemetry stats strip */}
+              <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-[#131D2D] text-[9px] font-mono text-zinc-400">
+                <div className="flex items-center justify-between bg-[#080E1B] px-1.5 py-0.5 rounded border border-[#142033]">
+                  <span>Pico:</span>
+                  <span className="text-white font-bold">{auditFrequencyStats.peak} evt</span>
+                </div>
+                <div className="flex items-center justify-between bg-[#080E1B] px-1.5 py-0.5 rounded border border-[#142033]">
+                  <span>Média:</span>
+                  <span className="text-sky-300 font-bold">{auditFrequencyStats.avg}/janela</span>
+                </div>
+                <div className="flex items-center justify-between bg-[#080E1B] px-1.5 py-0.5 rounded border border-[#142033]">
+                  <span>Anomalias:</span>
+                  <span className={`font-bold ${auditFrequencyStats.anomalyCount > 0 ? 'text-rose-400 animate-pulse' : 'text-emerald-400'}`}>
+                    {auditFrequencyStats.anomalyCount > 0 ? `${auditFrequencyStats.anomalyCount} picos ⚠️` : '0 (OK)'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Scrollable List of Audit Logs */}
@@ -2066,10 +2715,10 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
               <ShieldAlert className="w-8 h-8 text-zinc-600 mx-auto" />
               <p>Nenhum log de auditoria encontrado para o filtro atual.</p>
               <button
-                onClick={() => { setAuditSearchQuery(''); setAuditSeverityFilter('ALL'); }}
+                onClick={() => { setAuditSearchQuery(''); setAuditToolFilter('ALL'); setAuditSeverityFilter('ALL'); }}
                 className="px-2.5 py-1 rounded bg-[#121927] hover:bg-[#1C2636] border border-[#223044] text-zinc-300 text-[11px] cursor-pointer"
               >
-                Limpar Filtros
+                Limpar Filtros e Pesquisa
               </button>
             </div>
           ) : (
