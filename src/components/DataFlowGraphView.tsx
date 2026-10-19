@@ -48,19 +48,28 @@ import {
   DataFlowLayoutMode,
   DataFlowGraphSettings,
   TaintVariableFlow,
-  DataFlowNodeType
+  DataFlowNodeType,
+  ScanFinding,
+  ApiEndpointFinding,
+  ApiSecurityReport
 } from '../types';
 import { DataFlowSettingsPanel } from './DataFlowSettingsPanel';
 import { DataFlowTutorialOverlay } from './DataFlowTutorialOverlay';
 import { DataFlowTaintLegend } from './DataFlowTaintLegend';
 import { calculateDataFlowDelta, generateSimulatedPreviousGraph } from '../lib/dataFlowDelta';
 import { DataFlowDeltaPanel, DeltaFilterMode } from './DataFlowDeltaPanel';
+import { AttackPath, computeAttackPaths } from '../lib/attackPathEngine';
+import { DataFlowAttackPathPanel } from './DataFlowAttackPathPanel';
 
 interface DataFlowGraphViewProps {
   graphData?: DataFlowGraphData;
   previousGraphData?: DataFlowGraphData;
   files: ScannedFile[];
   onSelectFile?: (filePath: string, line?: number) => void;
+  findings?: ScanFinding[];
+  apiEndpoints?: ApiEndpointFinding[];
+  apiSecurityReport?: ApiSecurityReport;
+  onNavigateToTab?: (tabId: string) => void;
 }
 
 const DEFAULT_SETTINGS: DataFlowGraphSettings = {
@@ -83,7 +92,11 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
   graphData,
   previousGraphData,
   files,
-  onSelectFile
+  onSelectFile,
+  findings,
+  apiEndpoints,
+  apiSecurityReport,
+  onNavigateToTab
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -119,6 +132,12 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
   const [showVariableLabels, setShowVariableLabels] = useState<boolean>(true);
   const [filterNodeType, setFilterNodeType] = useState<DataFlowNodeType | 'TAINTED' | null>(null);
 
+  // Attack Path Visualization States (API Security Inspector -> SAST Engine Correlation)
+  const [showAttackPathVisualization, setShowAttackPathVisualization] = useState<boolean>(false);
+  const [activeAttackPathIndex, setActiveAttackPathIndex] = useState<number>(0);
+  const [activeAttackStepIndex, setActiveAttackStepIndex] = useState<number>(0);
+  const [isPlayingAttackPath, setIsPlayingAttackPath] = useState<boolean>(false);
+
   const isPanModeRef = useRef(isPanMode);
   useEffect(() => {
     isPanModeRef.current = isPanMode;
@@ -138,6 +157,34 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
       filesAnalyzed: 0
     }
   };
+
+  // Attack Path Engine (Correlating External Endpoints with Sensitive SAST Nodes)
+  const attackPaths: AttackPath[] = useMemo(() => {
+    return computeAttackPaths(safeGraph, findings, apiEndpoints, apiSecurityReport, files);
+  }, [safeGraph, findings, apiEndpoints, apiSecurityReport, files]);
+
+  const activeAttackPath: AttackPath | null = useMemo(() => {
+    if (!attackPaths || attackPaths.length === 0) return null;
+    return attackPaths[activeAttackPathIndex] || attackPaths[0];
+  }, [attackPaths, activeAttackPathIndex]);
+
+  const activeAttackPathNodeIds = useMemo(() => {
+    return new Set(activeAttackPath?.pathNodeIds || []);
+  }, [activeAttackPath]);
+
+  const activeAttackPathLinkIds = useMemo(() => {
+    return new Set(activeAttackPath?.pathLinkIds || []);
+  }, [activeAttackPath]);
+
+  // Stepper playback loop for Attack Path Simulation
+  useEffect(() => {
+    if (!isPlayingAttackPath || !activeAttackPath) return;
+    const maxSteps = activeAttackPath.steps.length;
+    const interval = setInterval(() => {
+      setActiveAttackStepIndex(prev => (prev + 1) % maxSteps);
+    }, 1300);
+    return () => clearInterval(interval);
+  }, [isPlayingAttackPath, activeAttackPath]);
 
   // Delta Analysis Computations
   const effectiveBaseline = useMemo(() => {
@@ -468,6 +515,7 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
     createMarker('arrow-safe', '#00E5FF');
     createMarker('arrow-consumer', '#F59E0B');
     createMarker('arrow-neutral', '#666666');
+    createMarker('arrow-attack-path', '#F43F5E');
 
     // Graph Root Group with Zoom Support
     const gRoot = svg.append('g').attr('class', 'graph-root');
@@ -817,7 +865,17 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
     // Active taint flow link set
     const activeFlowPathLinks = new Set(selectedTaintFlow?.pathLinkIds || []);
 
+    const isAttackLink = (d: any) => {
+      if (!showAttackPathVisualization || !activeAttackPath) return false;
+      const sId = typeof d.source === 'string' ? d.source : d.source.id;
+      const tId = typeof d.target === 'string' ? d.target : d.target.id;
+      return activeAttackPathLinkIds.has(d.id) || (activeAttackPathNodeIds.has(sId) && activeAttackPathNodeIds.has(tId));
+    };
+
     const isLinkHighlighted = (d: any) => {
+      if (showAttackPathVisualization && activeAttackPath) {
+        return isAttackLink(d);
+      }
       if (selectedTaintFlow) {
         return activeFlowPathLinks.has(d.id) || (selectedPathIds.has(d.source.id) && selectedPathIds.has(d.target.id));
       }
@@ -840,19 +898,27 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
       .attr('class', 'graph-link transition-opacity duration-200 cursor-pointer')
       .attr('fill', 'none')
       .attr('stroke', d => {
+        if (showAttackPathVisualization && isAttackLink(d)) return '#F43F5E';
         if (selectedTaintFlow && isLinkHighlighted(d)) return '#FF0055';
         if (d.isNewlyTainted) return '#FF0055';
         if (d.isTainted) return '#FF3E00';
         return '#00E5FF';
       })
       .attr('stroke-width', d => {
+        if (showAttackPathVisualization && isAttackLink(d)) return 4.5;
         if (selectedTaintFlow && isLinkHighlighted(d)) return 4.2;
         if (d.isNewlyTainted) return 3.8;
         if (d.isTainted) return settings.highlightTaintEdges ? 3.2 : 2.5;
         return 1.5;
       })
-      .attr('stroke-dasharray', d => (d.isTainted ? '6 4' : 'none'))
+      .attr('stroke-dasharray', d => {
+        if (showAttackPathVisualization && isAttackLink(d)) return '8 4';
+        return d.isTainted ? '6 4' : 'none';
+      })
       .attr('opacity', d => {
+        if (showAttackPathVisualization && activeAttackPath) {
+          return isAttackLink(d) ? 1 : 0.08;
+        }
         if (selectedTaintFlow) {
           return isLinkHighlighted(d) ? 1 : 0.08;
         }
@@ -863,12 +929,13 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
         return isLinkHighlighted(d) ? 1 : 0.15;
       })
       .attr('marker-end', d => {
+        if (showAttackPathVisualization && isAttackLink(d)) return 'url(#arrow-attack-path)';
         if (selectedTaintFlow && isLinkHighlighted(d)) return 'url(#arrow-tainted-active)';
         return d.isTainted ? 'url(#arrow-tainted)' : 'url(#arrow-safe)';
       });
 
-    // Animated Taint Flow Effect for Tainted Paths
-    linkPaths.filter(d => d.isTainted).style('animation', 'dash 1.2s linear infinite');
+    // Animated Taint Flow & Attack Path Effect
+    linkPaths.filter(d => isAttackLink(d) || d.isTainted).style('animation', d => (isAttackLink(d) ? 'dash 0.9s linear infinite' : 'dash 1.2s linear infinite'));
 
     // Variable Labels Layer on Tainted Links
     const varLabelGroup = gRoot.append('g').attr('class', 'var-labels-layer');
@@ -991,6 +1058,9 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
       .append('g')
       .attr('class', 'graph-node cursor-pointer select-none transition-all duration-150')
       .attr('opacity', d => {
+        if (showAttackPathVisualization && activeAttackPath) {
+          return activeAttackPathNodeIds.has(d.id) ? 1 : 0.12;
+        }
         if (selectedTaintFlow) {
           return selectedTaintFlow.pathNodeIds.includes(d.id) ? 1 : 0.1;
         }
@@ -1044,13 +1114,32 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
       const g = d3.select(this);
       const isSelected = selectedNode?.id === d.id;
 
+      // Active Attack Path Check
+      const isInAttackPath = showAttackPathVisualization && activeAttackPath && activeAttackPathNodeIds.has(d.id);
+      const isAttackStepActive = isInAttackPath && activeAttackPath?.steps[activeAttackStepIndex]?.nodeId === d.id;
+
       // Active Taint Path Step Check
       const isInActivePath = selectedTaintFlow && selectedTaintFlow.pathNodeIds.includes(d.id);
       const stepIndexInPath = selectedTaintFlow ? selectedTaintFlow.pathNodeIds.indexOf(d.id) : -1;
       const isCurrentActiveStep = isInActivePath && stepIndexInPath === activeStepIndex;
 
       // Active step pulse/halo ring
-      if (isCurrentActiveStep) {
+      if (isAttackStepActive) {
+        g.append('circle')
+          .attr('r', 34)
+          .attr('fill', 'rgba(244, 63, 94, 0.35)')
+          .attr('stroke', '#F43F5E')
+          .attr('stroke-width', 2.8)
+          .attr('stroke-dasharray', '4 2')
+          .attr('filter', 'url(#glow-critical)');
+      } else if (isInAttackPath) {
+        g.append('circle')
+          .attr('r', 28)
+          .attr('fill', 'rgba(244, 63, 94, 0.12)')
+          .attr('stroke', '#F43F5E')
+          .attr('stroke-width', 1.8)
+          .attr('stroke-dasharray', '3 2');
+      } else if (isCurrentActiveStep) {
         g.append('circle')
           .attr('r', 30)
           .attr('fill', 'rgba(255, 0, 85, 0.25)')
@@ -1242,8 +1331,33 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
           .attr('opacity', 0.75);
       }
 
-      // Taint Step Badge or Variable Tag
-      if (isInActivePath) {
+      // Attack Step Badge or Taint Step Badge
+      if (isInAttackPath && activeAttackPath) {
+        const stepInAttack = activeAttackPath.steps.findIndex(s => s.nodeId === d.id);
+        if (stepInAttack !== -1) {
+          const stepObj = activeAttackPath.steps[stepInAttack];
+          const badgeG = g.append('g').attr('class', 'attack-step-badge').attr('transform', 'translate(0, -26)');
+          const tagW = 144;
+          badgeG.append('rect')
+            .attr('x', -tagW / 2)
+            .attr('y', -8)
+            .attr('width', tagW)
+            .attr('height', 16)
+            .attr('rx', 4)
+            .attr('fill', isAttackStepActive ? '#E11D48' : stepObj.role === 'EXTERNAL_ENTRY' ? '#082f49' : stepObj.role === 'SENSITIVE_ASSET' ? '#4c0519' : '#331904')
+            .attr('stroke', isAttackStepActive ? '#FFFFFF' : stepObj.role === 'EXTERNAL_ENTRY' ? '#38bdf8' : stepObj.role === 'SENSITIVE_ASSET' ? '#f43f5e' : '#f59e0b')
+            .attr('stroke-width', isAttackStepActive ? 1.5 : 1);
+
+          badgeG.append('text')
+            .attr('text-anchor', 'middle')
+            .attr('y', 3.5)
+            .attr('font-size', '8px')
+            .attr('font-family', 'monospace')
+            .attr('font-weight', 'bold')
+            .attr('fill', '#FFFFFF')
+            .text(`PASSO ${stepInAttack + 1}: ${stepObj.role === 'EXTERNAL_ENTRY' ? 'API INGRESS' : stepObj.role === 'SENSITIVE_ASSET' ? 'SAST SECRET' : 'HANDLER'}`);
+        }
+      } else if (isInActivePath) {
         const stepNum = stepIndexInPath + 1;
         const totalSteps = selectedTaintFlow!.pathNodeIds.length;
         const roleLabel = stepIndexInPath === 0
@@ -1372,7 +1486,7 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
     return () => {
       simulation.stop();
     };
-  }, [filteredNodes, filteredLinks, settings, selectedNode, selectedPathIds, selectedTaintFlow, activeStepIndex, highlightAllTainted, showVariableLabels]);
+  }, [filteredNodes, filteredLinks, settings, selectedNode, selectedPathIds, selectedTaintFlow, activeStepIndex, highlightAllTainted, showVariableLabels, showAttackPathVisualization, activeAttackPath, activeAttackStepIndex, activeAttackPathNodeIds, activeAttackPathLinkIds]);
 
   // Zoom & Pan control helpers
   const handleZoomIn = () => {
@@ -1642,6 +1756,30 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
               {safeGraph.metrics.totalTaintFlows}
             </span>
           </div>
+
+          <button
+            onClick={() => {
+              setShowAttackPathVisualization(prev => {
+                const next = !prev;
+                if (next && attackPaths.length > 0) {
+                  handleZoomToPath(attackPaths[0].pathNodeIds);
+                }
+                return next;
+              });
+            }}
+            className={`px-3 py-1.5 rounded-lg border text-center min-w-[110px] cursor-pointer transition-all ${
+              showAttackPathVisualization
+                ? 'bg-rose-950/70 border-rose-500 text-rose-200 shadow-[0_0_15px_rgba(244,63,94,0.4)] ring-1 ring-rose-500/60'
+                : 'bg-[#15070A] border-rose-950/80 hover:border-rose-700/80 text-rose-400'
+            }`}
+            title="Alternar Visualização de Caminhos de Ataque (API Inspector ➔ SAST)"
+          >
+            <span className="block text-[10px] font-mono uppercase font-bold text-rose-400">Attack Paths</span>
+            <span className="text-sm font-mono font-bold flex items-center justify-center gap-1 text-rose-300">
+              <Crosshair className={`w-3.5 h-3.5 text-rose-400 ${showAttackPathVisualization ? 'animate-spin' : ''}`} />
+              {attackPaths.length}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -1731,6 +1869,34 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
           >
             <Flame className="w-3.5 h-3.5 text-rose-400" />
             <span>Apenas Fluxos Críticos (Tainted)</span>
+          </button>
+
+          {/* Attack Path Visualization Toggle */}
+          <button
+            id="btn-attack-path-visualization-toggle"
+            onClick={() => {
+              setShowAttackPathVisualization(prev => {
+                const next = !prev;
+                if (next && attackPaths.length > 0) {
+                  handleZoomToPath(attackPaths[0].pathNodeIds);
+                }
+                return next;
+              });
+            }}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-all cursor-pointer ${
+              showAttackPathVisualization
+                ? 'bg-rose-500/25 text-rose-200 border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.35)] ring-1 ring-rose-500/50 font-bold'
+                : 'bg-[#180A0E] text-rose-400 border-rose-950/80 hover:text-rose-200 hover:border-rose-700/60'
+            }`}
+            title="Visualização de Caminho de Ataque: destaca como endpoints externos do API Security Inspector alcançam dados sensíveis mapeados no motor SAST"
+          >
+            <Crosshair className={`w-3.5 h-3.5 text-rose-400 ${showAttackPathVisualization ? 'animate-pulse' : ''}`} />
+            <span>Attack Paths (API ➔ SAST)</span>
+            <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold ${
+              showAttackPathVisualization ? 'bg-rose-500 text-white' : 'bg-rose-950 text-rose-300 border border-rose-800'
+            }`}>
+              {attackPaths.length}
+            </span>
           </button>
         </div>
 
@@ -1874,6 +2040,34 @@ export const DataFlowGraphView: React.FC<DataFlowGraphViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Attack Path Interactive Panel */}
+      {showAttackPathVisualization && activeAttackPath && (
+        <DataFlowAttackPathPanel
+          attackPaths={attackPaths}
+          activePath={activeAttackPath}
+          activePathIndex={activeAttackPathIndex}
+          activeStepIndex={activeAttackStepIndex}
+          isPlayingFlow={isPlayingAttackPath}
+          onSelectPath={(idx) => {
+            setActiveAttackPathIndex(idx);
+            setActiveAttackStepIndex(0);
+            if (attackPaths[idx]) {
+              handleZoomToPath(attackPaths[idx].pathNodeIds);
+            }
+          }}
+          onSelectStep={(stepIdx) => {
+            setActiveAttackStepIndex(stepIdx);
+            if (activeAttackPath?.steps[stepIdx]) {
+              handleZoomToPath([activeAttackPath.steps[stepIdx].nodeId]);
+            }
+          }}
+          onTogglePlay={() => setIsPlayingAttackPath(prev => !prev)}
+          onClose={() => setShowAttackPathVisualization(false)}
+          onSelectFile={onSelectFile}
+          onNavigateToTab={onNavigateToTab}
+        />
+      )}
 
       {/* Main Graph Canvas & Inspector Split Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-[580px]">

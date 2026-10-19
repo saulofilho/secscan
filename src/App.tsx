@@ -2163,6 +2163,9 @@ export default function App() {
             graphData={report.dataFlowGraph}
             previousGraphData={previousDataFlowGraph}
             files={files}
+            findings={report.findings}
+            apiEndpoints={report.apiEndpoints}
+            apiSecurityReport={report.apiSecurityReport}
             onSelectFile={(filePath) => {
               const target = files.find(f => f.path === filePath);
               if (target) {
@@ -2170,6 +2173,7 @@ export default function App() {
                 setActiveTab('scanner');
               }
             }}
+            onNavigateToTab={(tabId) => setActiveTab(tabId)}
           />
         )}
 

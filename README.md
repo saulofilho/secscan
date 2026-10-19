@@ -7,7 +7,7 @@
 [![Quality Gate](https://img.shields.io/badge/Quality%20Gate-Max%20Risk%20Score%20(0--100)-FF3E00)](README.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-**SecScan AppSec Suite** é uma plataforma avançada e modular de **Análise Estática de Segurança de Aplicações (SAST)**, auditoria de código JavaScript/TypeScript, detecção de segredos de alta entropia e inteligência de superfície de ataque. Desenvolvida para engenheiros de DevSecOps, AppSec, pesquisadores de Bug Bounty e desenvolvedores full-stack, a suíte reúne um motor de **Risk Score Cumulativo do Workspace (0-100)** para Quality Gates, painel de evolução temporal com gráficos Recharts (**SecScan Trend Dashboard**), painel de **Logs de Auditoria de Segurança com detecção de anomalias estatísticas e gráfico de frequência**, grafo de fluxo de dados (**DataFlow Taint Analysis**), auditoria de rotas (**OWASP API Security & LinkFinder**), validação contra metadados de nuvem (**SSRF & Webhook Validator**), avaliação declarativa (**Policy-as-Code OPA Rego**) e uma base unificada de remediação com links oficiais para **OWASP**, **Snyk Learn** e **MITRE CWE** diretamente nos cards de achados.
+**SecScan AppSec Suite** é uma plataforma avançada e modular de **Análise Estática de Segurança de Aplicações (SAST)**, auditoria de código JavaScript/TypeScript, detecção de segredos de alta entropia e inteligência de superfície de ataque. Desenvolvida para engenheiros de DevSecOps, AppSec, pesquisadores de Bug Bounty e desenvolvedores full-stack, a suíte reúne um motor de **Risk Score Cumulativo do Workspace (0-100)** para Quality Gates, painel de evolução temporal com gráficos Recharts (**SecScan Trend Dashboard**), painel de **Logs de Auditoria de Segurança com barra de busca, gráfico de linhas de frequência e detecção de anomalias estatísticas com alertas de picos maliciosos**, grafo de fluxo de dados (**DataFlow Taint Analysis & Attack Path Visualization: API Inspector ➔ Motor SAST**), auditoria de rotas (**OWASP API Security & LinkFinder**), validação contra metadados de nuvem (**SSRF & Webhook Validator**), avaliação declarativa (**Policy-as-Code OPA Rego**) e uma base unificada de remediação com links oficiais para **OWASP**, **Snyk Learn** e **MITRE CWE** diretamente nos cards de achados.
 
 ---
 
@@ -268,6 +268,26 @@
   - **Sanitizers (Higienizadores):** Validações e métodos de sanitização (ex.: `DOMPurify.sanitize`, `encodeURIComponent`).
   - **Sinks Perigosos:** Destinos arriscados como `innerHTML`, `dangerouslySetInnerHTML`, `child_process.exec`, `eval`, `document.write`.
 - **Tutorial Interativo Integrado (`DataFlowTutorialOverlay`):** Guia interativo integrado ao container do grafo com dicas sobre navegação, pan, zoom, layout e interpretação da trilha de contaminação (taint analysis).
+- **🎯 Visualização de Caminho de Ataque (Attack Path Visualization — API Inspector ➔ Motor SAST):**
+  - **O que é e Como Funciona:** Correlaciona a superfície de ataque externa mapeada pelo **API Security Inspector** (e LinkFinder) com vulnerabilidades do **OWASP API Security Top 10** (ex.: `API1:2023 BOLA`, `API2:2023 Broken Authentication`, `API5:2023 BFLA`) e rastreia como invasores externos conseguem atravessar handlers e controladores da aplicação até atingir **ativos de dados confidenciais e credenciais sensíveis identificados pelo motor SAST** (ex.: segredos hardcoded, chaves Stripe, tokens JWT, conexões de banco de dados, variáveis de ambiente ou sinks de injeção SQL/RCE).
+  - **Toggle Rápido na Barra de Ferramentas (`Attack Paths`):** Botão dedicado com ícone de mira (`Crosshair`) e contador de rotas de ataque descobertas. Permite ativar e desativar instantaneamente a camada visual de ataque no grafo D3.
+  - **Realce Gráfico de Alta Fidelidade no Canvas D3:**
+    - As arestas e conexões do vetor de ataque ativo são realçadas com traçado pontilhado em crimson neon (`#F43F5E`), espessura aumentada (4.5px) e animação contínua de pulso laser.
+    - Todos os nós e arestas não envolvidos no ataque têm sua opacidade reduzida drasticamente (0.08–0.12), permitindo que a rota de invasão salte aos olhos com clareza cristalina.
+    - Anéis concêntricos com brilho de advertência (`#F43F5E`) envolvem o nó atualmente ativo no ataque.
+    - Badges de passo são renderizados sobre os nós indicando o papel de cada etapa: `PASSO 1: API INGRESS` (ponto de entrada externo), `PASSO 2: HANDLER` (função intermediária) e `PASSO 3: SAST SECRET` (ativo comprometido).
+  - **Painel Interativo de Vetor de Ataque (`DataFlowAttackPathPanel`):**
+    - **Carrossel de Caminhos:** Exibe todos os vetores de ataque descobertos com método HTTP (`POST`, `GET`, `PUT`), endpoint, ativo alvo e Score de Risco calculado (0–100%).
+    - **Cadeia de Exploração (Step-by-step Stepper):** Navegação passo a passo com papéis de nós, descrições detalhadas do vetor de invasão, snippets de código fonte com linha exata e atalho **"Abrir Código"** no visualizador.
+    - **Simulador de Trajetória (`Simular Rota` / `Pausar`):** Execução animada automática da trajetória do payload de ataque trafegando nó a nó pelo grafo.
+    - **Prova Técnica de Conceito & cURL:** Geração automática da linha de raciocínio forense (`[API ENTRY] ➔ [HANDLER] ➔ [SAST ASSET]`) e comando `cURL` de exploração com botão de cópia em 1 clique.
+    - **Navegação Bidirecional de Segurança:** Botões de atalho direto para visualizar o endpoint vulnerável no **API Security Inspector** ou o achado de segredo correspondente no **Scanner SAST**.
+  - **Como Usar no Sistema:**
+    1. Acesse a aba **"Data Flow Graph"** no menu principal.
+    2. Clique no botão de alternância **"Attack Paths (API ➔ SAST)"** na barra de ferramentas superior (ou no card de métricas no topo).
+    3. Selecione um dos caminhos no carrossel do painel de ataque para centralizar e focar o grafo naquele vetor.
+    4. Clique em **"Simular Rota"** para visualizar a animação do ataque percorrendo da borda externa até o segredo interno.
+    5. Clique em **"Ver no API Security Inspector"** ou **"Ver Achado no Scanner SAST"** para navegar imediatamente às ferramentas correlacionadas.
 
 ---
 
