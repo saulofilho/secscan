@@ -812,6 +812,8 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     'action.run_scan': 'Executar Análise',
 
     // Abas de Ferramentas
+    'tab.hub': 'Central de Módulos',
+    'tab.hub_tooltip': 'Visão geral e catálogo de módulos especializados de segurança',
     'tab.dashboard': 'Dashboard Executivo',
     'tab.dashboard_tooltip': 'Visão consolidada com matriz de risco e métricas executivas',
     'tab.trenddashboard': 'Tendências de Risco',
@@ -934,6 +936,8 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     'action.run_scan': 'Run Scan',
 
     // Tool tabs
+    'tab.hub': 'Modules Hub',
+    'tab.hub_tooltip': 'Overview and catalog of specialized security modules',
     'tab.dashboard': 'Executive Dashboard',
     'tab.dashboard_tooltip': 'Consolidated view with risk matrix and executive metrics',
     'tab.trenddashboard': 'Risk Trends',
@@ -1056,6 +1060,8 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     'action.run_scan': 'Ejecutar Análisis',
 
     // Pestañas
+    'tab.hub': 'Centro de Módulos',
+    'tab.hub_tooltip': 'Vista general y catálogo de módulos especializados de seguridad',
     'tab.dashboard': 'Tablero Ejecutivo',
     'tab.dashboard_tooltip': 'Vista consolidada con matriz de riesgo y métricas ejecutivas',
     'tab.trenddashboard': 'Tendencias de Riesgo',

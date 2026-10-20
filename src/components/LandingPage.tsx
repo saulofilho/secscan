@@ -752,18 +752,6 @@ critical_findings[f] {
           <div className="flex items-center gap-3">
             <LanguageSwitcher />
 
-            {onOpenUrlIngest && (
-              <button
-                id="landing-btn-nav-audit-url"
-                onClick={onOpenUrlIngest}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#00F0FF]/10 hover:bg-[#00F0FF]/20 text-[#00F0FF] border border-[#00F0FF]/30 font-mono text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                title="Auditar website ou API pública via link direto"
-              >
-                <Globe className="w-3.5 h-3.5 text-[#00F0FF]" />
-                <span>Auditar URL</span>
-              </button>
-            )}
-            
             <button
               id="landing-btn-enter-app-nav"
               onClick={() => onEnterApp(false)}

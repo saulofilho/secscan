@@ -21,6 +21,8 @@ import {
   Clock,
   Command,
   Keyboard,
+  ChevronLeft,
+  Home,
   Radio,
   Zap,
   Globe,
@@ -452,6 +454,25 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
+            {/* Central de Módulos (Hub) Button */}
+            <button
+              id="btn-header-modules-hub"
+              onClick={() => setActiveTab('hub')}
+              className={`h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs border ${
+                activeTab === 'hub'
+                  ? 'bg-[#00F0FF]/20 text-[#00F0FF] border-[#00F0FF]/60 shadow-[0_0_12px_rgba(0,240,255,0.25)]'
+                  : 'text-zinc-200 hover:text-white bg-[#121217] hover:bg-[#1E1E28] border-[#2B2B38] hover:border-[#00F0FF]/50'
+              }`}
+              title="Central de Módulos: Navegação organizada por grupos de ferramentas em cards"
+            >
+              {activeTab === 'hub' ? (
+                <Layers className="w-3.5 h-3.5 text-[#00F0FF] shrink-0" />
+              ) : (
+                <ChevronLeft className="w-3.5 h-3.5 text-[#00F0FF] shrink-0" />
+              )}
+              <span>{t('tab.hub')}</span>
+            </button>
+
             {/* Auditar URL Button */}
             {onOpenUrlIngest && (
               <button
@@ -664,6 +685,19 @@ export const Header: React.FC<HeaderProps> = ({
         >
           {/* Domain tabs */}
           <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5">
+            {/* Quick Back to Hub when inside a tool */}
+            {activeTab !== 'hub' && (
+              <button
+                id="ribbon-btn-back-to-hub"
+                onClick={() => setActiveTab('hub')}
+                className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-md text-[11px] font-mono font-bold uppercase text-[#00F0FF] hover:text-white bg-[#00F0FF]/10 hover:bg-[#00F0FF]/20 border border-[#00F0FF]/30 hover:border-[#00F0FF] transition-all cursor-pointer shrink-0 mr-1"
+                title="Voltar para a Central de Módulos (Catálogo de Cards)"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Hub</span>
+              </button>
+            )}
+
             <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400 uppercase font-black tracking-wider shrink-0 mr-1 hidden sm:flex">
               <span className="text-[#FF3E00]">⚡</span>
               <span>{language === 'pt' ? 'Módulos:' : language === 'es' ? 'Módulos:' : 'Modules:'}</span>
@@ -751,64 +785,66 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Navigation Tabs Bar */}
-        <nav className="flex items-center gap-1 sm:gap-2 pt-1.5 pb-2 overflow-x-auto no-scrollbar">
-          {/* Tool Guide & Examples Button */}
-          {onOpenToolGuide && (
-            <button
-              id="btn-nav-open-tool-guide"
-              type="button"
-              onClick={() => onOpenToolGuide(activeTab)}
-              className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 text-[11px] font-mono font-bold tracking-wide uppercase whitespace-nowrap transition-all cursor-pointer bg-cyan-950/40 hover:bg-cyan-900/50 text-[#00F0FF] border border-cyan-500/40 hover:border-cyan-400 rounded shrink-0 shadow-xs mr-1"
-              title="Abrir o Manual das Ferramentas com explicações, arquitetura, passo a passo e exemplos de código"
-            >
-              <BookOpen className="w-3.5 h-3.5 text-[#00F0FF] shrink-0" />
-              <span>💡 Como Usar &amp; Exemplos</span>
-            </button>
-          )}
-
-          {visibleNavItems.length === 0 ? (
-            <div className="flex items-center gap-3 py-2 px-3 text-xs font-mono text-zinc-400 bg-[#0F0F12] border border-zinc-800 rounded w-full">
-              <span>Nenhuma ferramenta encontrada com &ldquo;<strong className="text-white">{toolSearchTerm}</strong>&rdquo; no domínio selecionado.</span>
+        {/* Navigation Tabs Bar (Only shown when inside a specific tool or module, keeping Hub clean) */}
+        {activeTab !== 'hub' && (
+          <nav className="flex items-center gap-1 sm:gap-2 pt-1.5 pb-2 overflow-x-auto no-scrollbar">
+            {/* Tool Guide & Examples Button */}
+            {onOpenToolGuide && (
               <button
-                onClick={() => { setToolSearchTerm(''); setSelectedCategory('ALL'); }}
-                className="text-[#FF3E00] hover:underline font-bold cursor-pointer"
+                id="btn-nav-open-tool-guide"
+                type="button"
+                onClick={() => onOpenToolGuide(activeTab)}
+                className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 text-[11px] font-mono font-bold tracking-wide uppercase whitespace-nowrap transition-all cursor-pointer bg-cyan-950/40 hover:bg-cyan-900/50 text-[#00F0FF] border border-cyan-500/40 hover:border-cyan-400 rounded shrink-0 shadow-xs mr-1"
+                title="Abrir o Manual das Ferramentas com explicações, arquitetura, passo a passo e exemplos de código"
               >
-                Limpar filtros
+                <BookOpen className="w-3.5 h-3.5 text-[#00F0FF] shrink-0" />
+                <span>💡 Como Usar &amp; Exemplos</span>
               </button>
-            </div>
-          ) : (
-            visibleNavItems.map(item => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
+            )}
+
+            {visibleNavItems.length === 0 ? (
+              <div className="flex items-center gap-3 py-2 px-3 text-xs font-mono text-zinc-400 bg-[#0F0F12] border border-zinc-800 rounded w-full">
+                <span>Nenhuma ferramenta encontrada com &ldquo;<strong className="text-white">{toolSearchTerm}</strong>&rdquo; no domínio selecionado.</span>
                 <button
-                  key={item.id}
-                  id={`nav-tab-${item.id}`}
-                  onClick={() => setActiveTab(item.id)}
-                  title={item.tooltip}
-                  className={`flex items-center gap-2 py-2 px-3 rounded text-[11px] font-mono font-bold tracking-wide uppercase whitespace-nowrap transition-all cursor-pointer border ${
-                    isActive
-                      ? 'bg-[#18181B] text-[#FF3E00] border-[#FF3E00]/60 shadow-[0_0_12px_rgba(255,62,0,0.18)] scale-[1.02]'
-                      : 'bg-[#0A0A0C] text-[#888] hover:text-white hover:bg-[#141416] border-[#1E1E24] hover:border-[#383844]'
-                  }`}
+                  onClick={() => { setToolSearchTerm(''); setSelectedCategory('ALL'); }}
+                  className="text-[#FF3E00] hover:underline font-bold cursor-pointer"
                 >
-                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#FF3E00]' : 'text-[#666]'}`} />
-                  <span>{item.label}</span>
-                  {item.badge !== undefined && (
-                    <span className={`text-[9.5px] font-mono px-1.5 py-0.2 rounded font-bold ${
-                      isActive 
-                        ? 'bg-[#FF3E00] text-black font-black' 
-                        : 'text-zinc-400 bg-[#141414] border border-[#2A2A30]'
-                    }`}>
-                      {item.badge}
-                    </span>
-                  )}
+                  Limpar filtros
                 </button>
-              );
-            })
-          )}
-        </nav>
+              </div>
+            ) : (
+              visibleNavItems.map(item => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    id={`nav-tab-${item.id}`}
+                    onClick={() => setActiveTab(item.id)}
+                    title={item.tooltip}
+                    className={`flex items-center gap-2 py-2 px-3 rounded text-[11px] font-mono font-bold tracking-wide uppercase whitespace-nowrap transition-all cursor-pointer border ${
+                      isActive
+                        ? 'bg-[#18181B] text-[#FF3E00] border-[#FF3E00]/60 shadow-[0_0_12px_rgba(255,62,0,0.18)] scale-[1.02]'
+                        : 'bg-[#0A0A0C] text-[#888] hover:text-white hover:bg-[#141416] border-[#1E1E24] hover:border-[#383844]'
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#FF3E00]' : 'text-[#666]'}`} />
+                    <span>{item.label}</span>
+                    {item.badge !== undefined && (
+                      <span className={`text-[9.5px] font-mono px-1.5 py-0.2 rounded font-bold ${
+                        isActive 
+                          ? 'bg-[#FF3E00] text-black font-black' 
+                          : 'text-zinc-400 bg-[#141414] border border-[#2A2A30]'
+                      }`}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </nav>
+        )}
       </div>
     </header>
   );

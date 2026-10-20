@@ -82,6 +82,7 @@ import { LandingPage } from './components/LandingPage';
 import { UrlIngestModal } from './components/UrlIngestModal';
 import { GitignoreAuditModal } from './components/GitignoreAuditModal';
 import { AnalyticsDashboardModal } from './components/AnalyticsDashboardModal';
+import { AppModulesHub } from './components/AppModulesHub';
 import { sendAnalyticsEvent, recordLocalTabSessionActivity, recordSecurityAuditLog } from './lib/analyticsTracker';
 import { auditGitignoreSecurity } from './lib/gitignoreAuditor';
 import { useLanguage } from './lib/i18nContext';
@@ -111,7 +112,7 @@ export interface NoticeDetailItem {
 export default function App() {
   const { language } = useLanguage();
   const [currentView, setCurrentView] = useState<'landing' | 'app'>('landing');
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [activeTab, setActiveTab] = useState<string>('hub');
   const [files, setFiles] = useState<ScannedFile[]>([]);
   const [rules, setRules] = useState<RegexRule[]>(() => {
     const saved = safeGetItem('secscan_rules');
@@ -538,7 +539,7 @@ export default function App() {
 
   const handleEnterApp = useCallback((loadDemoData?: boolean) => {
     setCurrentView('app');
-    setActiveTab('dashboard');
+    setActiveTab('hub');
     setShowWelcomeModal(false);
     safeSetItem('secscan_welcome_completed', 'true');
     if (loadDemoData) {
@@ -2097,6 +2098,22 @@ export default function App() {
               </button>
             </div>
           </div>
+        )}
+
+        {activeTab === 'hub' && (
+          <AppModulesHub
+            report={report}
+            files={files}
+            onNavigateToTab={setActiveTab}
+            onRunScan={() => executeScan(files, rules, ignorePatterns)}
+            isScanning={isScanning}
+            scanProgress={scanProgress}
+            onOpenExport={() => setShowExportModal(true)}
+            onOpenTour={() => setShowTour(true)}
+            onOpenCommandPalette={() => setShowCommandPalette(true)}
+            onOpenGlossary={handleOpenGlossary}
+            onOpenGitignoreAudit={() => setShowGitignoreModal(true)}
+          />
         )}
 
         {activeTab === 'dashboard' && (

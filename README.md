@@ -475,6 +475,33 @@ O SecScan serve como suíte preparatória e de auditoria de código para program
 
 ---
 
+### 31. 🍏 Central de Módulos (App Modules Hub — Arquitetura de Design Limpo Apple-Inspired)
+
+- **O que é e Como Funciona:** Refatoração completa da diagramação inicial e fluxo de navegação do SecScan. Em vez de despejar mais de 40 ferramentas de uma vez em barras de rolagem horizontais confusas, a aplicação agora recebe o usuário na **Central de Módulos (Hub)**: uma interface limpa, equilibrada e espaçosa inspirada nas diretrizes de design da **Apple** (macOS System Settings, App Store e Apple Developer Portal).
+
+- **Agrupamento por 5 Núcleos Especializados de Escopo Semelhante:**
+  1. **Análise de Código & SAST (9 ferramentas):**
+     - *Scanner SAST*, *Grafo DataFlow & Caminhos de Ataque*, *Mapeador de Endpoints & Rotas*, *Caçador de Segredos por Entropia de Shannon*, *JSMiner Assets & Bundles*, *Dependências SCA & CVEs*, *IAST Runtime Hooks*, *Auto-Remediação em 1-Clique* e *Refatoração Segura & Modernização*.
+  2. **APIs, DAST & Superfície Externa (5 ferramentas):**
+     - *API Security Inspector (OWASP API Top 10)*, *DAST Web Fuzzer*, *Auditor de Headers de Segurança HTTP (CSP, HSTS)*, *Inspetor Forense de Tokens JWT (RFC 7519)* e *Validador de SSRF & Metadados Cloud*.
+  3. **Nuvem, Infraestrutura & Redes (8 ferramentas):**
+     - *IaC Security (Terraform & Kubernetes)*, *Segurança de Containers & Dockerfile (CIS)*, *Cloud IAM & Privilégios Mínimos*, *Next-Gen Firewall (NGFW L7 & IPS)*, *IDS/IPS Snort Engine*, *DNSSEC & DoH Validator*, *SD-WAN & SASE Mesh Overlay* e *Sensor EDR & eBPF*.
+  4. **SOC, Detecção & Resposta a Incidentes (6 ferramentas):**
+     - *SOC Command Center 24/7 (Live SIEM)*, *Security Onion NSM (Zeek/Suricata)*, *CrowdStrike Falcon Incident Response*, *WAF ModSecurity Engine (OWASP CRS)*, *Reconhecimento de Portas Nmap* e *Auditoria Web Server Nikto*.
+  5. **Governança, Threat Intel & Compliance (16 ferramentas):**
+     - *Dashboard Executivo & Matriz de Risco*, *Tendências & MTTR (Recharts)*, *CTI Threat Intel Hub (CISA KEV & OTX)*, *Modelagem de Ameaças STRIDE*, *Policy-as-Code Declarativo (OPA Rego)*, *Gerador SBOM (CycloneDX & SPDX)*, *Auditoria de Conformidade (SOC 2, ISO 27001, HIPAA)*, *Frameworks & Matriz CIS*, *Gestão de SLA & ASOC*, *OWASP LLM & IA*, *Arquiteto de Playbooks SOAR*, *10 Ferramentas Pro Cyber*, *Editor de Regras Customizadas (Regex)*, *Terminal SecScan CLI*, *Pipeline Flow DevSecOps* e *Templates CI/CD*.
+
+- **Padrões de Design Apple Adotados:**
+  - **Zero-Pill Discipline:** Eliminação de pílulas estáticas repetitivas em favor de tipografia limpa com separadores sutis (`·`), hierarquia visual clara e espaçamento generoso.
+  - **Cards Bento com Translucidez & Squircles:** Cada módulo possui seu card de vidro escuro (`bg-[#0B0B10]/90 backdrop-blur-xl border border-white/[0.08]`), ícone em squircle com acento de cor luminoso, métricas contextuais ao vivo e micro-tiles clicáveis para acesso imediato a qualquer recurso.
+  - **Navegação Focada no Header (Anti-Sobrecarga):**
+    - Quando o usuário entra em uma ferramenta, o cabeçalho superior oculta o excesso de abas e exibe **apenas as 5 a 9 ferramentas daquele módulo específico**.
+    - Botão imediato de retorno **`[← Central de Módulos]`** ou atalho global `⌘H` / `Ctrl+H` para retornar ao catálogo geral a qualquer momento.
+    - Seletor de domínio em abas para alternar facilmente entre módulos sem perder o contexto.
+  - **Spotlight Search Integrada (`⌘K` ou `/`):** Barra de busca em tempo real com auto-filtro que destaca e filtra instantaneamente as ferramentas que atendem à pesquisa.
+
+---
+
 ## 💻 Interface de Linha de Comando (CLI)
 
 A suíte inclui o executável nativo em Node.js (`bin/secscan.js`):

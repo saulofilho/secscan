@@ -45,7 +45,8 @@ import {
   Workflow,
   FileCheck,
   Cpu,
-  TrendingDown
+  TrendingDown,
+  Layers
 } from 'lucide-react';
 import { ScannedFile, RegexRule, ScanReport } from '../types';
 import { useLanguage, SUPPORTED_LANGUAGES } from '../lib/i18nContext';
@@ -294,6 +295,21 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       })),
 
       // Navigation Modules
+      {
+        id: 'nav-modules-hub',
+        title: 'Central de Módulos (Catálogo de Ferramentas)',
+        subtitle: 'Visão geral organizada por escopo em cards (Código, APIs, Nuvem, SOC, Governança)',
+        category: 'Navegação',
+        icon: Layers,
+        shortcut: `${modKey}H`,
+        badge: 'Hub',
+        badgeColor: 'bg-[#00F0FF]/15 text-[#00F0FF] border-[#00F0FF]/30',
+        action: () => {
+          onClose();
+          setActiveTab('hub');
+        },
+        keywords: ['hub', 'modulos', 'central', 'inicio', 'home', 'cards', 'ferramentas', 'catalogo', 'organizacao', 'apple']
+      },
       {
         id: 'nav-dashboard',
         title: 'Módulo: Dashboard & Métricas Executivas',
