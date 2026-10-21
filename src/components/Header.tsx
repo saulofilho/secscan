@@ -11,8 +11,6 @@ import {
   CloudCog, 
   Boxes,
   Network,
-  CheckCircle2, 
-  AlertTriangle,
   RotateCcw,
   Trash2,
   Compass,
@@ -22,7 +20,8 @@ import {
   Command,
   Keyboard,
   ChevronLeft,
-  Home,
+  ChevronDown,
+  Layers,
   Radio,
   Zap,
   Globe,
@@ -40,7 +39,6 @@ import {
   Lock,
   Key,
   KeyRound,
-  Layers,
   Sparkles,
   Workflow,
   FileCheck,
@@ -50,7 +48,8 @@ import {
   X,
   Share2,
   Check,
-  BarChart3
+  BarChart3,
+  MoreHorizontal
 } from 'lucide-react';
 import { ScanReport, ScanProgress } from '../types';
 import { useLanguage } from '../lib/i18nContext';
@@ -77,6 +76,24 @@ interface HeaderProps {
   onNavigateToLanding?: () => void;
   onOpenUrlIngest?: () => void;
   onOpenAnalytics?: () => void;
+}
+
+interface NavToolItem {
+  id: string;
+  category: 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI';
+  label: string;
+  icon: any;
+  badge?: any;
+  tooltip: string;
+}
+
+interface SecOpsModuleGroup {
+  id: 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI';
+  label: string;
+  icon: any;
+  color: string;
+  primaryTab: string;
+  tools: NavToolItem[];
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -107,9 +124,61 @@ export const Header: React.FC<HeaderProps> = ({
 
   const { t, language } = useLanguage();
 
-  const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI'>('ALL');
   const [toolSearchTerm, setToolSearchTerm] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
   const [isCopiedShare, setIsCopiedShare] = useState(false);
+  const [isModuleMenuOpen, setIsModuleMenuOpen] = useState(false);
+  const [isToolMenuOpen, setIsToolMenuOpen] = useState(false);
+  const [isUtilsMenuOpen, setIsUtilsMenuOpen] = useState(false);
+
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const moduleMenuRef = useRef<HTMLDivElement>(null);
+  const toolMenuRef = useRef<HTMLDivElement>(null);
+  const utilsMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns on click outside or escape key
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (searchContainerRef.current && !searchContainerRef.current.contains(target)) {
+        setIsSearchOpen(false);
+      }
+      if (moduleMenuRef.current && !moduleMenuRef.current.contains(target)) {
+        setIsModuleMenuOpen(false);
+      }
+      if (toolMenuRef.current && !toolMenuRef.current.contains(target)) {
+        setIsToolMenuOpen(false);
+      }
+      if (utilsMenuRef.current && !utilsMenuRef.current.contains(target)) {
+        setIsUtilsMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsModuleMenuOpen(false);
+        setIsToolMenuOpen(false);
+        setIsUtilsMenuOpen(false);
+        setIsSearchOpen(false);
+      }
+      if (e.key === '/' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+        const input = document.getElementById('nav-tool-search-input');
+        if (input) {
+          input.focus();
+          setIsSearchOpen(true);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   const handleShareLink = async () => {
     const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
@@ -137,25 +206,11 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // Global shortcut '/' to focus tool search
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === '/' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
-        e.preventDefault();
-        const input = document.getElementById('nav-tool-search-input');
-        if (input) {
-          input.focus();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   const criticalCount = report.metrics.criticalCount;
   const isHealthy = criticalCount === 0;
 
-  const navItems = useMemo<{ id: string; category: 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI'; label: string; icon: any; badge?: any; tooltip: string }[]>(() => [
+  // Catalog of all 44 tools classified into 5 core domains
+  const navItems = useMemo<NavToolItem[]>(() => [
     { id: 'dashboard', category: 'GOV_AI', label: t('tab.dashboard'), icon: ShieldAlert, tooltip: t('tab.dashboard_tooltip') },
     { id: 'trenddashboard', category: 'GOV_AI', label: t('tab.trenddashboard'), icon: TrendingDown, badge: 'Trends', tooltip: t('tab.trenddashboard_tooltip') },
     { id: 'scanner', category: 'CODE_SAST', label: t('tab.scanner'), icon: FileCode2, badge: report.findings.length, tooltip: t('tab.scanner_tooltip') },
@@ -202,266 +257,139 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'cicd', category: 'GOV_AI', label: t('tab.cicd'), icon: CloudCog, tooltip: t('tab.cicd_tooltip') },
   ], [t, language, report]);
 
-  // Primary landing tab for each domain
-  const PRIMARY_DOMAIN_TABS: Record<string, string> = useMemo(() => ({
-    CODE_SAST: 'scanner',
-    CLOUD_INFRA: 'iac',
-    API_DAST: 'apisecurity',
-    SOC_EDR: 'soccommand',
-    GOV_AI: 'dashboard',
-  }), []);
+  // 5 Scoped Modules matching the AppModulesHub layout
+  const SECOPS_MODULES = useMemo<SecOpsModuleGroup[]>(() => [
+    {
+      id: 'CODE_SAST',
+      label: language === 'pt' ? 'Código & SAST' : language === 'es' ? 'Código y SAST' : 'Code & SAST',
+      icon: FileCode2,
+      color: '#00F0FF',
+      primaryTab: 'scanner',
+      tools: navItems.filter(i => i.category === 'CODE_SAST')
+    },
+    {
+      id: 'API_DAST',
+      label: language === 'pt' ? 'APIs & DAST' : language === 'es' ? 'APIs y DAST' : 'APIs & DAST',
+      icon: Route,
+      color: '#FF3E00',
+      primaryTab: 'apisecurity',
+      tools: navItems.filter(i => i.category === 'API_DAST')
+    },
+    {
+      id: 'CLOUD_INFRA',
+      label: language === 'pt' ? 'Nuvem & Infra' : language === 'es' ? 'Nube e Infra' : 'Cloud & Infra',
+      icon: Container,
+      color: '#38BDF8',
+      primaryTab: 'iac',
+      tools: navItems.filter(i => i.category === 'CLOUD_INFRA')
+    },
+    {
+      id: 'SOC_EDR',
+      label: language === 'pt' ? 'SOC & Resposta' : language === 'es' ? 'SOC y Respuesta' : 'SOC & Response',
+      icon: Radio,
+      color: '#A78BFA',
+      primaryTab: 'soccommand',
+      tools: navItems.filter(i => i.category === 'SOC_EDR')
+    },
+    {
+      id: 'GOV_AI',
+      label: language === 'pt' ? 'Governança & AI' : language === 'es' ? 'Gobernanza e IA' : 'Gov & AI',
+      icon: Scale,
+      color: '#F59E0B',
+      primaryTab: 'dashboard',
+      tools: navItems.filter(i => i.category === 'GOV_AI')
+    }
+  ], [navItems, language]);
 
-  // Track previous active tab to sync category smoothly without feedback loops
-  const lastActiveTabRef = useRef(activeTab);
+  // Determine current active module and active tool item
+  const activeToolItem = useMemo(() => {
+    return navItems.find(i => i.id === activeTab) || null;
+  }, [navItems, activeTab]);
+
+  const currentModule = useMemo(() => {
+    if (activeTab === 'hub') return null;
+    if (!activeToolItem) return SECOPS_MODULES[0];
+    return SECOPS_MODULES.find(m => m.id === activeToolItem.category) || SECOPS_MODULES[0];
+  }, [SECOPS_MODULES, activeToolItem, activeTab]);
+
+  // Search filtered results across all tools with accent normalization
+  const searchResults = useMemo(() => {
+    if (!toolSearchTerm.trim()) return [];
+    const clean = (str: string) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const q = clean(toolSearchTerm);
+
+    return navItems.filter(item => {
+      const matchLabel = clean(item.label).includes(q);
+      const matchId = clean(item.id).includes(q);
+      const matchTooltip = clean(item.tooltip || '').includes(q);
+      const matchBadge = typeof item.badge === 'string' && clean(item.badge).includes(q);
+      const mod = SECOPS_MODULES.find(m => m.id === item.category);
+      const matchModule = mod ? clean(mod.label).includes(q) : false;
+
+      return matchLabel || matchId || matchTooltip || matchBadge || matchModule;
+    });
+  }, [navItems, toolSearchTerm, SECOPS_MODULES]);
 
   useEffect(() => {
-    if (lastActiveTabRef.current !== activeTab) {
-      lastActiveTabRef.current = activeTab;
-      const currentItem = navItems.find(i => i.id === activeTab);
-      if (currentItem && selectedCategory !== 'ALL' && currentItem.category !== selectedCategory) {
-        setSelectedCategory(currentItem.category);
-      }
-    }
-  }, [activeTab, navItems, selectedCategory]);
-
-  // Handler for domain navigation in ribbon
-  const handleDomainSelect = (domainId: 'ALL' | 'CODE_SAST' | 'CLOUD_INFRA' | 'API_DAST' | 'SOC_EDR' | 'GOV_AI') => {
-    setSelectedCategory(domainId);
-
-    if (domainId === 'ALL') {
-      return;
-    }
-
-    const currentItem = navItems.find(i => i.id === activeTab);
-    // If user is not already in a tab belonging to this domain, navigate to the default module
-    if (!currentItem || currentItem.category !== domainId) {
-      const targetTab = PRIMARY_DOMAIN_TABS[domainId];
-      if (targetTab) {
-        setActiveTab(targetTab);
-      }
-    }
-  };
-
-  // Scroll active sub-tab into view if it overflows horizontally
-  useEffect(() => {
-    const el = document.getElementById(`nav-tab-${activeTab}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-    }
-  }, [activeTab]);
-
-  const visibleNavItems = useMemo(() => {
-    let items = selectedCategory === 'ALL' ? navItems : navItems.filter(item => item.category === selectedCategory);
-    if (toolSearchTerm.trim()) {
-      const q = toolSearchTerm.toLowerCase().trim();
-      items = items.filter(item => 
-        item.label.toLowerCase().includes(q) || 
-        item.id.toLowerCase().includes(q) || 
-        item.tooltip.toLowerCase().includes(q) ||
-        (typeof item.badge === 'string' && item.badge.toLowerCase().includes(q))
-      );
-    }
-    return items;
-  }, [selectedCategory, navItems, toolSearchTerm]);
-
-  const SECOPS_DOMAINS = useMemo(() => [
-    { id: 'ALL' as const, label: t('nav.category_all'), count: navItems.length, icon: Layers },
-    { id: 'CODE_SAST' as const, label: t('nav.category_code_sast'), count: navItems.filter(i => i.category === 'CODE_SAST').length, icon: FileCode2 },
-    { id: 'CLOUD_INFRA' as const, label: t('nav.category_cloud_infra'), count: navItems.filter(i => i.category === 'CLOUD_INFRA').length, icon: Container },
-    { id: 'API_DAST' as const, label: t('nav.category_api_dast'), count: navItems.filter(i => i.category === 'API_DAST').length, icon: Route },
-    { id: 'SOC_EDR' as const, label: t('nav.category_soc_edr'), count: navItems.filter(i => i.category === 'SOC_EDR').length, icon: Radio },
-    { id: 'GOV_AI' as const, label: t('nav.category_gov_ai'), count: navItems.filter(i => i.category === 'GOV_AI').length, icon: ShieldCheck },
-  ], [t, navItems]);
+    setSelectedSearchIndex(0);
+  }, [toolSearchTerm]);
 
   return (
-    <header className="w-full border-b border-[#222] bg-[#050505]/95 backdrop-blur-md sticky top-0 z-30">
-      {/* Top Banner Bar & Navigation Container */}
-      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Main Header Bar (Responsive Brand + Toolbar) */}
-        <div className="w-full flex flex-wrap 2xl:flex-nowrap items-center justify-between py-2.5 sm:py-3.5 gap-2.5 sm:gap-3 border-b border-[#1A1A1A]">
-          {/* Brand Logo & Meta */}
-          <div 
-            onClick={onNavigateToLanding || (() => setActiveTab('dashboard'))}
-            className="flex items-center gap-2.5 sm:gap-3.5 shrink-0 cursor-pointer select-none group"
-            title="Ir para a Página Inicial de Apresentação do SecScan"
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                if (onNavigateToLanding) onNavigateToLanding();
-                else setActiveTab('dashboard');
-              }
-            }}
-          >
-            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-b from-[#1C1C1C] to-[#0A0A0A] border border-[#333] group-hover:border-[#FF3E00]/60 rounded-lg flex items-center justify-center text-[#FF3E00] shrink-0 shadow-[0_0_15px_rgba(255,62,0,0.15)] relative transition-all">
-              <ShieldAlert className="w-5 h-5 sm:w-6 sm:h-6 text-[#FF3E00] drop-shadow-[0_0_6px_rgba(255,62,0,0.5)] transition-transform group-hover:scale-110" />
-              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                  (report.metrics.riskScore ?? 0) >= 75 ? 'bg-[#FF3E00]' : (report.metrics.riskScore ?? 0) >= 50 ? 'bg-[#FF7A00]' : 'bg-[#00FF41]'
-                }`} />
-                <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-                  (report.metrics.riskScore ?? 0) >= 75 ? 'bg-[#FF3E00]' : (report.metrics.riskScore ?? 0) >= 50 ? 'bg-[#FF7A00]' : 'bg-[#00FF41]'
-                }`} />
-              </span>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <div className="flex items-center">
-                  <span className="font-black text-lg sm:text-2xl tracking-tight text-white uppercase group-hover:text-zinc-100 transition-colors">
-                    SECSCAN
-                  </span>
-                  <span className="text-[#FF3E00] font-black tracking-tight text-lg sm:text-2xl uppercase ml-1.5 drop-shadow-[0_0_8px_rgba(255,62,0,0.4)]">
-                    APPSEC
-                  </span>
-                  <span className="ml-2 px-1.5 sm:px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-200 text-[9px] sm:text-[10px] font-black tracking-widest uppercase shadow-xs">
-                    SUITE
-                  </span>
-                </div>
-                <span className="text-[9px] sm:text-[9.5px] font-mono bg-[#FF3E00]/15 text-[#FF3E00] border border-[#FF3E00]/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                  v2.5
-                </span>
-                <span className="hidden md:inline-flex items-center text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#111] text-zinc-400 border border-[#222]">
-                  ENTERPRISE SAST
+    <header className="w-full border-b border-white/[0.08] bg-[#07070A]/95 backdrop-blur-xl sticky top-0 z-30 shadow-md">
+      <div className="max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8">
+        {/* CONCENTRATED SINGLE-MENU BAR (Divided into 3 Scopes/Blocks) */}
+        <div className="h-16 flex items-center justify-between gap-2 sm:gap-4">
+          
+          {/* =========================================================================
+              BLOCO 1: IDENTIDADE & HUB (Brand & Core Hub Scope)
+             ========================================================================= */}
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+            {/* Logo & Brand Name */}
+            <div 
+              onClick={onNavigateToLanding || (() => setActiveTab('hub'))}
+              className="flex items-center gap-2.5 cursor-pointer select-none group"
+              title="Ir para a Página Inicial de Apresentação"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  if (onNavigateToLanding) onNavigateToLanding();
+                  else setActiveTab('hub');
+                }
+              }}
+            >
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-b from-[#1C1C24] to-[#0A0A0E] border border-white/[0.1] group-hover:border-[#FF3E00]/60 flex items-center justify-center text-[#FF3E00] shadow-[0_0_12px_rgba(255,62,0,0.15)] relative transition-all">
+                <ShieldAlert className="w-4 h-4 text-[#FF3E00] group-hover:scale-110 transition-transform" />
+                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    (report.metrics.riskScore ?? 0) >= 75 ? 'bg-[#FF3E00]' : (report.metrics.riskScore ?? 0) >= 50 ? 'bg-[#FF7A00]' : 'bg-[#00FF41]'
+                  }`} />
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                    (report.metrics.riskScore ?? 0) >= 75 ? 'bg-[#FF3E00]' : (report.metrics.riskScore ?? 0) >= 50 ? 'bg-[#FF7A00]' : 'bg-[#00FF41]'
+                  }`} />
                 </span>
               </div>
-              <p className="text-[10px] font-mono text-[#777] hidden xl:flex items-center gap-2 tracking-wider uppercase mt-0.5">
-                <span>{t('app.tagline')}</span>
-                <span className="text-[#333]">•</span>
-                <span className="text-zinc-400 flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-[#00FF41]" />
-                  <span>{t('app.duration')} <strong className="text-[#00FF41] font-mono">{report.durationMs ?? 0}ms</strong></span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-black text-base sm:text-lg tracking-tight text-white uppercase font-sans">
+                  SECSCAN
                 </span>
-                <span className="text-[#333] hidden 2xl:inline">•</span>
-                <span className="text-zinc-400 hidden 2xl:flex items-center gap-1">
-                  <span>{t('app.risk_score')}</span>
-                  <strong className={`font-mono font-bold ${
-                    (report.metrics.riskScore ?? 0) >= 75 ? 'text-[#FF3E00]' :
-                    (report.metrics.riskScore ?? 0) >= 50 ? 'text-[#FF7A00]' :
-                    (report.metrics.riskScore ?? 0) >= 25 ? 'text-amber-400' : 'text-[#00FF41]'
-                  }`}>
-                    {report.metrics.riskScore ?? 0}/100 [{report.metrics.riskLevel ?? 'MINIMAL'}]
-                  </strong>
+                <span className="text-[#FF3E00] font-black text-base sm:text-lg uppercase font-sans">
+                  APPSEC
                 </span>
-              </p>
-            </div>
-          </div>
-
-          {/* Quick Stats & Action Toolbar */}
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
-            {/* Cumulative Workspace Risk Score Pill */}
-            <button
-              id="header-workspace-risk-score-badge"
-              type="button"
-              onClick={() => {
-                if (activeTab !== 'dashboard') {
-                  setActiveTab('dashboard');
-                }
-                setTimeout(() => {
-                  const el = document.getElementById('cumulative-risk-validation-section') || 
-                             document.getElementById('metric-card-cumulative-risk-score') ||
-                             document.getElementById('cumulative-risk-score-gauge-card');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }, 100);
-              }}
-              className={`flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded border font-mono text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                (report.metrics.riskScore ?? 0) >= 75
-                  ? 'bg-[#FF3E00]/15 text-[#FF3E00] border-[#FF3E00]/40 hover:bg-[#FF3E00]/25'
-                  : (report.metrics.riskScore ?? 0) >= 50
-                  ? 'bg-[#FF7A00]/15 text-[#FF7A00] border-[#FF7A00]/40 hover:bg-[#FF7A00]/25'
-                  : (report.metrics.riskScore ?? 0) >= 25
-                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/40 hover:bg-amber-500/25'
-                  : 'bg-[#00FF41]/10 text-[#00FF41] border-[#00FF41]/30 hover:bg-[#00FF41]/20'
-              }`}
-              title={`${t('app.risk_score')} ${report.metrics.riskScore ?? 0}/100 [${report.metrics.riskLevel ?? 'MINIMAL'}]`}
-            >
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              <span className="text-zinc-400 text-[10px] uppercase tracking-wider hidden sm:inline">
-                {t('app.risk_score')}
-              </span>
-              <span className="font-mono font-black tracking-tight">
-                {report.metrics.riskScore ?? 0}/100
-              </span>
-              <span className="text-[9px] px-1 py-0.2 rounded bg-black/40 border border-current hidden md:inline">
-                {report.metrics.riskLevel ?? 'MINIMAL'}
-              </span>
-            </button>
-
-            {/* Scan Duration Indicator */}
-            <button
-              id="header-scan-duration-badge"
-              type="button"
-              onClick={() => {
-                if (activeTab !== 'dashboard') {
-                  setActiveTab('dashboard');
-                }
-                setTimeout(() => {
-                  const el = document.getElementById('scan-speedometer-gauge-section');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }, 100);
-              }}
-              className={`flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded border font-mono text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                isScanning
-                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                  : 'bg-[#0F0F0F] hover:bg-[#1A1A1A] text-[#00FF41] border-[#2A2A2A] hover:border-[#00FF41]/50 shadow-xs'
-              }`}
-              title={
-                isScanning
-                  ? t('action.scanning')
-                  : `${t('app.duration')} ${report.durationMs ?? 0}ms.`
-              }
-            >
-              <Clock className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin text-amber-400' : 'text-[#00FF41]'} shrink-0`} />
-              <span className="text-zinc-400 text-[10px] uppercase tracking-wider hidden sm:inline">
-                {t('app.duration')}
-              </span>
-              <span className="font-mono font-bold tracking-tight">
-                {isScanning ? t('app.scan_measuring') : `${report.durationMs ?? 0}ms`}
-              </span>
-            </button>
-
-            {/* Status indicator pill */}
-            <div className={`flex items-center gap-1.5 h-8 px-2.5 rounded border font-mono text-[11px] font-bold uppercase tracking-wider ${
-              isHealthy 
-                ? 'bg-[#00FF41]/10 text-[#00FF41] border-[#00FF41]/30' 
-                : 'bg-[#FF3E00]/10 text-[#FF3E00] border-[#FF3E00]/40'
-            }`}>
-              {isHealthy ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-[#00FF41] animate-pulse" />
-                  <span>{t('app.healthy')}</span>
-                </>
-              ) : (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-[#FF3E00] animate-pulse" />
-                  <span>{t('app.critical_findings', { count: criticalCount, plural: criticalCount > 1 ? 'S' : '' })}</span>
-                </>
-              )}
+              </div>
             </div>
 
-            {/* Language Switcher */}
-            <LanguageSwitcher />
-
-            {/* Landing Page Button */}
-            {onNavigateToLanding && (
-              <button
-                id="btn-header-landing"
-                onClick={onNavigateToLanding}
-                className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-[#121217] hover:bg-[#1E1E28] border border-[#2B2B38] hover:border-[#FF3E00]/60 transition-all cursor-pointer shadow-xs"
-                title="Voltar para a Página Inicial de Apresentação do SecScan"
-              >
-                <BookOpen className="w-3.5 h-3.5 text-[#FF3E00] shrink-0" />
-                <span>Página Inicial</span>
-              </button>
-            )}
+            {/* Subtle Vertical Divider */}
+            <div className="h-5 w-px bg-white/10 hidden sm:block" />
 
             {/* Central de Módulos (Hub) Button */}
             <button
               id="btn-header-modules-hub"
               onClick={() => setActiveTab('hub')}
-              className={`h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs border ${
+              className={`h-8 px-2.5 sm:px-3 rounded-lg inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer border ${
                 activeTab === 'hub'
-                  ? 'bg-[#00F0FF]/20 text-[#00F0FF] border-[#00F0FF]/60 shadow-[0_0_12px_rgba(0,240,255,0.25)]'
-                  : 'text-zinc-200 hover:text-white bg-[#121217] hover:bg-[#1E1E28] border-[#2B2B38] hover:border-[#00F0FF]/50'
+                  ? 'bg-[#00F0FF]/15 text-[#00F0FF] border-[#00F0FF]/50 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+                  : 'text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border-white/[0.08] hover:border-[#00F0FF]/40'
               }`}
               title="Central de Módulos: Navegação organizada por grupos de ferramentas em cards"
             >
@@ -470,188 +398,481 @@ export const Header: React.FC<HeaderProps> = ({
               ) : (
                 <ChevronLeft className="w-3.5 h-3.5 text-[#00F0FF] shrink-0" />
               )}
-              <span>{t('tab.hub')}</span>
+              <span className="hidden md:inline">{t('tab.hub')}</span>
+              <span className="md:hidden">Hub</span>
             </button>
+          </div>
 
-            {/* Auditar URL Button */}
-            {onOpenUrlIngest && (
+          {/* =========================================================================
+              BLOCO 2: MÓDULOS & FERRAMENTAS DO ESCOPO (Scoped Module & Tool Selector)
+             ========================================================================= */}
+          <div className="flex items-center gap-2 flex-1 max-w-2xl mx-1 sm:mx-3 justify-center">
+            {/* Module Selector Dropdown */}
+            <div className="relative" ref={moduleMenuRef}>
               <button
-                id="btn-header-open-url-audit"
-                onClick={onOpenUrlIngest}
-                className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-[#00F0FF] hover:text-white bg-[#00F0FF]/10 hover:bg-[#00F0FF]/25 border border-[#00F0FF]/30 hover:border-[#00F0FF] transition-all cursor-pointer shadow-xs"
-                title="Auditar website ou API pública via URL"
+                id="header-btn-module-selector"
+                onClick={() => setIsModuleMenuOpen(!isModuleMenuOpen)}
+                className={`h-8 px-2.5 sm:px-3 rounded-lg inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap border ${
+                  activeTab === 'hub'
+                    ? 'bg-white/[0.03] text-zinc-300 hover:text-white border-white/[0.08] hover:border-white/[0.2]'
+                    : 'bg-white/[0.06] text-white border-white/[0.15] hover:border-white/[0.3] shadow-xs'
+                }`}
+                title="Escolher Módulo de Segurança Especializado"
               >
-                <Globe className="w-3.5 h-3.5 text-[#00F0FF] shrink-0" />
-                <span className="hidden sm:inline">Auditar URL</span>
-              </button>
-            )}
-
-            {/* Command Palette Button */}
-            {onOpenCommandPalette && (
-              <button
-                id="btn-header-open-command-palette"
-                onClick={onOpenCommandPalette}
-                className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-white bg-[#181818] hover:bg-[#222] border border-[#333] hover:border-[#FF3E00]/60 transition-all cursor-pointer shadow-xs group"
-                title={`Abrir Command Palette (${isMac ? '⌘K' : 'Ctrl+K'})`}
-              >
-                <Command className="w-3.5 h-3.5 text-[#FF3E00] group-hover:scale-110 transition-transform shrink-0" />
-                <span className="hidden lg:inline text-zinc-200">{t('action.commands')}</span>
-                <kbd className="hidden sm:inline-flex items-center text-[9px] font-mono px-1 py-0.2 rounded bg-[#0A0A0A] text-zinc-400 border border-[#333] font-semibold">
-                  {isMac ? '⌘K' : 'Ctrl+K'}
-                </kbd>
-              </button>
-            )}
-
-            {/* Tutorial Button */}
-            <button
-              id="btn-quick-tour"
-              onClick={onOpenTour}
-              title="Abrir Tutorial Completo da Ferramenta SecScan"
-              className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-[#FF3E00] bg-[#FF3E00]/15 hover:bg-[#FF3E00] hover:text-white border border-[#FF3E00]/40 hover:border-[#FF3E00] transition-all cursor-pointer shadow-[0_0_12px_rgba(255,62,0,0.15)]"
-            >
-              <Compass className="w-3.5 h-3.5 shrink-0 animate-spin-slow" />
-              <span>{t('action.tutorial')}</span>
-            </button>
-
-            {/* Global Ignore List Button */}
-            {onOpenIgnoreModal && (
-              <button
-                id="btn-header-open-ignore"
-                onClick={onOpenIgnoreModal}
-                className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-[#AAA] hover:text-white bg-[#0F0F0F] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#444] transition-all cursor-pointer"
-                title={`Configurações da Global Ignore List (${isMac ? '⌘I' : 'Ctrl+I'})`}
-              >
-                <Ban className="w-3.5 h-3.5 text-[#FF3E00] shrink-0" />
-                <span className="hidden xl:inline">{t('action.exclusions')}</span>
-                {activeIgnoreCount !== undefined && (
-                  <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-[#1A1A1A] text-[#00FF41] border border-[#333] font-bold">
-                    {activeIgnoreCount}
-                  </span>
+                {currentModule ? (
+                  <>
+                    <currentModule.icon className="w-3.5 h-3.5" style={{ color: currentModule.color }} />
+                    <span className="max-w-[100px] sm:max-w-none truncate">{currentModule.label}</span>
+                  </>
+                ) : (
+                  <>
+                    <Layers className="w-3.5 h-3.5 text-[#00F0FF]" />
+                    <span className="hidden sm:inline">Módulos</span>
+                  </>
                 )}
+                <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform ${isModuleMenuOpen ? 'rotate-180' : ''}`} />
               </button>
+
+              {/* Module Dropdown Popover */}
+              {isModuleMenuOpen && (
+                <div className="absolute left-0 mt-2 w-72 rounded-2xl bg-[#0D0D14]/98 backdrop-blur-2xl border border-white/[0.12] shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-2.5 py-1.5 text-[10px] font-mono uppercase font-bold text-zinc-400 border-b border-white/[0.08] mb-1">
+                    {language === 'pt' ? 'Módulos Especializados' : 'Specialized Modules'}
+                  </div>
+                  <button
+                    onClick={() => { setActiveTab('hub'); setIsModuleMenuOpen(false); }}
+                    className={`w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs transition-colors cursor-pointer ${
+                      activeTab === 'hub' ? 'bg-[#00F0FF]/15 text-[#00F0FF]' : 'hover:bg-white/[0.06] text-zinc-300 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Layers className="w-4 h-4 text-[#00F0FF]" />
+                      <span className="font-bold">Central de Módulos (Geral)</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-zinc-500">5 Módulos</span>
+                  </button>
+
+                  {SECOPS_MODULES.map(mod => {
+                    const ModIcon = mod.icon;
+                    const isCurrentMod = currentModule?.id === mod.id && activeTab !== 'hub';
+                    return (
+                      <button
+                        key={mod.id}
+                        onClick={() => {
+                          setActiveTab(mod.primaryTab);
+                          setIsModuleMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs transition-colors cursor-pointer ${
+                          isCurrentMod ? 'bg-white/[0.1] text-white font-bold' : 'hover:bg-white/[0.06] text-zinc-300 hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <ModIcon className="w-4 h-4 shrink-0" style={{ color: mod.color }} />
+                          <span className="truncate">{mod.label}</span>
+                        </div>
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-black/40 text-zinc-400 border border-white/[0.08] shrink-0">
+                          {mod.tools.length}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Active Tool Selector inside Module (only shown when inside a specific tool) */}
+            {activeTab !== 'hub' && currentModule && (
+              <div className="relative" ref={toolMenuRef}>
+                <button
+                  id="header-btn-tool-selector"
+                  onClick={() => setIsToolMenuOpen(!isToolMenuOpen)}
+                  className="h-8 px-2.5 sm:px-3 rounded-lg inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-wider bg-white/[0.03] hover:bg-white/[0.07] text-[#00FF41] border border-[#00FF41]/30 hover:border-[#00FF41]/60 transition-all cursor-pointer whitespace-nowrap"
+                  title="Ferramenta Ativa no Módulo"
+                >
+                  {activeToolItem ? (
+                    <>
+                      <activeToolItem.icon className="w-3.5 h-3.5 text-[#00FF41] shrink-0" />
+                      <span className="max-w-[110px] sm:max-w-[150px] truncate">{activeToolItem.label}</span>
+                    </>
+                  ) : (
+                    <span>Ferramenta</span>
+                  )}
+                  <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform ${isToolMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Tool Dropdown Popover */}
+                {isToolMenuOpen && (
+                  <div className="absolute left-0 mt-2 w-72 max-h-80 overflow-y-auto rounded-2xl bg-[#0D0D14]/98 backdrop-blur-2xl border border-white/[0.12] shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-2.5 py-1.5 text-[10px] font-mono uppercase font-bold text-zinc-400 border-b border-white/[0.08] mb-1">
+                      {currentModule.label} ({currentModule.tools.length} ferramentas)
+                    </div>
+                    {currentModule.tools.map(tool => {
+                      const ToolIcon = tool.icon;
+                      const isToolActive = activeTab === tool.id;
+                      return (
+                        <button
+                          key={tool.id}
+                          onClick={() => {
+                            setActiveTab(tool.id);
+                            setIsToolMenuOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs transition-colors cursor-pointer ${
+                            isToolActive ? 'bg-[#00FF41]/15 text-[#00FF41] font-bold' : 'hover:bg-white/[0.06] text-zinc-300 hover:text-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <ToolIcon className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                            <span className="truncate">{tool.label}</span>
+                          </div>
+                          {tool.badge !== undefined && (
+                            <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-black/40 text-zinc-400 border border-white/[0.08] shrink-0">
+                              {tool.badge}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
 
-            {/* Security Glossary Button */}
-            {onOpenGlossary && (
-              <button
-                id="btn-header-open-glossary"
-                onClick={onOpenGlossary}
-                className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-[#AAA] hover:text-white bg-[#0F0F0F] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#444] transition-all cursor-pointer"
-                title={`Glossário de Vulnerabilidades & Ameaças (${isMac ? '⌘G' : 'Ctrl+G'})`}
-              >
-                <BookOpen className="w-3.5 h-3.5 text-[#FF3E00] shrink-0" />
-                <span className="hidden xl:inline">{t('action.glossary')}</span>
-              </button>
-            )}
+            {/* Spotlight Search Box (Apple Style) */}
+            <div ref={searchContainerRef} className="relative hidden md:flex items-center max-w-[200px] lg:max-w-[250px] w-full">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 text-zinc-400 pointer-events-none" />
+              <input
+                id="nav-tool-search-input"
+                type="text"
+                value={toolSearchTerm}
+                onFocus={() => setIsSearchOpen(true)}
+                onChange={(e) => {
+                  setToolSearchTerm(e.target.value);
+                  setIsSearchOpen(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (searchResults.length > 0) {
+                      setSelectedSearchIndex(prev => Math.min(searchResults.length - 1, prev + 1));
+                    }
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (searchResults.length > 0) {
+                      setSelectedSearchIndex(prev => Math.max(0, prev - 1));
+                    }
+                  } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (searchResults.length > 0) {
+                      const selected = searchResults[selectedSearchIndex] || searchResults[0];
+                      setActiveTab(selected.id);
+                      setToolSearchTerm('');
+                      setIsSearchOpen(false);
+                    }
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setIsSearchOpen(false);
+                    setToolSearchTerm('');
+                  }
+                }}
+                placeholder={t('nav.search_placeholder') || 'Buscar ferramentas (/)...'}
+                className="w-full h-8 pl-8 pr-7 text-[11px] font-mono bg-white/[0.04] hover:bg-white/[0.07] focus:bg-white/[0.09] border border-white/[0.10] focus:border-[#00F0FF]/60 rounded-lg text-zinc-200 placeholder-zinc-500 focus:outline-none transition-all shadow-inner"
+              />
+              {toolSearchTerm ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setToolSearchTerm('');
+                    setIsSearchOpen(false);
+                  }}
+                  className="absolute right-2 text-zinc-400 hover:text-white cursor-pointer"
+                  title="Limpar filtro"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <kbd className="hidden lg:inline-block absolute right-2 text-[9px] font-mono px-1 py-0.2 bg-white/[0.06] text-zinc-500 border border-white/[0.08] rounded pointer-events-none">
+                  /
+                </kbd>
+              )}
 
-            {/* Gitignore Security Audit Button */}
-            {onOpenGitignoreAudit && (
+              {/* Spotlight Search Results Dropdown Popover */}
+              {isSearchOpen && toolSearchTerm.trim().length > 0 && (
+                <div 
+                  id="nav-tool-search-results-popover"
+                  className="absolute top-full mt-2 left-0 w-80 sm:w-96 max-h-[380px] overflow-y-auto bg-[#0A0A10]/98 border border-white/[0.12] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] backdrop-blur-2xl z-50 p-2 flex flex-col gap-1 animate-in fade-in slide-in-from-top-2 duration-150"
+                >
+                  <div className="flex items-center justify-between px-2.5 py-1 border-b border-white/[0.06] text-[10px] font-mono text-zinc-400">
+                    <span>{searchResults.length} ferramenta(s) encontrada(s)</span>
+                    <span className="text-zinc-500">↑↓ navegar • ↵ abrir</span>
+                  </div>
+
+                  {searchResults.length > 0 ? (
+                    <div className="flex flex-col gap-0.5 mt-1">
+                      {searchResults.map((tool, idx) => {
+                        const ToolIcon = tool.icon;
+                        const isSelected = idx === selectedSearchIndex;
+                        const isCurrentActive = tool.id === activeTab;
+                        const moduleItem = SECOPS_MODULES.find(m => m.id === tool.category);
+
+                        return (
+                          <button
+                            key={tool.id}
+                            type="button"
+                            onMouseEnter={() => setSelectedSearchIndex(idx)}
+                            onClick={() => {
+                              setActiveTab(tool.id);
+                              setToolSearchTerm('');
+                              setIsSearchOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-all cursor-pointer ${
+                              isSelected 
+                                ? 'bg-[#00F0FF]/15 text-white border border-[#00F0FF]/30' 
+                                : isCurrentActive
+                                ? 'bg-white/[0.06] text-[#00FF41]'
+                                : 'hover:bg-white/[0.05] text-zinc-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                              <div className={`p-1.5 rounded-md shrink-0 ${isSelected ? 'bg-[#00F0FF]/20 text-[#00F0FF]' : 'bg-white/[0.05] text-zinc-400'}`}>
+                                <ToolIcon className="w-3.5 h-3.5" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-semibold text-white truncate">
+                                    {tool.label}
+                                  </span>
+                                  {isCurrentActive && (
+                                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-[#00FF41]/20 text-[#00FF41] border border-[#00FF41]/40 font-bold">
+                                      ATIVO
+                                    </span>
+                                  )}
+                                  {moduleItem && (
+                                    <span className="text-[9px] font-mono text-zinc-500 hidden sm:inline">
+                                      • {moduleItem.label}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[10.5px] text-zinc-400 truncate mt-0.5">
+                                  {tool.tooltip}
+                                </p>
+                              </div>
+                            </div>
+
+                            {tool.badge !== undefined && (
+                              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/50 text-zinc-400 border border-white/[0.08] shrink-0">
+                                {tool.badge}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-6 px-4 text-center space-y-1.5">
+                      <Search className="w-5 h-5 text-zinc-600 mx-auto" />
+                      <p className="text-xs text-zinc-400">
+                        Nenhuma ferramenta para <strong className="text-zinc-200">"{toolSearchTerm}"</strong>
+                      </p>
+                      <p className="text-[10px] text-zinc-500 font-mono">
+                        Tente termos como "scanner", "dast", "api", "grafo", "compliance" ou pressione ⌘K.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* =========================================================================
+              BLOCO 3: TELEMETRIA, UTILIDADES & AÇÕES (Telemetry & Actions Scope)
+             ========================================================================= */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Risk Score Pill */}
+            <button
+              id="header-workspace-risk-score-badge"
+              type="button"
+              onClick={() => {
+                if (activeTab !== 'dashboard') setActiveTab('dashboard');
+                setTimeout(() => {
+                  const el = document.getElementById('cumulative-risk-validation-section') || 
+                             document.getElementById('metric-card-cumulative-risk-score');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+              }}
+              className="hidden xl:flex items-center gap-1.5 h-8 px-2.5 rounded-lg border font-mono text-[11px] font-bold uppercase transition-all cursor-pointer bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08]"
+              title="Score de Risco do Workspace"
+            >
+              <span className={`w-2 h-2 rounded-full ${
+                (report.metrics.riskScore ?? 0) >= 75 ? 'bg-[#FF3E00]' : (report.metrics.riskScore ?? 0) >= 50 ? 'bg-[#FF7A00]' : 'bg-[#00FF41]'
+              }`} />
+              <span className="text-zinc-400 text-[10px]">Score:</span>
+              <span className="text-white font-mono font-bold">{report.metrics.riskScore ?? 0}/100</span>
+            </button>
+
+            {/* Consolidated Utilities Dropdown ([⚙️ Utilidades ▾]) */}
+            <div className="relative" ref={utilsMenuRef}>
               <button
-                id="btn-header-open-gitignore-audit"
-                onClick={onOpenGitignoreAudit}
-                className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-emerald-300 hover:text-white bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/40 hover:border-emerald-400 transition-all cursor-pointer shadow-xs"
-                title="Auditoria de .gitignore & Práticas de Segurança: Verifique se o repositório possui .gitignore e arquivos sensíveis desprotegidos"
+                id="btn-header-utilities-menu"
+                onClick={() => setIsUtilsMenuOpen(!isUtilsMenuOpen)}
+                className="h-8 px-2.5 rounded-lg inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] hover:border-white/[0.2] transition-all cursor-pointer"
+                title="Utilidades e Ferramentas Auxiliares"
               >
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span className="hidden sm:inline">{t('action.gitignore')}</span>
+                <MoreHorizontal className="w-4 h-4 text-zinc-400" />
+                <span className="hidden xl:inline">{language === 'pt' ? 'Utilidades' : 'Tools'}</span>
+                <ChevronDown className={`w-3 h-3 text-zinc-500 transition-transform ${isUtilsMenuOpen ? 'rotate-180' : ''}`} />
               </button>
-            )}
+
+              {/* Utilities Popover */}
+              {isUtilsMenuOpen && (
+                <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-[#0D0D14]/98 backdrop-blur-2xl border border-white/[0.12] shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-2.5 py-1 text-[10px] font-mono uppercase font-bold text-zinc-400 border-b border-white/[0.08] mb-1">
+                    {language === 'pt' ? 'Recursos & Suporte' : 'Resources & Tools'}
+                  </div>
+
+                  {onOpenToolGuide && (
+                    <button
+                      onClick={() => { onOpenToolGuide(activeTab); setIsUtilsMenuOpen(false); }}
+                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-[#00F0FF]" />
+                      <span>💡 {language === 'pt' ? 'Como Usar & Exemplos' : 'How to Use & Examples'}</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => { onOpenTour(); setIsUtilsMenuOpen(false); }}
+                    className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
+                  >
+                    <Compass className="w-3.5 h-3.5 text-[#FF3E00]" />
+                    <span>{t('action.tutorial')}</span>
+                  </button>
+
+                  {onOpenCommandPalette && (
+                    <button
+                      onClick={() => { onOpenCommandPalette(); setIsUtilsMenuOpen(false); }}
+                      className="w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Command className="w-3.5 h-3.5 text-[#FF3E00]" />
+                        <span>{t('action.commands')}</span>
+                      </div>
+                      <kbd className="text-[9px] px-1 py-0.2 rounded bg-black/40 text-zinc-400 border border-white/10 font-mono">
+                        {isMac ? '⌘K' : 'Ctrl+K'}
+                      </kbd>
+                    </button>
+                  )}
+
+                  {onOpenGlossary && (
+                    <button
+                      onClick={() => { onOpenGlossary(); setIsUtilsMenuOpen(false); }}
+                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>{t('action.glossary')}</span>
+                    </button>
+                  )}
+
+                  {onOpenIgnoreModal && (
+                    <button
+                      onClick={() => { onOpenIgnoreModal(); setIsUtilsMenuOpen(false); }}
+                      className="w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Ban className="w-3.5 h-3.5 text-zinc-400" />
+                        <span>{t('action.exclusions')}</span>
+                      </div>
+                      {activeIgnoreCount !== undefined && (
+                        <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-[#00FF41]/10 text-[#00FF41] border border-[#00FF41]/30">
+                          {activeIgnoreCount}
+                        </span>
+                      )}
+                    </button>
+                  )}
+
+                  {onOpenGitignoreAudit && (
+                    <button
+                      onClick={() => { onOpenGitignoreAudit(); setIsUtilsMenuOpen(false); }}
+                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-emerald-300 hover:text-white cursor-pointer"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{t('action.gitignore')}</span>
+                    </button>
+                  )}
+
+                  {onOpenUrlIngest && (
+                    <button
+                      onClick={() => { onOpenUrlIngest(); setIsUtilsMenuOpen(false); }}
+                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-[#00F0FF] hover:text-white cursor-pointer"
+                    >
+                      <Globe className="w-3.5 h-3.5 text-[#00F0FF]" />
+                      <span>Auditar URL Direta</span>
+                    </button>
+                  )}
+
+                  {onOpenAnalytics && (
+                    <button
+                      onClick={() => { onOpenAnalytics(); setIsUtilsMenuOpen(false); }}
+                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-emerald-300 hover:text-white cursor-pointer"
+                    >
+                      <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Analytics & Telemetria</span>
+                    </button>
+                  )}
+
+                  {onOpenShortcuts && (
+                    <button
+                      onClick={() => { onOpenShortcuts(); setIsUtilsMenuOpen(false); }}
+                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-400 hover:text-white cursor-pointer"
+                    >
+                      <Keyboard className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>Atalhos de Teclado</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => { handleShareLink(); setIsUtilsMenuOpen(false); }}
+                    className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-400 hover:text-white cursor-pointer"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-[#00FF41]" />
+                    <span>Compartilhar Link</span>
+                  </button>
+
+                  <div className="border-t border-white/[0.08] my-1" />
+
+                  <button
+                    onClick={() => { onResetWorkspace(); setIsUtilsMenuOpen(false); }}
+                    className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-400 hover:text-white cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>Restaurar Demo</span>
+                  </button>
+
+                  {onClearWorkspace && (
+                    <button
+                      onClick={() => { onClearWorkspace(); setIsUtilsMenuOpen(false); }}
+                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Limpar Workspace</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Language Switcher */}
+            <LanguageSwitcher />
 
             {/* Export Button */}
             <button
               id="btn-export-report"
               onClick={onOpenExport}
-              className="h-8 px-2.5 sm:px-3 rounded inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-[#0F0F0F] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#444] transition-all cursor-pointer"
-              title={`Exportar Relatório de Segurança (${isMac ? '⌘E' : 'Ctrl+E'})`}
+              className="h-8 px-2.5 sm:px-3 rounded-lg inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] hover:border-white/[0.2] transition-all cursor-pointer"
+              title="Exportar Relatório"
             >
-              <Download className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">{t('action.export')}</span>
-              <kbd className="hidden 2xl:inline-flex items-center text-[9px] font-mono px-1 py-0.2 rounded bg-[#1A1A1A] text-zinc-400 border border-[#333]">
-                {isMac ? '⌘E' : 'Ctrl+E'}
-              </kbd>
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">{t('action.export')}</span>
             </button>
-
-            {/* Keyboard Shortcuts Cheat Sheet Button */}
-            {onOpenShortcuts && (
-              <button
-                id="btn-header-open-shortcuts"
-                onClick={onOpenShortcuts}
-                title={`Atalhos Globais de Teclado (${isMac ? '⌘/' : 'Ctrl+/'} ou ?)`}
-                className="h-8 w-8 rounded flex items-center justify-center text-zinc-400 hover:text-white bg-[#0F0F0F] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#444] transition-colors cursor-pointer shrink-0"
-              >
-                <Keyboard className="w-3.5 h-3.5 text-zinc-400" />
-              </button>
-            )}
-
-            {/* Clear Workspace (Zerar Plataforma) */}
-            {onClearWorkspace && (
-              <button
-                id="btn-header-clear-workspace"
-                onClick={onClearWorkspace}
-                title="Limpar workspace e começar com a plataforma zerada"
-                className="h-8 w-8 rounded flex items-center justify-center text-rose-500/70 hover:text-rose-400 bg-[#0F0F0F] hover:bg-rose-950/40 border border-[#2A2A2A] hover:border-rose-800/60 transition-colors cursor-pointer shrink-0"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
-
-            {/* Reset Workspace */}
-            <button
-              id="btn-reset-demo"
-              onClick={onResetWorkspace}
-              title={`Restaurar arquivos de exemplo (${isMac ? '⌘B' : 'Ctrl+B'})`}
-              className="h-8 w-8 rounded flex items-center justify-center text-[#777] hover:text-white bg-[#0F0F0F] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#444] transition-colors cursor-pointer shrink-0"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Share Site Link with Thumbnail Card Preview */}
-            <button
-              id="btn-header-share-link"
-              onClick={handleShareLink}
-              title={
-                isCopiedShare
-                  ? (language === 'pt' ? 'Link copiado com sucesso!' : 'Link copied to clipboard!')
-                  : (language === 'pt' ? 'Compartilhar link com preview/thumb da imagem (WhatsApp, X, Discord)' : 'Share link with thumbnail card (WhatsApp, X, Discord)')
-              }
-              className={`h-8 px-2.5 rounded flex items-center gap-1.5 text-xs font-mono transition-all cursor-pointer shrink-0 border ${
-                isCopiedShare
-                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/60'
-                  : 'bg-[#0F0F0F] text-zinc-300 hover:text-white hover:bg-[#1A1A1A] border-[#2A2A2A] hover:border-[#00FF41]/40'
-              }`}
-            >
-              {isCopiedShare ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-[10.5px] font-bold text-emerald-300">
-                    {language === 'pt' ? 'Copiado!' : 'Copied!'}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Share2 className="w-3.5 h-3.5 text-[#00FF41]" />
-                  <span className="hidden xl:inline text-[10.5px] font-bold">
-                    {language === 'pt' ? 'Compartilhar' : 'Share'}
-                  </span>
-                </>
-              )}
-            </button>
-
-            {/* Analytics & Visitor Telemetry Button */}
-            {onOpenAnalytics && (
-              <button
-                id="btn-header-open-analytics"
-                onClick={onOpenAnalytics}
-                title={language === 'pt' ? 'Painel de Analytics & Visitantes em Tempo Real' : 'Real-time Analytics & Visitors Dashboard'}
-                className="h-8 px-2.5 rounded flex items-center gap-1.5 text-xs font-mono transition-all cursor-pointer shrink-0 border bg-[#0F0F0F] text-zinc-300 hover:text-white hover:bg-[#1A1A1A] border-[#2A2A2A] hover:border-emerald-500/50"
-              >
-                <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="hidden lg:inline text-[10.5px] font-bold">
-                  Analytics
-                </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              </button>
-            )}
 
             {/* Primary Action: Run Scan */}
             <button
@@ -659,192 +880,22 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onRunScan}
               disabled={isScanning}
               title={`Executar Análise SAST (${isMac ? '⌘S' : 'Ctrl+S'})`}
-              className={`h-8 px-3.5 sm:px-4 rounded inline-flex items-center gap-2 font-mono text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm shrink-0 ${
+              className={`h-8 px-3.5 sm:px-4 rounded-xl inline-flex items-center gap-2 font-mono text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-md shrink-0 ${
                 isScanning
                   ? 'bg-[#262626] text-[#777] cursor-not-allowed border border-[#333]'
-                  : 'bg-white text-black hover:bg-[#FF3E00] hover:text-white hover:border-[#FF3E00] border border-white active:scale-95'
+                  : 'bg-[#FF3E00] hover:bg-[#E03700] text-white active:scale-95 shadow-[0_0_15px_rgba(255,62,0,0.3)]'
               }`}
             >
               <Play className={`w-3 h-3 fill-current ${isScanning ? 'animate-spin' : ''}`} />
-              <span>
+              <span className="whitespace-nowrap">
                 {isScanning 
                   ? `${t('action.scanning')}${scanProgress ? ` (${scanProgress.percentage}%)` : ''}` 
                   : t('action.run_scan')}
               </span>
-              <kbd className="hidden sm:inline-flex items-center text-[9px] font-mono px-1.5 py-0.2 rounded bg-black/10 border border-current/25 font-bold">
-                {isMac ? '⌘S' : 'Ctrl+S'}
-              </kbd>
             </button>
           </div>
+
         </div>
-
-        {/* SecOps Domain Category Selector Ribbon & Fast Search */}
-        <div 
-          id="header-domain-navigation-ribbon"
-          className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 py-2 px-3 my-1.5 rounded-lg bg-[#0A0A0E]/95 border border-[#1E1E26] shadow-sm backdrop-blur-md"
-        >
-          {/* Domain tabs */}
-          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5">
-            {/* Quick Back to Hub when inside a tool */}
-            {activeTab !== 'hub' && (
-              <button
-                id="ribbon-btn-back-to-hub"
-                onClick={() => setActiveTab('hub')}
-                className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-md text-[11px] font-mono font-bold uppercase text-[#00F0FF] hover:text-white bg-[#00F0FF]/10 hover:bg-[#00F0FF]/20 border border-[#00F0FF]/30 hover:border-[#00F0FF] transition-all cursor-pointer shrink-0 mr-1"
-                title="Voltar para a Central de Módulos (Catálogo de Cards)"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Hub</span>
-              </button>
-            )}
-
-            <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400 uppercase font-black tracking-wider shrink-0 mr-1 hidden sm:flex">
-              <span className="text-[#FF3E00]">⚡</span>
-              <span>{language === 'pt' ? 'Módulos:' : language === 'es' ? 'Módulos:' : 'Modules:'}</span>
-            </div>
-            {SECOPS_DOMAINS.map(domain => {
-              const Icon = domain.icon;
-              const isSelected = selectedCategory === domain.id;
-              // Check if currently activeTab belongs to this category when in ALL mode
-              const currentItem = navItems.find(i => i.id === activeTab);
-              const isCurrentTabDomain = currentItem?.category === domain.id;
-
-              return (
-                <button
-                  key={domain.id}
-                  id={`domain-nav-btn-${domain.id.toLowerCase()}`}
-                  onClick={() => handleDomainSelect(domain.id)}
-                  title={`${domain.label} (${domain.count} ${language === 'pt' ? 'módulos' : language === 'es' ? 'módulos' : 'modules'}) - ${language === 'pt' ? 'Clique para navegar' : language === 'es' ? 'Haga clic para navegar' : 'Click to navigate'}`}
-                  className={`flex items-center gap-2 py-1.5 px-3 rounded-md text-[11px] font-mono font-bold tracking-wide uppercase transition-all whitespace-nowrap cursor-pointer shrink-0 border relative group ${
-                    isSelected
-                      ? 'bg-[#181820] text-white border-[#00FF41]/70 shadow-[0_0_12px_rgba(0,255,65,0.2)]'
-                      : isCurrentTabDomain && selectedCategory === 'ALL'
-                      ? 'bg-[#121217] text-zinc-200 border-[#FF3E00]/40 hover:border-[#FF3E00]/70'
-                      : 'bg-[#0E0E12] text-zinc-400 hover:text-zinc-100 hover:bg-[#16161D] border-[#22222B] hover:border-zinc-600'
-                  }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 shrink-0 transition-transform group-hover:scale-110 ${
-                    isSelected 
-                      ? 'text-[#00FF41]' 
-                      : isCurrentTabDomain && selectedCategory === 'ALL'
-                      ? 'text-[#FF3E00]'
-                      : 'text-zinc-500'
-                  }`} />
-                  <span className="tracking-tight">{domain.label}</span>
-                  <span className={`text-[9.5px] font-mono px-1.5 py-0.2 rounded font-black ${
-                    isSelected
-                      ? 'bg-[#00FF41]/20 text-[#00FF41] border border-[#00FF41]/50'
-                      : 'bg-black/50 text-zinc-400 border border-[#272730]'
-                  }`}>
-                    {domain.count}
-                  </span>
-                  {isSelected && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#00FF41] shadow-[0_0_6px_#00FF41] animate-pulse shrink-0 ml-0.5" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Quick Tool Search / Filter */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="relative flex items-center">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 text-zinc-500 pointer-events-none" />
-              <input
-                id="nav-tool-search-input"
-                type="text"
-                value={toolSearchTerm}
-                onChange={(e) => setToolSearchTerm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && visibleNavItems.length > 0) {
-                    setActiveTab(visibleNavItems[0].id);
-                  }
-                }}
-                placeholder={t('nav.search_placeholder')}
-                className="w-44 sm:w-56 h-8 pl-8 pr-7 text-[11px] font-mono bg-[#0D0D10] border border-[#27272A] focus:border-[#FF3E00]/70 rounded text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-[#FF3E00]/50 transition-all"
-              />
-              {toolSearchTerm ? (
-                <button
-                  onClick={() => setToolSearchTerm('')}
-                  className="absolute right-2 text-zinc-400 hover:text-white cursor-pointer"
-                  title="Limpar filtro"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              ) : (
-                <kbd className="hidden sm:inline-block absolute right-2 text-[9px] font-mono px-1 py-0.2 bg-[#1A1A1E] text-zinc-500 border border-zinc-700/50 rounded pointer-events-none">
-                  /
-                </kbd>
-              )}
-            </div>
-            {toolSearchTerm && (
-              <span className="text-[10px] font-mono text-zinc-400 whitespace-nowrap">
-                {visibleNavItems.length} {language === 'pt' ? 'encontrado(s)' : 'found'}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Navigation Tabs Bar (Only shown when inside a specific tool or module, keeping Hub clean) */}
-        {activeTab !== 'hub' && (
-          <nav className="flex items-center gap-1 sm:gap-2 pt-1.5 pb-2 overflow-x-auto no-scrollbar">
-            {/* Tool Guide & Examples Button */}
-            {onOpenToolGuide && (
-              <button
-                id="btn-nav-open-tool-guide"
-                type="button"
-                onClick={() => onOpenToolGuide(activeTab)}
-                className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 text-[11px] font-mono font-bold tracking-wide uppercase whitespace-nowrap transition-all cursor-pointer bg-cyan-950/40 hover:bg-cyan-900/50 text-[#00F0FF] border border-cyan-500/40 hover:border-cyan-400 rounded shrink-0 shadow-xs mr-1"
-                title="Abrir o Manual das Ferramentas com explicações, arquitetura, passo a passo e exemplos de código"
-              >
-                <BookOpen className="w-3.5 h-3.5 text-[#00F0FF] shrink-0" />
-                <span>💡 Como Usar &amp; Exemplos</span>
-              </button>
-            )}
-
-            {visibleNavItems.length === 0 ? (
-              <div className="flex items-center gap-3 py-2 px-3 text-xs font-mono text-zinc-400 bg-[#0F0F12] border border-zinc-800 rounded w-full">
-                <span>Nenhuma ferramenta encontrada com &ldquo;<strong className="text-white">{toolSearchTerm}</strong>&rdquo; no domínio selecionado.</span>
-                <button
-                  onClick={() => { setToolSearchTerm(''); setSelectedCategory('ALL'); }}
-                  className="text-[#FF3E00] hover:underline font-bold cursor-pointer"
-                >
-                  Limpar filtros
-                </button>
-              </div>
-            ) : (
-              visibleNavItems.map(item => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    id={`nav-tab-${item.id}`}
-                    onClick={() => setActiveTab(item.id)}
-                    title={item.tooltip}
-                    className={`flex items-center gap-2 py-2 px-3 rounded text-[11px] font-mono font-bold tracking-wide uppercase whitespace-nowrap transition-all cursor-pointer border ${
-                      isActive
-                        ? 'bg-[#18181B] text-[#FF3E00] border-[#FF3E00]/60 shadow-[0_0_12px_rgba(255,62,0,0.18)] scale-[1.02]'
-                        : 'bg-[#0A0A0C] text-[#888] hover:text-white hover:bg-[#141416] border-[#1E1E24] hover:border-[#383844]'
-                    }`}
-                  >
-                    <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#FF3E00]' : 'text-[#666]'}`} />
-                    <span>{item.label}</span>
-                    {item.badge !== undefined && (
-                      <span className={`text-[9.5px] font-mono px-1.5 py-0.2 rounded font-bold ${
-                        isActive 
-                          ? 'bg-[#FF3E00] text-black font-black' 
-                          : 'text-zinc-400 bg-[#141414] border border-[#2A2A30]'
-                      }`}>
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })
-            )}
-          </nav>
-        )}
       </div>
     </header>
   );

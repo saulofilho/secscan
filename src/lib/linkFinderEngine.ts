@@ -34,14 +34,28 @@ const HTTP_METHOD_CONTEXTS: Array<{ method: ApiEndpointFinding['method']; regex:
 ];
 
 /**
- * Extracts line number and snippet from content and match index
+ * Extracts line number and bounded snippet from content and match index
  */
 function getLineInfo(content: string, index: number): { line: number; snippet: string } {
-  const upToIndex = content.substring(0, index);
-  const lines = upToIndex.split('\n');
-  const line = lines.length;
-  const allLines = content.split('\n');
-  const snippet = (allLines[line - 1] || '').trim();
+  let line = 1;
+  let lineStart = 0;
+  const safeIndex = Math.min(index, content.length);
+
+  for (let i = 0; i < safeIndex; i++) {
+    if (content[i] === '\n') {
+      line++;
+      lineStart = i + 1;
+    }
+  }
+
+  let lineEnd = content.indexOf('\n', safeIndex);
+  if (lineEnd === -1) lineEnd = content.length;
+
+  let snippet = content.substring(lineStart, lineEnd).trim();
+  if (snippet.length > 250) {
+    snippet = snippet.substring(0, 247) + '...';
+  }
+
   return { line, snippet };
 }
 
@@ -226,6 +240,7 @@ export function extractLinkFinderEndpoints(filePath: string, content: string): A
   LINKFINDER_REGEX.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = LINKFINDER_REGEX.exec(content)) !== null) {
+    if (results.length >= 60) break;
     const rawMatch = (match[1] || '').trim();
     if (!rawMatch || rawMatch.length < 2) continue;
 

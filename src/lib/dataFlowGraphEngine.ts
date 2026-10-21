@@ -64,32 +64,53 @@ const SINK_TAXONOMY: Record<
   }
 };
 
+const ALLOWED_CODE_EXTENSIONS = new Set(['js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs', 'py', 'php', 'rb', 'go']);
+
 /**
- * Extracts functions from source code with line ranges and body content
+ * Extracts functions from source code with line ranges and body content safely
  */
 export function extractFunctionsFromSource(file: ScannedFile): ExtractedFunction[] {
   const content = file.content;
   if (!content) return [];
 
+  // 1. Skip non-code files (HTML, JSON, markdown, styles, etc.) to prevent expensive parsing stalls
+  const fileName = (file.name || '').toLowerCase();
+  const ext = fileName.split('.').pop() || '';
+  if (!ALLOWED_CODE_EXTENSIONS.has(ext)) {
+    return [];
+  }
+
   const lines = content.split('\n');
   const functions: ExtractedFunction[] = [];
+
+  // Minified file heuristic: very long single lines or few lines for massive content
+  const isMinified = lines.length <= 5 && content.length > 30000;
+  const maxFunctionsToExtract = isMinified ? 12 : 30;
 
   // Patterns for function declarations and methods
   const FUNCTION_HEADER_PATTERNS = [
     // async function name(...) or function name(...)
-    /(?:async\s+)?function\s+([a-zA-Z0-9_$]+)\s*\(([^)]*)\)/g,
+    /(?:async\s+)?function\s+([a-zA-Z0-9_$]{2,40})\s*\(([^)]*)\)/g,
     // const/let/var name = async (...) => or name = (...) =>
-    /(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?(?:\(([^)]*)\)|[a-zA-Z0-9_$]+)\s*=>/g,
+    /(?:const|let|var)\s+([a-zA-Z0-9_$]{2,40})\s*=\s*(?:async\s*)?(?:\(([^)]*)\)|[a-zA-Z0-9_$]{2,40})\s*=>/g,
     // const/let/var name = async function(...)
-    /(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?function\s*\(([^)]*)\)/g,
-    // static async methodName(...) or async methodName(...) or methodName(...) inside class
-    /(?:static\s+)?(?:async\s+)?([a-zA-Z0-9_$]+)\s*\(([^)]*)\)\s*\{/g,
+    /(?:const|let|var)\s+([a-zA-Z0-9_$]{2,40})\s*=\s*(?:async\s*)?function\s*\(([^)]*)\)/g,
+    // static async methodName(...) or async methodName(...)
+    /(?:static\s+)?(?:async\s+)?([a-zA-Z0-9_$]{2,40})\s*\(([^)]*)\)\s*\{/g,
     // router.post('/path', async (req, res) => ...)
     /(?:router|app)\.(get|post|put|delete|patch)\s*\(\s*['"`]([^'"`]+)['"`]/g
   ];
 
-  for (let i = 0; i < lines.length; i++) {
-    const lineText = lines[i];
+  const maxLinesToScan = Math.min(lines.length, 3000);
+
+  for (let i = 0; i < maxLinesToScan; i++) {
+    if (functions.length >= maxFunctionsToExtract) break;
+
+    let lineText = lines[i];
+    // Safeguard for minified code: truncate long lines to 800 chars for regex scanning
+    if (lineText.length > 800) {
+      lineText = lineText.substring(0, 800);
+    }
 
     // Check for route handler: router.post('/path', ...)
     const routeMatch = /(?:router|app)\.(get|post|put|delete|patch)\s*\(\s*['"`]([^'"`]+)['"`]/i.exec(lineText);
@@ -98,7 +119,7 @@ export function extractFunctionsFromSource(file: ScannedFile): ExtractedFunction
       const routePath = routeMatch[2];
       const fnName = `RouteHandler: ${method} ${routePath}`;
       const startLine = i + 1;
-      const { endLine, body } = estimateFunctionBlock(lines, i);
+      const { endLine, body } = estimateFunctionBlock(lines, i, isMinified);
 
       functions.push({
         id: `fn-${file.path}-${startLine}-${functions.length}`,
@@ -106,7 +127,7 @@ export function extractFunctionsFromSource(file: ScannedFile): ExtractedFunction
         file: file.path,
         startLine,
         endLine,
-        snippet: lineText.trim(),
+        snippet: lineText.trim().substring(0, 200),
         body,
         isAsync: lineText.includes('async'),
         calls: extractCallsFromBody(body)
@@ -120,8 +141,8 @@ export function extractFunctionsFromSource(file: ScannedFile): ExtractedFunction
       const match = pattern.exec(lineText);
       if (match && match[1]) {
         const fnName = match[1];
-        // Skip common keywords mistakenly captured
-        if (['if', 'for', 'while', 'switch', 'catch', 'constructor'].includes(fnName)) {
+        // Skip common keywords mistakenly captured or 1-character minified tokens
+        if (fnName.length < 2 || ['if', 'for', 'while', 'switch', 'catch', 'constructor'].includes(fnName)) {
           continue;
         }
 
@@ -131,7 +152,7 @@ export function extractFunctionsFromSource(file: ScannedFile): ExtractedFunction
           continue;
         }
 
-        const { endLine, body } = estimateFunctionBlock(lines, i);
+        const { endLine, body } = estimateFunctionBlock(lines, i, isMinified);
 
         functions.push({
           id: `fn-${file.path}-${startLine}-${fnName}`,
@@ -139,7 +160,7 @@ export function extractFunctionsFromSource(file: ScannedFile): ExtractedFunction
           file: file.path,
           startLine,
           endLine,
-          snippet: lineText.trim(),
+          snippet: lineText.trim().substring(0, 200),
           body,
           isAsync: lineText.includes('async'),
           calls: extractCallsFromBody(body)
@@ -153,16 +174,25 @@ export function extractFunctionsFromSource(file: ScannedFile): ExtractedFunction
 }
 
 /**
- * Estimates the closing line of a function block by counting braces
+ * Estimates the closing line of a function block by counting braces safely
  */
-function estimateFunctionBlock(lines: string[], startIdx: number): { endLine: number; body: string } {
+function estimateFunctionBlock(lines: string[], startIdx: number, isMinified = false): { endLine: number; body: string } {
+  if (isMinified) {
+    const rawLine = lines[startIdx] || '';
+    return { endLine: startIdx + 1, body: rawLine.substring(0, 600) };
+  }
+
   let openBraces = 0;
   let hasOpened = false;
   let endIdx = startIdx;
+  const maxScanLines = Math.min(lines.length, startIdx + 120);
 
-  for (let i = startIdx; i < lines.length; i++) {
+  for (let i = startIdx; i < maxScanLines; i++) {
     const line = lines[i];
-    for (const ch of line) {
+    const scanLimit = Math.min(line.length, 500);
+
+    for (let c = 0; c < scanLimit; c++) {
+      const ch = line[c];
       if (ch === '{') {
         openBraces++;
         hasOpened = true;
@@ -175,27 +205,22 @@ function estimateFunctionBlock(lines: string[], startIdx: number): { endLine: nu
       endIdx = i;
       break;
     }
-
-    // Safeguard: Max function size 300 lines
-    if (i - startIdx > 300) {
-      endIdx = i;
-      break;
-    }
   }
 
-  const body = lines.slice(startIdx, endIdx + 1).join('\n');
+  const body = lines.slice(startIdx, Math.min(endIdx + 1, startIdx + 60)).join('\n').substring(0, 2500);
   return { endLine: endIdx + 1, body };
 }
 
 /**
- * Extracts calls to other functions or API clients from function body
+ * Extracts calls to other functions or API clients from function body safely
  */
 function extractCallsFromBody(body: string): string[] {
   const calls: Set<string> = new Set();
-  const callRegex = /\b([a-zA-Z0-9_$]{2,40})\s*\(/g;
+  const boundedBody = body.substring(0, 2000);
+  const callRegex = /\b([a-zA-Z0-9_$]{3,35})\s*\(/g;
   let m: RegExpExecArray | null;
 
-  while ((m = callRegex.exec(body)) !== null) {
+  while ((m = callRegex.exec(boundedBody)) !== null && calls.size < 15) {
     const called = m[1];
     if (
       !['if', 'for', 'while', 'switch', 'catch', 'return', 'require', 'import', 'console', 'log'].includes(called)
@@ -216,7 +241,8 @@ export function buildDataFlowGraph(
   apiEndpoints: ApiEndpointFinding[],
   dangerousSinks: DangerousSinkFinding[]
 ): DataFlowGraphData {
-  const activeFiles = files.filter(f => !f.isIgnored);
+  try {
+    const activeFiles = files.filter(f => !f.isIgnored);
   const nodesMap: Map<string, DataFlowNode> = new Map();
   const links: DataFlowLink[] = [];
 
@@ -392,11 +418,17 @@ export function buildDataFlowGraph(
   }
 
   // 7. Connect Inter-Function calls (e.g. renderUserProfile calls fetchPortalMetadata)
+  // Bounded check: never compare 1-2 char names, max 40 links to prevent dense graph explosions
+  const maxInterLinks = 40;
+  let interLinksCreated = 0;
   for (const fnA of allFunctions) {
+    if (interLinksCreated >= maxInterLinks) break;
     for (const fnB of allFunctions) {
+      if (interLinksCreated >= maxInterLinks) break;
       if (fnA.id !== fnB.id && fnA.file === fnB.file) {
-        if (fnA.calls.includes(fnB.name) || fnA.body.includes(fnB.name)) {
+        if (fnB.name && fnB.name.length >= 3 && fnA.calls.includes(fnB.name)) {
           addLink(fnB.id, fnA.id, 'CONSUMER_TO_SINK', false, fnA.file, 'Data Invocation');
+          interLinksCreated++;
         }
       }
     }
@@ -466,13 +498,22 @@ export function buildDataFlowGraph(
   const taintFlows: TaintVariableFlow[] = [];
   const registeredFlowKeys = new Set<string>();
 
+  // Limit BFS breadth and depth to guarantee instant execution
+  const MAX_TAINT_FLOWS = 20;
+  const MAX_BFS_DEPTH = 5;
+
   for (const epNode of endpointNodes) {
+    if (taintFlows.length >= MAX_TAINT_FLOWS) break;
+
     const visitedInThisBfs: Set<string> = new Set();
     const queue: Array<{ current: string; path: string[] }> = [{ current: epNode.id, path: [epNode.id] }];
 
-    while (queue.length > 0) {
+    while (queue.length > 0 && queue.length < 80) {
+      if (taintFlows.length >= MAX_TAINT_FLOWS) break;
       const { current, path } = queue.shift()!;
       reachableFromEndpoint.add(current);
+
+      if (path.length >= MAX_BFS_DEPTH) continue;
 
       const targetNeighbors = adjacency.get(current) || [];
       for (const next of targetNeighbors) {
@@ -586,17 +627,33 @@ export function buildDataFlowGraph(
   // Metrics
   const criticalSinksCount = sinkNodes.filter(s => s.severity === 'CRITICAL' || s.tainted).length;
 
-  return {
-    nodes: finalNodes,
-    links,
-    taintFlows,
-    metrics: {
-      totalEndpoints: endpointNodes.length,
-      totalConsumers: consumerNodes.length,
-      totalSinks: sinkNodes.length,
-      totalTaintFlows: taintFlows.length > 0 ? taintFlows.length : totalTaintFlows,
-      criticalSinksCount,
-      filesAnalyzed: activeFiles.length
-    }
-  };
+    return {
+      nodes: finalNodes,
+      links,
+      taintFlows,
+      metrics: {
+        totalEndpoints: endpointNodes.length,
+        totalConsumers: consumerNodes.length,
+        totalSinks: sinkNodes.length,
+        totalTaintFlows: taintFlows.length > 0 ? taintFlows.length : totalTaintFlows,
+        criticalSinksCount,
+        filesAnalyzed: activeFiles.length
+      }
+    };
+  } catch (err) {
+    console.warn('Safe fallback in buildDataFlowGraph:', err);
+    return {
+      nodes: [],
+      links: [],
+      taintFlows: [],
+      metrics: {
+        totalEndpoints: apiEndpoints.length,
+        totalConsumers: 0,
+        totalSinks: dangerousSinks.length,
+        totalTaintFlows: 0,
+        criticalSinksCount: dangerousSinks.filter(s => s.severity === 'CRITICAL').length,
+        filesAnalyzed: files.length
+      }
+    };
+  }
 }

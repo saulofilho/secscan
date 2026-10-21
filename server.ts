@@ -814,11 +814,16 @@ Responda ESTRITAMENTE em formato JSON com o seguinte formato, sem markdown ou fe
       // 2. Main response file (HTML or JSON)
       const isJson = contentType.includes('json') || targetUrl.endsWith('.json');
       const mainFileName = isJson ? 'api-response.json' : 'website-index.html';
+      const boundedText = text.slice(0, 200000);
+      const safeContent = (!isJson && (!boundedText.includes('\n') || boundedText.indexOf('\n') > 800))
+        ? boundedText.replace(/>\s*</g, '>\n<').slice(0, 200000)
+        : boundedText;
+
       files.push({
         name: mainFileName,
         path: isJson ? 'api/response.json' : 'index.html',
-        content: text,
-        size: Buffer.byteLength(text, 'utf8'),
+        content: safeContent,
+        size: Buffer.byteLength(safeContent, 'utf8'),
         extension: isJson ? 'json' : 'html',
         lastModified: now
       });
@@ -861,7 +866,10 @@ Responda ESTRITAMENTE em formato JSON com o seguinte formato, sem markdown ou fe
             const sText = await sRes.text();
             const sName = path.basename(new URL(absScriptUrl).pathname) || `bundle-${i + 1}.js`;
             const cleanName = sName.endsWith('.js') ? sName : `${sName}.js`;
-            const truncated = sText.slice(0, 250000);
+            let truncated = sText.slice(0, 120000);
+            if (!truncated.includes('\n') || truncated.indexOf('\n') > 800) {
+              truncated = truncated.replace(/;(?=[a-zA-Z0-9_$])/g, ';\n').slice(0, 120000);
+            }
             files.push({
               name: cleanName,
               path: `scripts/${cleanName}`,

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { ScannedFile } from '../types';
 import { useLanguage } from '../lib/i18nContext';
+import { useToast } from '../lib/toastContext';
 
 interface UrlIngestModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export const UrlIngestModal: React.FC<UrlIngestModalProps> = ({
   onIngestSuccess
 }) => {
   const { language } = useLanguage();
+  const toast = useToast();
   const [targetUrl, setTargetUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -61,7 +63,9 @@ export const UrlIngestModal: React.FC<UrlIngestModalProps> = ({
   const handleStartAudit = async (urlToScan?: string) => {
     const rawUrl = urlToScan || targetUrl;
     if (!rawUrl || !rawUrl.trim()) {
-      setErrorMessage(language === 'en' ? 'Please provide a valid website or API URL.' : 'Por favor, informe a URL do site ou da API.');
+      const msg = language === 'en' ? 'Please provide a valid website or API URL.' : 'Por favor, informe a URL do site ou da API.';
+      setErrorMessage(msg);
+      toast.warning(msg, { title: 'URL do Alvo Obrigatória' });
       return;
     }
 
@@ -99,21 +103,31 @@ export const UrlIngestModal: React.FC<UrlIngestModalProps> = ({
       }
 
       setProgressStep(language === 'en' ? '✓ Ingestion complete! Loading workspace...' : '✓ Ingestão concluída! Carregando workspace...');
+      toast.success(
+        language === 'en'
+          ? `Audited ${formattedUrl} (${data.files?.length || 0} files extracted).`
+          : `Alvo ${formattedUrl} auditado com sucesso (${data.files?.length || 0} arquivos gerados).`,
+        { title: 'Auditoria de URL Concluída' }
+      );
 
       setTimeout(() => {
         setIsLoading(false);
         onIngestSuccess(data.files, formattedUrl);
         onClose();
-      }, 600);
+      }, 500);
     } catch (err: any) {
       setIsLoading(false);
       setProgressStep(null);
-      setErrorMessage(
-        err.message || 
+      const detailMsg = err.message || 
         (language === 'en' 
           ? 'Unable to reach the specified URL. Please verify that the target is online and publicly reachable.' 
-          : 'Não foi possível alcançar a URL especificada. Verifique se o site está online e acessível publicamente.')
-      );
+          : 'Não foi possível alcançar a URL especificada. Verifique se o site está online e acessível publicamente.');
+
+      setErrorMessage(detailMsg);
+      toast.error(detailMsg, {
+        title: 'Erro na Auditoria de URL',
+        details: `Alvo: ${formattedUrl}\nCausa: ${err?.stack || err?.message || 'Host inacessível ou timeout de rede.'}`
+      });
     }
   };
 

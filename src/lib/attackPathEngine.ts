@@ -144,12 +144,21 @@ export function computeAttackPaths(
   const registeredPathKeys = new Set<string>();
 
   // 3. Find Graph Traversal Paths from Endpoints to Sinks/Sensitive Nodes
+  const MAX_ATTACK_PATHS = 12;
+  const MAX_PATH_DEPTH = 5;
+
   for (const epNode of endpointNodes) {
+    if (attackPaths.length >= MAX_ATTACK_PATHS) break;
+
     const queue: Array<{ current: string; path: string[] }> = [{ current: epNode.id, path: [epNode.id] }];
     const visited = new Set<string>([epNode.id]);
 
-    while (queue.length > 0) {
+    while (queue.length > 0 && queue.length < 60) {
+      if (attackPaths.length >= MAX_ATTACK_PATHS) break;
+
       const { current, path } = queue.shift()!;
+      if (path.length >= MAX_PATH_DEPTH) continue;
+
       const neighbors = adjacency.get(current) || [];
 
       for (const next of neighbors) {

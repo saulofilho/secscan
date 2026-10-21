@@ -86,6 +86,7 @@ import { AppModulesHub } from './components/AppModulesHub';
 import { sendAnalyticsEvent, recordLocalTabSessionActivity, recordSecurityAuditLog } from './lib/analyticsTracker';
 import { auditGitignoreSecurity } from './lib/gitignoreAuditor';
 import { useLanguage } from './lib/i18nContext';
+import { useToast } from './lib/toastContext';
 
 import { DEFAULT_RULES } from './lib/defaultRules';
 import { SAMPLE_FILES } from './lib/sampleFiles';
@@ -111,6 +112,7 @@ export interface NoticeDetailItem {
 
 export default function App() {
   const { language } = useLanguage();
+  const toast = useToast();
   const [currentView, setCurrentView] = useState<'landing' | 'app'>('landing');
   const [activeTab, setActiveTab] = useState<string>('hub');
   const [files, setFiles] = useState<ScannedFile[]>([]);
@@ -648,8 +650,12 @@ export default function App() {
           return updated.slice(-10);
         });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error in executeScan:', err);
+      toast.error(err?.message || 'Falha durante o processamento de análise estática.', {
+        title: 'Erro na Varredura SAST',
+        details: err?.stack || String(err)
+      });
     } finally {
       if (activeScanSequenceRef.current === currentSeq) {
         setIsScanning(false);
@@ -719,6 +725,11 @@ export default function App() {
     setCurrentView('app');
     setActiveTab('scanner');
 
+    toast.info(
+      `Alvo ${targetUrl} carregado no workspace (${ingestedFiles.length} arquivos). Análise estática iniciada.`,
+      { title: 'Workspace Atualizado' }
+    );
+
     executeScan(ingestedFiles, rules, ignorePatterns);
 
     const logEvent: AuditLogEvent = {
@@ -730,7 +741,7 @@ export default function App() {
       details: { action: 'URL_INGEST', targetUrl, filesCount: ingestedFiles.length }
     };
     setAuditLogs(prev => [logEvent, ...prev].slice(0, 80));
-  }, [rules, ignorePatterns, executeScan]);
+  }, [rules, ignorePatterns, executeScan, toast]);
 
   const handleToggleIgnorePattern = (id: string) => {
     const updated = ignorePatterns.map(p => p.id === id ? { ...p, enabled: !p.enabled } : p);
