@@ -41,7 +41,8 @@ import {
   Check, 
   AlertTriangle,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
 import { ScanReport, ScannedFile, ScanProgress } from '../types';
 import { useLanguage } from '../lib/i18nContext';
@@ -743,18 +744,52 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
               id="hub-btn-run-full-scan"
               onClick={onRunScan}
               disabled={isScanning}
-              className={`h-10 px-4 rounded-xl inline-flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_20px_rgba(255,62,0,0.25)] ${
+              className={`relative overflow-hidden h-10 px-4 rounded-xl inline-flex items-center gap-2.5 font-mono text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(255,62,0,0.25)] ${
                 isScanning
-                  ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
-                  : 'bg-[#FF3E00] hover:bg-[#E03700] text-white active:scale-95'
+                  ? 'bg-zinc-950/90 text-zinc-100 border border-[#00F0FF]/50 shadow-[0_0_25px_rgba(0,240,255,0.25)] cursor-wait select-none'
+                  : 'bg-gradient-to-r from-[#FF3E00] via-[#FF551C] to-[#E03700] hover:from-[#FF551C] hover:to-[#FF3E00] text-white border border-[#FF3E00]/80 hover:shadow-[0_0_30px_rgba(255,62,0,0.55)] cursor-pointer active:scale-95 group'
               }`}
-              title="Executar varredura completa de todos os módulos"
+              title={
+                isScanning
+                  ? (scanProgress ? `Progresso: ${scanProgress.percentage}% - ${scanProgress.phaseLabel || 'Analisando...'}` : 'Varredura em andamento...')
+                  : (language === 'pt' ? 'Executar varredura completa de todos os módulos' : language === 'es' ? 'Ejecutar escaneo completo de todos los módulos' : 'Run full scan across all modules')
+              }
             >
-              <Play className={`w-3.5 h-3.5 fill-current ${isScanning ? 'animate-spin' : ''}`} />
-              <span>
-                {isScanning 
-                  ? (scanProgress ? `Escaneando (${scanProgress.percentage}%)` : 'Escaneando...') 
-                  : (language === 'pt' ? 'Scan Completo' : language === 'es' ? 'Escaneo Total' : 'Run Full Scan')}
+              {isScanning && (
+                <>
+                  {/* Real-time fluid progress bar fill */}
+                  <span
+                    className="absolute inset-0 bg-gradient-to-r from-[#00F0FF]/20 via-[#FF3E00]/25 to-[#00F0FF]/25 transition-all duration-300 ease-out pointer-events-none"
+                    style={{ width: `${Math.min(100, Math.max(4, scanProgress?.percentage ?? 0))}%` }}
+                  />
+                  {/* Crisp bottom neon track indicator */}
+                  <span
+                    className="absolute bottom-0 left-0 h-[2px] bg-gradient-to-r from-[#00F0FF] via-[#FF3E00] to-[#00F0FF] transition-all duration-300 ease-out shadow-[0_0_8px_#00F0FF] pointer-events-none"
+                    style={{ width: `${Math.min(100, Math.max(4, scanProgress?.percentage ?? 0))}%` }}
+                  />
+                </>
+              )}
+
+              <span className="relative z-10 flex items-center gap-2">
+                {isScanning ? (
+                  <Loader2 className="w-3.5 h-3.5 text-[#00F0FF] animate-spin shrink-0" />
+                ) : (
+                  <Play className="w-3.5 h-3.5 fill-current text-white group-hover:scale-110 transition-transform shrink-0" />
+                )}
+
+                <span>
+                  {isScanning 
+                    ? (scanProgress ? `Escaneando (${scanProgress.percentage}%)` : 'Escaneando...') 
+                    : (language === 'pt' ? 'Scan Completo' : language === 'es' ? 'Escaneo Total' : 'Run Full Scan')}
+                </span>
+
+                {isScanning && scanProgress?.percentage === 100 && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-ping" />
+                )}
+
+                {!isScanning && (
+                  <span className="hidden sm:inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
+                )}
               </span>
             </button>
 

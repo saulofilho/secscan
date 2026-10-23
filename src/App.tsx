@@ -492,6 +492,14 @@ export default function App() {
     }
     lastScanWorkspaceBytesRef.current = currentWorkspaceBytes;
 
+    const watchdogTimer = setTimeout(() => {
+      if (activeScanSequenceRef.current === currentSeq) {
+        console.warn('Scan watchdog timer reached - auto-unlocking scan state');
+        setIsScanning(false);
+        setScanProgress(null);
+      }
+    }, 10000);
+
     try {
       const result = await scanSourceFilesAsync(
         targetFiles, 
@@ -532,8 +540,15 @@ export default function App() {
         details: err?.stack || String(err)
       });
     } finally {
+      clearTimeout(watchdogTimer);
       if (activeScanSequenceRef.current === currentSeq) {
         setIsScanning(false);
+        // Give UI 1.2s to show 100% completed badge before clearing scanProgress bar
+        setTimeout(() => {
+          if (activeScanSequenceRef.current === currentSeq) {
+            setScanProgress(null);
+          }
+        }, 1200);
       }
     }
   }, [ignorePatterns]);

@@ -935,7 +935,9 @@ function assembleScanReport(
   allJwtTokens: JwtTokenFinding[],
   allDependencies: BundledDependencyFinding[],
   allDangerousSinks: DangerousSinkFinding[],
-  onLog?: (event: AuditLogEvent) => void
+  onLog?: (event: AuditLogEvent) => void,
+  precomputedDataFlowGraph?: DataFlowGraphData,
+  precomputedIastReport?: any
 ): ScanReport {
   // Construct JS Miner Results
   const jsMiner: JsMinerResults = {
@@ -953,7 +955,7 @@ function assembleScanReport(
   };
 
   // 3. Data Flow Graph Engine: Map endpoints -> consumer functions -> dangerous sinks
-  const dataFlowGraph = buildDataFlowGraph(files, apiEndpoints, allDangerousSinks);
+  const dataFlowGraph = precomputedDataFlowGraph || buildDataFlowGraph(files, apiEndpoints, allDangerousSinks);
 
   // Calculate Metrics
   const criticalCount = findings.filter(f => f.severity === 'CRITICAL').length;
@@ -999,12 +1001,14 @@ function assembleScanReport(
   const maxRiskScore = findings.reduce((max, curr) => Math.max(max, curr.riskScore ?? 0), 0);
 
   // Run IAST runtime emulation to track runtime dataflow and detect vulnerabilities visible during execution
-  let iastReport: any;
-  try {
-    iastReport = runIastRuntimeEmulation(files, INITIAL_IAST_HOOKS, undefined, allDangerousSinks, apiEndpoints);
-  } catch (e) {
-    console.warn('Fallback in IAST runtime emulation:', e);
-    iastReport = runIastRuntimeEmulation([], INITIAL_IAST_HOOKS);
+  let iastReport: any = precomputedIastReport;
+  if (!iastReport) {
+    try {
+      iastReport = runIastRuntimeEmulation(files, INITIAL_IAST_HOOKS, undefined, allDangerousSinks, apiEndpoints);
+    } catch (e) {
+      console.warn('Fallback in IAST runtime emulation:', e);
+      iastReport = runIastRuntimeEmulation([], INITIAL_IAST_HOOKS);
+    }
   }
 
   const durationMs = Math.max(1, Math.round(performance.now() - startTime));
@@ -1347,8 +1351,17 @@ export async function scanSourceFilesAsync(
     }
   }
 
+  // Safe progress emitter so listener errors cannot crash scan execution
+  const emitProgress = (progressData: ScanProgress) => {
+    try {
+      onProgress?.(progressData);
+    } catch (err) {
+      console.warn('Scan progress listener error caught safely:', err);
+    }
+  };
+
   // Phase: LinkFinder & JS Miner (88%)
-  onProgress?.({
+  emitProgress({
     percentage: 88,
     currentFileIndex: files.length,
     totalFiles: files.length,
@@ -1361,13 +1374,10 @@ export async function scanSourceFilesAsync(
     ignoredCount,
     elapsedMs: Math.round(performance.now() - startTime)
   });
-
-  if (files.length <= 15) {
-    await new Promise(r => setTimeout(r, 35));
-  }
+  await new Promise(r => setTimeout(r, 20));
 
   // Phase: Data Flow Graph (92%)
-  onProgress?.({
+  emitProgress({
     percentage: 92,
     currentFileIndex: files.length,
     totalFiles: files.length,
@@ -1380,13 +1390,18 @@ export async function scanSourceFilesAsync(
     ignoredCount,
     elapsedMs: Math.round(performance.now() - startTime)
   });
+  await new Promise(r => setTimeout(r, 20));
 
-  if (files.length <= 15) {
-    await new Promise(r => setTimeout(r, 30));
+  // Safely compute Data Flow Graph with zero UI block
+  let computedDataFlowGraph: DataFlowGraphData | undefined;
+  try {
+    computedDataFlowGraph = buildDataFlowGraph(files, apiEndpoints, allDangerousSinks);
+  } catch (err) {
+    console.warn('Non-fatal error in buildDataFlowGraph:', err);
   }
 
   // Phase: IAST Runtime Emulation (95%)
-  onProgress?.({
+  emitProgress({
     percentage: 95,
     currentFileIndex: files.length,
     totalFiles: files.length,
@@ -1399,13 +1414,18 @@ export async function scanSourceFilesAsync(
     ignoredCount,
     elapsedMs: Math.round(performance.now() - startTime)
   });
+  await new Promise(r => setTimeout(r, 20));
 
-  if (files.length <= 15) {
-    await new Promise(r => setTimeout(r, 30));
+  // Safely compute IAST Runtime Emulation
+  let computedIastReport: any;
+  try {
+    computedIastReport = runIastRuntimeEmulation(files, INITIAL_IAST_HOOKS, undefined, allDangerousSinks, apiEndpoints);
+  } catch (err) {
+    console.warn('Non-fatal error in runIastRuntimeEmulation:', err);
   }
 
   // Phase: Finalizing metrics (98%)
-  onProgress?.({
+  emitProgress({
     percentage: 98,
     currentFileIndex: files.length,
     totalFiles: files.length,
@@ -1418,9 +1438,7 @@ export async function scanSourceFilesAsync(
     ignoredCount,
     elapsedMs: Math.round(performance.now() - startTime)
   });
-
-  // Yield to browser execution cycle so UI paints and does not lock
-  await new Promise(r => setTimeout(r, 25));
+  await new Promise(r => setTimeout(r, 20));
 
   let report: ScanReport;
   try {
@@ -1437,7 +1455,9 @@ export async function scanSourceFilesAsync(
       allJwtTokens,
       allDependencies,
       allDangerousSinks,
-      onLog
+      onLog,
+      computedDataFlowGraph,
+      computedIastReport
     );
   } catch (err: any) {
     console.error('Safe fallback during assembleScanReport:', err);
@@ -1459,7 +1479,7 @@ export async function scanSourceFilesAsync(
         dangerousSinks: allDangerousSinks,
         totalAssetsCount: allSourceMaps.length + allCloudBuckets.length + allJwtTokens.length
       },
-      dataFlowGraph: {
+      dataFlowGraph: computedDataFlowGraph || {
         nodes: [],
         links: [],
         taintFlows: [],
@@ -1472,7 +1492,7 @@ export async function scanSourceFilesAsync(
           filesAnalyzed: files.length
         }
       },
-      iastReport: runIastRuntimeEmulation([], INITIAL_IAST_HOOKS),
+      iastReport: computedIastReport || runIastRuntimeEmulation([], INITIAL_IAST_HOOKS),
       opaCompliance: {
         timestamp: new Date().toISOString(),
         totalPolicies: 0,
@@ -1528,7 +1548,7 @@ export async function scanSourceFilesAsync(
   }
 
   // Phase: Completed (100%) - Guaranteed
-  onProgress?.({
+  emitProgress({
     percentage: 100,
     currentFileIndex: files.length,
     totalFiles: files.length,
@@ -1541,6 +1561,7 @@ export async function scanSourceFilesAsync(
     ignoredCount,
     elapsedMs: report.durationMs
   });
+  await new Promise(r => setTimeout(r, 20));
 
   return report;
 }
