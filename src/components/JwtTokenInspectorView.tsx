@@ -32,8 +32,8 @@ interface JwtTokenInspectorViewProps {
 export const JwtTokenInspectorView: React.FC<JwtTokenInspectorViewProps> = ({
   onNavigateToScanner
 }) => {
-  const [selectedSampleIndex, setSelectedSampleIndex] = useState<number>(0);
-  const [tokenInput, setTokenInput] = useState<string>(() => SAMPLE_TOKENS[0].token);
+  const [selectedSampleIndex, setSelectedSampleIndex] = useState<number>(-1);
+  const [tokenInput, setTokenInput] = useState<string>('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Tamper state
@@ -76,6 +76,20 @@ export const JwtTokenInspectorView: React.FC<JwtTokenInspectorViewProps> = ({
 
   return (
     <div className="space-y-6 animate-fadeIn pb-12">
+      {/* Testing Context Banner */}
+      <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-violet-500/10 border border-violet-500/25 text-xs text-violet-200">
+        <div className="flex items-center gap-2.5">
+          <Info className="w-4 h-4 text-violet-400 shrink-0" />
+          <span>
+            <strong className="text-violet-300 font-bold uppercase font-mono mr-1.5">[Contexto: Utilitário / Sandbox de Teste]</strong>
+            Este módulo analisa tokens JWT fornecidos interativamente para testes criptográficos e validação RFC 7519. Ele não insere nem inventa falhas no seu código-fonte.
+          </span>
+        </div>
+        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-violet-950/70 text-violet-300 border border-violet-700/50 uppercase shrink-0 hidden sm:inline">
+          Ambiente Interativo
+        </span>
+      </div>
+
       {/* Top Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-xl bg-[#0F0F0F] border border-[#222]">
         <div className="flex items-start gap-4">

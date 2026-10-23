@@ -129,6 +129,19 @@ const ESCALATION_VECTORS: { actions: string[]; title: string; desc: string; cwe:
 ];
 
 export function auditIamPolicy(policyString: string, policyName: string = 'AWS-IAM-Policy'): IamAuditReport {
+  if (!policyString || !policyString.trim()) {
+    return {
+      policyName: 'Nenhuma Política',
+      riskScore: 100,
+      posture: 'HARDENED',
+      findings: [],
+      wildcardActionsDetected: [],
+      wildcardResourcesDetected: [],
+      privilegeEscalationVectors: [],
+      leastPrivilegePolicySnippet: '// Cole uma política IAM para gerar a versão com privilégio mínimo.'
+    };
+  }
+
   let parsed: any;
   try {
     parsed = JSON.parse(policyString);

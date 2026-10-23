@@ -53,6 +53,31 @@ ENTRYPOINT ["/bin/app"]`
 ];
 
 export function auditDockerfile(content: string, fileName: string = 'Dockerfile'): ContainerAuditReport {
+  if (!content || !content.trim()) {
+    return {
+      imageOrDockerfileName: fileName,
+      totalScore: 100,
+      status: 'SECURE',
+      baseImageAudit: {
+        baseImage: 'none',
+        tag: 'latest',
+        isOutdated: false,
+        latestSecureTag: 'distroless/static-debian12:nonroot',
+        isPinnedByHash: true,
+        knownCveCount: 0,
+        criticalCves: []
+      },
+      findings: [],
+      summary: {
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0
+      },
+      hardenedDockerfileSnippet: '# Nenhum Dockerfile carregado para auditoria'
+    };
+  }
+
   const lines = content.split('\n');
   const findings: DockerfileFinding[] = [];
 

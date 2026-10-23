@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   ShieldAlert,
+  ShieldCheck,
   Zap,
   Activity,
   Search,
@@ -120,6 +121,10 @@ export const CrowdStrikeSuiteView: React.FC<CrowdStrikeSuiteViewProps> = ({
       }
     }
 
+    if (!report.totalFiles || report.totalFiles === 0) {
+      return [];
+    }
+
     return [
       {
         id: 'AID-99201-US',
@@ -131,7 +136,7 @@ export const CrowdStrikeSuiteView: React.FC<CrowdStrikeSuiteViewProps> = ({
         containmentStatus: 'NORMAL',
         assignedRepo: 'src/config/aws.ts',
         lastSeen: 'Agora há pouco',
-        activeThreatCount: report.metrics.criticalCount || 2,
+        activeThreatCount: report.metrics?.criticalCount ?? 0,
         policy: 'Production Hardened Zero-Trust'
       },
       {
@@ -144,7 +149,7 @@ export const CrowdStrikeSuiteView: React.FC<CrowdStrikeSuiteViewProps> = ({
         containmentStatus: 'NORMAL',
         assignedRepo: 'src/auth/jwt.js',
         lastSeen: '1 min atrás',
-        activeThreatCount: report.metrics.highCount || 1,
+        activeThreatCount: report.metrics?.highCount ?? 0,
         policy: 'Container Workload Protection'
       },
       {
@@ -347,6 +352,20 @@ Código de saída: 0 (OK). Telemetria transmitida para a nuvem Falcon Threat Gra
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
+      {/* Testing Context Banner */}
+      <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-red-500/10 border border-red-500/25 text-xs text-red-200">
+        <div className="flex items-center gap-2.5">
+          <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
+          <span>
+            <strong className="text-red-300 font-bold uppercase font-mono mr-1.5">[Contexto: Laboratório EDR &amp; Resposta a Incidentes]</strong>
+            Simulação de agentes CrowdStrike Falcon e contenção de host. Indicadores de Ataque (IOA) são correlacionados com os achados reais do seu repositório ({report.findings.length} achados).
+          </span>
+        </div>
+        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-red-950/70 text-red-300 border border-red-700/50 uppercase shrink-0 hidden sm:inline">
+          {report.findings.length > 0 ? 'Dados Reais' : 'Workspace Limpo'}
+        </span>
+      </div>
+
       {/* CrowdStrike Falcon Header Banner */}
       <div className="p-4 sm:p-5 rounded-xl border border-red-500/30 bg-gradient-to-r from-[#1f0505]/95 via-[#140303]/95 to-[#080202] shadow-[0_0_25px_rgba(239,68,68,0.12)] relative overflow-hidden">
         <div className="absolute -right-6 -bottom-6 opacity-10 pointer-events-none">
@@ -472,87 +491,126 @@ Código de saída: 0 (OK). Telemetria transmitida para a nuvem Falcon Threat Gra
               </div>
 
               <div className="space-y-2.5">
-                {endpoints.map(ep => {
-                  const isSelected = ep.id === selectedEndpoint.id;
-                  const isContained = ep.containmentStatus === 'CONTAINED';
-
-                  return (
-                    <div
-                      key={ep.id}
-                      onClick={() => setSelectedEndpointId(ep.id)}
-                      className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#180909] border-red-500/60 shadow-lg'
-                          : 'bg-[#0d0d0f] border-white/10 hover:border-white/20 hover:bg-[#121215]'
-                      }`}
+                {endpoints.length === 0 ? (
+                  <div className="p-8 text-center bg-[#0d0d0f] border border-white/10 rounded-xl space-y-3">
+                    <ShieldCheck className="w-8 h-8 text-emerald-400 mx-auto" />
+                    <p className="text-xs text-zinc-300 font-mono font-bold">
+                      Nenhum sensor de teste ativo no workspace limpo.
+                    </p>
+                    <p className="text-[11px] text-zinc-400 max-w-sm mx-auto">
+                      O ambiente está zerado sem simulações falsas. Carregue os sensores do laboratório Falcon para simular contenção de rede e telemetria EDR.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const demo: CrowdStrikeEndpoint[] = [
+                          {
+                            id: 'AID-99201-US',
+                            hostname: 'prod-api-gateway-01',
+                            ip: '10.240.12.8',
+                            os: 'Ubuntu 24.04 LTS (Kernel 6.8)',
+                            agentVersion: 'Falcon 7.15.17804',
+                            status: 'ONLINE',
+                            containmentStatus: 'NORMAL',
+                            assignedRepo: 'src/api',
+                            lastSeen: 'Agora há pouco',
+                            activeThreatCount: report.metrics?.criticalCount ?? 0,
+                            policy: 'Production Hardened Zero-Trust'
+                          }
+                        ];
+                        setEndpoints(demo);
+                        setSelectedEndpointId(demo[0].id);
+                      }}
+                      className="px-3.5 py-2 rounded-lg bg-red-500/20 text-red-300 border border-red-500/40 text-xs font-mono font-bold hover:bg-red-500/30 transition-colors cursor-pointer inline-flex items-center gap-2"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-white">{ep.hostname}</span>
-                            <span className="text-[10px] font-mono text-zinc-500">({ep.ip})</span>
+                      <Zap className="w-3.5 h-3.5 text-red-400" />
+                      <span>🧪 Carregar Sensores do Laboratório Falcon</span>
+                    </button>
+                  </div>
+                ) : (
+                  endpoints.map(ep => {
+                    const isSelected = ep.id === selectedEndpoint?.id;
+                    const isContained = ep.containmentStatus === 'CONTAINED';
+
+                    return (
+                      <div
+                        key={ep.id}
+                        onClick={() => setSelectedEndpointId(ep.id)}
+                        className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#180909] border-red-500/60 shadow-lg'
+                            : 'bg-[#0d0d0f] border-white/10 hover:border-white/20 hover:bg-[#121215]'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-white">{ep.hostname}</span>
+                              <span className="text-[10px] font-mono text-zinc-500">({ep.ip})</span>
+                            </div>
+                            <span className="text-[10px] font-mono text-zinc-400 block">{ep.os}</span>
                           </div>
-                          <span className="text-[10px] font-mono text-zinc-400 block">{ep.os}</span>
+
+                          <div className="flex items-center gap-1.5">
+                            {isContained ? (
+                              <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold bg-red-500/20 text-red-300 border border-red-500/40 flex items-center gap-1 animate-pulse">
+                                <Lock className="w-2.5 h-2.5" />
+                                ISOLADO (CONTAINED)
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                                <CheckCircle2 className="w-2.5 h-2.5" />
+                                NORMAL (ONLINE)
+                              </span>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
-                          {isContained ? (
-                            <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold bg-red-500/20 text-red-300 border border-red-500/40 flex items-center gap-1 animate-pulse">
-                              <Lock className="w-2.5 h-2.5" />
-                              ISOLADO (CONTAINED)
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
-                              <CheckCircle2 className="w-2.5 h-2.5" />
-                              NORMAL (ONLINE)
-                            </span>
-                          )}
+                        <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 mt-2.5 pt-2 border-t border-white/5">
+                          <span>Arquivo: <code className="text-zinc-300">{ep.assignedRepo}</code></span>
+                          <span className="text-red-400 font-bold">{ep.activeThreatCount} ameaças ativas</span>
                         </div>
                       </div>
-
-                      <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 mt-2.5 pt-2 border-t border-white/5">
-                        <span>Arquivo: <code className="text-zinc-300">{ep.assignedRepo}</code></span>
-                        <span className="text-red-400 font-bold">{ep.activeThreatCount} ameaças ativas</span>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
 
             {/* Selected Host Control Panel & Rapid Isolation Action */}
             <div className="lg:col-span-6">
-              <div className="p-4 sm:p-5 rounded-xl bg-[#0d0f12] border border-white/10 space-y-4">
-                <div className="flex items-start justify-between border-b border-white/10 pb-3">
-                  <div>
-                    <span className="text-xs font-mono text-red-400 font-bold">{selectedEndpoint.id}</span>
-                    <h3 className="text-base font-bold text-white mt-0.5">{selectedEndpoint.hostname}</h3>
-                    <p className="text-xs text-zinc-400">{selectedEndpoint.policy}</p>
-                  </div>
+              {selectedEndpoint ? (
+                <div className="p-4 sm:p-5 rounded-xl bg-[#0d0f12] border border-white/10 space-y-4">
+                  <div className="flex items-start justify-between border-b border-white/10 pb-3">
+                    <div>
+                      <span className="text-xs font-mono text-red-400 font-bold">{selectedEndpoint.id}</span>
+                      <h3 className="text-base font-bold text-white mt-0.5">{selectedEndpoint.hostname}</h3>
+                      <p className="text-xs text-zinc-400">{selectedEndpoint.policy}</p>
+                    </div>
 
-                  {/* Network Containment Button */}
-                  <button
-                    type="button"
-                    onClick={() => toggleNetworkContainment(selectedEndpoint.id)}
-                    className={`px-3 py-2 rounded-lg font-mono text-xs font-bold border transition-all cursor-pointer flex items-center gap-2 ${
-                      selectedEndpoint.containmentStatus === 'CONTAINED'
-                        ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/40 shadow-sm'
-                        : 'bg-red-500/20 hover:bg-red-500/30 text-red-300 border-red-500/40 shadow-md animate-pulse'
-                    }`}
-                  >
-                    {selectedEndpoint.containmentStatus === 'CONTAINED' ? (
-                      <>
-                        <Unlock className="w-4 h-4 text-emerald-400" />
-                        <span>Liberar Isolamento</span>
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="w-4 h-4 text-red-400" />
-                        <span>Isolar Endpoint da Rede</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                    {/* Network Containment Button */}
+                    <button
+                      type="button"
+                      onClick={() => toggleNetworkContainment(selectedEndpoint.id)}
+                      className={`px-3 py-2 rounded-lg font-mono text-xs font-bold border transition-all cursor-pointer flex items-center gap-2 ${
+                        selectedEndpoint.containmentStatus === 'CONTAINED'
+                          ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/40 shadow-sm'
+                          : 'bg-red-500/20 hover:bg-red-500/30 text-red-300 border-red-500/40 shadow-md animate-pulse'
+                      }`}
+                    >
+                      {selectedEndpoint.containmentStatus === 'CONTAINED' ? (
+                        <>
+                          <Unlock className="w-4 h-4 text-emerald-400" />
+                          <span>Liberar Isolamento</span>
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-4 h-4 text-red-400" />
+                          <span>Isolar Endpoint da Rede</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
 
                 {/* Host Details Grid */}
                 <div className="grid grid-cols-2 gap-3 text-xs font-mono">
@@ -620,6 +678,11 @@ Código de saída: 0 (OK). Telemetria transmitida para a nuvem Falcon Threat Gra
                   )}
                 </div>
               </div>
+            ) : (
+              <div className="p-8 text-center bg-[#0d0f12] border border-white/10 rounded-xl space-y-2">
+                <p className="text-xs text-zinc-400 font-mono">Nenhum sensor selecionado.</p>
+              </div>
+            )}
             </div>
           </div>
         </div>

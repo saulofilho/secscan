@@ -437,131 +437,6 @@ export default function App() {
     return !safeGetItem('secscan_welcome_completed');
   });
 
-  const handleExploreWithMock = () => {
-    safeSetItem('secscan_welcome_completed', 'true');
-    setShowWelcomeModal(false);
-    setFiles(SAMPLE_FILES);
-    setSelectedFile(SAMPLE_FILES[0]);
-
-    // Compute validation notice for sample files
-    const noticeDetails: NoticeDetailItem[] = [];
-    const blockedFiles: string[] = [];
-    const warningFiles: string[] = [];
-
-    SAMPLE_FILES.forEach((file) => {
-      const nameCheck = isForbiddenWorkspaceFile(file.name);
-      if (nameCheck.isForbidden) {
-        blockedFiles.push(`${file.name} (${nameCheck.reason})`);
-        noticeDetails.push({
-          fileName: file.name,
-          blockedReason: nameCheck.reason,
-          status: 'BLOCKED',
-          findings: [
-            {
-              patternId: 'forbidden-filename',
-              name: 'Arquivo Bloqueado',
-              severity: 'CRITICAL',
-              description: nameCheck.reason || 'Tipo de arquivo restrito.',
-              matchedPreview: file.name,
-              line: 1,
-              remediation: 'Não envie arquivos de configuração de ambiente (.env) ou chaves privadas.',
-              securityImpact: 'Credentials exposure risk (Master environment keys & private certificates)'
-            }
-          ]
-        });
-        return;
-      }
-
-      const validation = validateFileForSensitivePatterns(file.name, file.content);
-      if (validation.isForbiddenFile || validation.hasBlockers) {
-        blockedFiles.push(`${file.name} [${validation.findings.map(f => f.name).join(', ')}]`);
-        noticeDetails.push({
-          fileName: file.name,
-          blockedReason: validation.blockedReason,
-          status: 'BLOCKED',
-          findings: validation.findings
-        });
-      } else if (validation.hasWarnings) {
-        warningFiles.push(`${file.name} (${validation.findings.length} aviso(s))`);
-        noticeDetails.push({
-          fileName: file.name,
-          status: 'WARNING',
-          findings: validation.findings
-        });
-      } else {
-        noticeDetails.push({
-          fileName: file.name,
-          status: 'VALIDATED',
-          findings: []
-        });
-      }
-    });
-
-    if (blockedFiles.length > 0) {
-      setValidationNotice({
-        type: 'error',
-        title: 'Arquivos Sensíveis Bloqueados',
-        phase: 'Blocked',
-        message: `Violações detectadas durante a verificação de integridade: ${blockedFiles.join('; ')}`,
-        details: noticeDetails.filter(d => d.status === 'BLOCKED')
-      });
-      setIsNoticeDetailsOpen(true);
-    } else if (warningFiles.length > 0) {
-      setValidationNotice({
-        type: 'warning',
-        title: 'Varredura com Alertas de Padrões',
-        phase: 'Filtered',
-        message: `Análise concluída com potenciais tokens detectados: ${warningFiles.join('; ')}`,
-        details: noticeDetails.filter(d => d.status === 'WARNING')
-      });
-      setIsNoticeDetailsOpen(true);
-    } else {
-      setValidationNotice(null);
-      setIsNoticeDetailsOpen(false);
-    }
-
-    executeScan(SAMPLE_FILES, rules, ignorePatterns);
-
-    const mockEvent: AuditLogEvent = {
-      id: `audit-mock-${Date.now()}`,
-      timestamp: new Date().toLocaleTimeString(),
-      type: 'SCAN_COMPLETE',
-      message: `${SAMPLE_FILES.length} arquivos demonstrativos carregados no workspace.`,
-      severity: 'LOW',
-      details: { action: 'EXPLORE_WITH_MOCK', filesCount: SAMPLE_FILES.length }
-    };
-    setAuditLogs(prev => [mockEvent, ...prev].slice(0, 80));
-  };
-
-  const handleStartCleanWorkspace = () => {
-    safeSetItem('secscan_welcome_completed', 'true');
-    setShowWelcomeModal(false);
-    handleClearAllFilesAndValidation();
-  };
-
-  const handleEnterApp = useCallback((loadDemoData?: boolean) => {
-    setCurrentView('app');
-    setActiveTab('hub');
-    setShowWelcomeModal(false);
-    safeSetItem('secscan_welcome_completed', 'true');
-    if (loadDemoData) {
-      handleExploreWithMock();
-    }
-  }, []);
-
-  const handleNavigateToLanding = useCallback(() => {
-    setCurrentView('landing');
-  }, []);
-
-  const [showTour, setShowTour] = useState<boolean>(() => {
-    return !safeGetItem('secscan_tour_completed');
-  });
-
-  const handleCloseTour = () => {
-    safeSetItem('secscan_tour_completed', 'true');
-    setShowTour(false);
-  };
-
   // Run initial scan (starts clean with 0 files by default)
   const [report, setReport] = useState<ScanReport>(() => {
     const safePatterns = Array.isArray(ignorePatterns) ? ignorePatterns : DEFAULT_GLOBAL_IGNORE_PATTERNS;
@@ -662,6 +537,156 @@ export default function App() {
       }
     }
   }, [ignorePatterns]);
+
+  const handleExploreWithMock = () => {
+    safeSetItem('secscan_welcome_completed', 'true');
+    setShowWelcomeModal(false);
+    setFiles(SAMPLE_FILES);
+    setSelectedFile(SAMPLE_FILES[0]);
+
+    // Compute validation notice for sample files
+    const noticeDetails: NoticeDetailItem[] = [];
+    const blockedFiles: string[] = [];
+    const warningFiles: string[] = [];
+
+    SAMPLE_FILES.forEach((file) => {
+      const nameCheck = isForbiddenWorkspaceFile(file.name);
+      if (nameCheck.isForbidden) {
+        blockedFiles.push(`${file.name} (${nameCheck.reason})`);
+        noticeDetails.push({
+          fileName: file.name,
+          blockedReason: nameCheck.reason,
+          status: 'BLOCKED',
+          findings: [
+            {
+              patternId: 'forbidden-filename',
+              name: 'Arquivo Bloqueado',
+              severity: 'CRITICAL',
+              description: nameCheck.reason || 'Tipo de arquivo restrito.',
+              matchedPreview: file.name,
+              line: 1,
+              remediation: 'Não envie arquivos de configuração de ambiente (.env) ou chaves privadas.',
+              securityImpact: 'Credentials exposure risk (Master environment keys & private certificates)'
+            }
+          ]
+        });
+        return;
+      }
+
+      const validation = validateFileForSensitivePatterns(file.name, file.content);
+      if (validation.isForbiddenFile || validation.hasBlockers) {
+        blockedFiles.push(`${file.name} [${validation.findings.map(f => f.name).join(', ')}]`);
+        noticeDetails.push({
+          fileName: file.name,
+          blockedReason: validation.blockedReason,
+          status: 'BLOCKED',
+          findings: validation.findings
+        });
+      } else if (validation.hasWarnings) {
+        warningFiles.push(`${file.name} (${validation.findings.length} aviso(s))`);
+        noticeDetails.push({
+          fileName: file.name,
+          status: 'WARNING',
+          findings: validation.findings
+        });
+      } else {
+        noticeDetails.push({
+          fileName: file.name,
+          status: 'VALIDATED',
+          findings: []
+        });
+      }
+    });
+
+    if (blockedFiles.length > 0) {
+      setValidationNotice({
+        type: 'error',
+        title: 'Arquivos Sensíveis Bloqueados',
+        phase: 'Blocked',
+        message: `Violações detectadas durante a verificação de integridade: ${blockedFiles.join('; ')}`,
+        details: noticeDetails.filter(d => d.status === 'BLOCKED')
+      });
+      setIsNoticeDetailsOpen(true);
+    } else if (warningFiles.length > 0) {
+      setValidationNotice({
+        type: 'warning',
+        title: 'Varredura com Alertas de Padrões',
+        phase: 'Filtered',
+        message: `Análise concluída com potenciais tokens detectados: ${warningFiles.join('; ')}`,
+        details: noticeDetails.filter(d => d.status === 'WARNING')
+      });
+      setIsNoticeDetailsOpen(true);
+    } else {
+      setValidationNotice(null);
+      setIsNoticeDetailsOpen(false);
+    }
+
+    executeScan(SAMPLE_FILES, rules, ignorePatterns);
+
+    const mockEvent: AuditLogEvent = {
+      id: `audit-mock-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'SCAN_COMPLETE',
+      message: `${SAMPLE_FILES.length} arquivos demonstrativos carregados no workspace.`,
+      severity: 'LOW',
+      details: { action: 'EXPLORE_WITH_MOCK', filesCount: SAMPLE_FILES.length }
+    };
+    setAuditLogs(prev => [mockEvent, ...prev].slice(0, 80));
+  };
+
+  const handleClearAllFilesAndValidation = useCallback(() => {
+    setFiles([]);
+    setSelectedFile(null);
+    setValidationNotice(null);
+    setIsNoticeDetailsOpen(false);
+    executeScan([], rules, ignorePatterns);
+    try {
+      localStorage.removeItem('secscan_dast_recent_logs_v1');
+      localStorage.removeItem('secscan_falcon_endpoints_v1');
+    } catch {
+      // ignore
+    }
+    const clearEvent: AuditLogEvent = {
+      id: `audit-clear-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'SCAN_COMPLETE',
+      message: 'Workspace limpo: arquivos e dados de teste removidos. Ambiente zerado sem dados mockados.',
+      severity: 'LOW',
+      details: { action: 'CLEAR_ALL' }
+    };
+    setAuditLogs(prev => [clearEvent, ...prev].slice(0, 80));
+  }, [executeScan, rules, ignorePatterns]);
+
+  const handleStartCleanWorkspace = () => {
+    safeSetItem('secscan_welcome_completed', 'true');
+    setShowWelcomeModal(false);
+    handleClearAllFilesAndValidation();
+  };
+
+  const handleEnterApp = useCallback((loadDemoData?: boolean) => {
+    setCurrentView('app');
+    setActiveTab('hub');
+    setShowWelcomeModal(false);
+    safeSetItem('secscan_welcome_completed', 'true');
+    if (loadDemoData) {
+      handleExploreWithMock();
+    } else {
+      handleClearAllFilesAndValidation();
+    }
+  }, [handleExploreWithMock, handleClearAllFilesAndValidation]);
+
+  const handleNavigateToLanding = useCallback(() => {
+    setCurrentView('landing');
+  }, []);
+
+  const [showTour, setShowTour] = useState<boolean>(() => {
+    return !safeGetItem('secscan_tour_completed');
+  });
+
+  const handleCloseTour = () => {
+    safeSetItem('secscan_tour_completed', 'true');
+    setShowTour(false);
+  };
 
   // Run on first load
   useEffect(() => {
@@ -968,22 +993,6 @@ export default function App() {
     }
   }, [validationNotice]);
 
-  const handleClearAllFilesAndValidation = useCallback(() => {
-    setFiles([]);
-    setSelectedFile(null);
-    setValidationNotice(null);
-    setIsNoticeDetailsOpen(false);
-    executeScan([], rules, ignorePatterns);
-    const clearEvent: AuditLogEvent = {
-      id: `audit-clear-${Date.now()}`,
-      timestamp: new Date().toLocaleTimeString(),
-      type: 'SCAN_COMPLETE',
-      message: 'All current files were removed and validation state was reset to empty.',
-      severity: 'LOW',
-      details: { action: 'CLEAR_ALL' }
-    };
-    setAuditLogs(prev => [clearEvent, ...prev].slice(0, 80));
-  }, [executeScan, rules, ignorePatterns]);
 
   // Quick Rescan handler to re-run scanning engine and refresh validation without full reload
   const handleQuickRescan = useCallback(() => {
@@ -1484,6 +1493,7 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         report={report}
+        files={files}
         isScanning={isScanning}
         scanProgress={scanProgress}
         onRunScan={() => executeScan(files, rules, ignorePatterns)}

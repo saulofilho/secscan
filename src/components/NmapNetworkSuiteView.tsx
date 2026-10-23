@@ -43,7 +43,8 @@ import {
 import { 
   NMAP_PRESET_PROFILES, 
   NSE_SCRIPT_DATABASE, 
-  generateDiscoveredHostsFromReport, 
+  generateDiscoveredHostsFromReport,
+  getDemoNmapHosts,
   simulateNmapScanExecution 
 } from '../lib/nmapEngine';
 
@@ -149,6 +150,20 @@ export const NmapNetworkSuiteView: React.FC<NmapNetworkSuiteViewProps> = ({
 
   return (
     <div id="nmap-network-suite-container" className="space-y-6">
+      {/* Testing Context Banner */}
+      <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs text-emerald-200">
+        <div className="flex items-center gap-2.5">
+          <Network className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>
+            <strong className="text-emerald-300 font-bold uppercase font-mono mr-1.5">[Contexto: Laboratório de Rede &amp; Reconhecimento]</strong>
+            Varredura e auditoria de portas, banners de serviços e scripts NSE. Não injeta vulnerabilidades sintéticas no seu código.
+          </span>
+        </div>
+        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/70 text-emerald-300 border border-emerald-700/50 uppercase shrink-0 hidden sm:inline">
+          {hosts.length > 0 ? 'Hosts Mapeados' : 'Workspace Limpo'}
+        </span>
+      </div>
+
       {/* Top Banner & Control Deck */}
       <div className="bg-[#0A0A0A] border border-[#222] rounded-xl p-4 sm:p-6 relative overflow-hidden shadow-lg">
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-[#00FF41]/5 via-transparent to-transparent pointer-events-none" />
@@ -378,54 +393,75 @@ export const NmapNetworkSuiteView: React.FC<NmapNetworkSuiteViewProps> = ({
             </div>
 
             <div className="space-y-2">
-              {filteredHosts.map((host) => {
-                const isSelected = selectedHost?.id === host.id;
-                const openCount = host.ports.filter(p => p.state === 'OPEN').length;
-                const hasCritical = host.scriptResults.some(s => s.severity === 'CRITICAL' || s.severity === 'HIGH');
-                
-                return (
-                  <div
-                    key={host.id}
-                    onClick={() => setSelectedHostId(host.id)}
-                    className={`p-3.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                      isSelected 
-                        ? 'bg-[#141414] border-[#00FF41]/60 shadow-[0_0_15px_rgba(0,255,65,0.1)]' 
-                        : 'bg-[#0E0E0E] hover:bg-[#121212] border-[#222]'
-                    }`}
+              {hosts.length === 0 ? (
+                <div className="p-8 text-center bg-[#0E0E0E] border border-[#222] rounded-lg space-y-3 font-mono">
+                  <ShieldCheck className="w-8 h-8 text-[#00FF41] mx-auto" />
+                  <p className="text-xs text-white font-bold">Nenhum host de rede configurado</p>
+                  <p className="text-[11px] text-zinc-400">
+                    O workspace está limpo sem alvos mapeados. Carregue os hosts de teste do laboratório ou informe um CIDR acima para escanear.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const demo = getDemoNmapHosts();
+                      setHosts(demo);
+                      setSelectedHostId(demo[0]?.id || '');
+                    }}
+                    className="px-3.5 py-2 rounded bg-[#00FF41]/20 text-[#00FF41] border border-[#00FF41]/40 text-xs font-bold hover:bg-[#00FF41]/30 transition-colors cursor-pointer"
                   >
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className={`mt-0.5 p-2 rounded ${
-                        hasCritical ? 'bg-rose-950/50 text-rose-400 border border-rose-800/40' : 'bg-zinc-800 text-zinc-300'
-                      }`}>
-                        <Server className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-white truncate">
-                            {host.hostname}
-                          </span>
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#00FF41]" />
+                    🧪 Carregar Hosts de Laboratório
+                  </button>
+                </div>
+              ) : (
+                filteredHosts.map((host) => {
+                  const isSelected = selectedHost?.id === host.id;
+                  const openCount = host.ports.filter(p => p.state === 'OPEN').length;
+                  const hasCritical = host.scriptResults.some(s => s.severity === 'CRITICAL' || s.severity === 'HIGH');
+                  
+                  return (
+                    <div
+                      key={host.id}
+                      onClick={() => setSelectedHostId(host.id)}
+                      className={`p-3.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                        isSelected 
+                          ? 'bg-[#141414] border-[#00FF41]/60 shadow-[0_0_15px_rgba(0,255,65,0.1)]' 
+                          : 'bg-[#0E0E0E] hover:bg-[#121212] border-[#222]'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className={`mt-0.5 p-2 rounded ${
+                          hasCritical ? 'bg-rose-950/50 text-rose-400 border border-rose-800/40' : 'bg-zinc-800 text-zinc-300'
+                        }`}>
+                          <Server className="w-4 h-4" />
                         </div>
-                        <span className="text-[11px] font-mono text-zinc-400 block">
-                          {host.ip}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-white truncate">
+                              {host.hostname}
+                            </span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00FF41]" />
+                          </div>
+                          <span className="text-[11px] font-mono text-zinc-400 block">
+                            {host.ip}
+                          </span>
+                          <span className="text-[10px] text-zinc-500 truncate block">
+                            {host.osFingerprint.name}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1 shrink-0 font-mono text-right">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                          {openCount} portas
                         </span>
-                        <span className="text-[10px] text-zinc-500 truncate block">
-                          {host.osFingerprint.name}
+                        <span className="text-[9.5px] text-zinc-500">
+                          {host.latencyMs}ms RTT
                         </span>
                       </div>
                     </div>
-
-                    <div className="flex flex-col items-end gap-1 shrink-0 font-mono text-right">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
-                        {openCount} portas
-                      </span>
-                      <span className="text-[9.5px] text-zinc-500">
-                        {host.latencyMs}ms RTT
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 

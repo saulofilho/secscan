@@ -20,6 +20,15 @@ export const NIKTO_TUNING_DICTIONARY: { code: string; label: string; desc: strin
 ];
 
 export function buildDefaultTargets(report: ScanReport): NiktoTargetProfile[] {
+  // If workspace is clean or empty, do not fabricate synthetic targets
+  if ((!report.totalFiles || report.totalFiles === 0) && (!report.apiEndpoints || report.apiEndpoints.length === 0)) {
+    return [];
+  }
+
+  return getDemoNiktoTargets();
+}
+
+export function getDemoNiktoTargets(): NiktoTargetProfile[] {
   return [
     {
       id: 'target-api-gateway',

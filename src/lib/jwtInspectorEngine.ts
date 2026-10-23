@@ -66,7 +66,26 @@ function base64UrlDecode(str: string): string {
 }
 
 export function auditJwtToken(tokenString: string): JwtAuditReport {
-  const clean = tokenString.trim();
+  const clean = tokenString ? tokenString.trim() : '';
+
+  if (!clean) {
+    return {
+      rawToken: '',
+      isValidFormat: true,
+      header: {},
+      payload: {},
+      signature: '',
+      algorithm: 'RS256',
+      isExpired: false,
+      expiresAt: null,
+      issuedAt: null,
+      claimsAudit: [],
+      vulnerabilities: [],
+      isWeakSecretDetected: false,
+      securityScore: 100
+    };
+  }
+
   const parts = clean.split('.');
 
   if (parts.length < 2) {

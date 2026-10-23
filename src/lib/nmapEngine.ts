@@ -139,6 +139,15 @@ export const NSE_SCRIPT_DATABASE = [
  * Generates initial realistic hosts discovered from code findings & environment endpoints
  */
 export function generateDiscoveredHostsFromReport(report: ScanReport): NmapHostTarget[] {
+  // If workspace is clean or empty, do not fabricate synthetic network hosts
+  if ((!report.totalFiles || report.totalFiles === 0) && (!report.apiEndpoints || report.apiEndpoints.length === 0)) {
+    return [];
+  }
+
+  return getDemoNmapHosts();
+}
+
+export function getDemoNmapHosts(): NmapHostTarget[] {
   const hosts: NmapHostTarget[] = [
     {
       id: 'host-gateway-01',

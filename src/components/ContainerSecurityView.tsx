@@ -39,9 +39,9 @@ export const ContainerSecurityView: React.FC<ContainerSecurityViewProps> = ({
   // Find Dockerfile in workspace if present
   const workspaceDockerFile = files.find(f => f.name.toLowerCase() === 'dockerfile' || f.name.toLowerCase().endsWith('.dockerfile'));
 
-  const [selectedSampleIndex, setSelectedSampleIndex] = useState<number>(0);
+  const [selectedSampleIndex, setSelectedSampleIndex] = useState<number>(workspaceDockerFile ? 0 : -1);
   const [customDockerfileText, setCustomDockerfileText] = useState<string>(() => {
-    return workspaceDockerFile?.content || SAMPLE_DOCKERFILES[0].content;
+    return workspaceDockerFile?.content || '';
   });
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [appliedNotification, setAppliedNotification] = useState<boolean>(false);
@@ -76,6 +76,22 @@ export const ContainerSecurityView: React.FC<ContainerSecurityViewProps> = ({
 
   return (
     <div className="space-y-6 animate-fadeIn pb-12">
+      {/* Testing Context Banner */}
+      <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-blue-500/10 border border-blue-500/25 text-xs text-blue-200">
+        <div className="flex items-center gap-2.5">
+          <Info className="w-4 h-4 text-blue-400 shrink-0" />
+          <span>
+            <strong className="text-blue-300 font-bold uppercase font-mono mr-1.5">[Contexto: Manifestos IaC &amp; Containers]</strong>
+            {workspaceDockerFile
+              ? `Auditando Dockerfile real do seu workspace (${workspaceDockerFile.name}). 0 dados sintéticos.`
+              : 'Nenhum Dockerfile detectado no seu repositório. Cole o conteúdo de um Dockerfile ou selecione um modelo do laboratório para inspecionar.'}
+          </span>
+        </div>
+        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-950/70 text-blue-300 border border-blue-700/50 uppercase shrink-0 hidden sm:inline">
+          {workspaceDockerFile ? 'Arquivo Real' : 'Sandbox Interativo'}
+        </span>
+      </div>
+
       {/* Top Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-xl bg-[#0F0F0F] border border-[#222]">
         <div className="flex items-start gap-4">

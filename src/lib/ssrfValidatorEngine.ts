@@ -42,7 +42,24 @@ export const SAMPLE_SSRF_PAYLOADS: { name: string; url: string; description: str
 ];
 
 export function validateSsrfTarget(targetUrl: string): SsrfCheckResult {
-  const clean = targetUrl.trim();
+  const clean = targetUrl ? targetUrl.trim() : '';
+
+  if (!clean) {
+    return {
+      url: '',
+      hostname: 'none',
+      scheme: 'none',
+      port: 0,
+      isPrivateOrLoopback: false,
+      isCloudMetadata: false,
+      isDecimalOrHexBypass: false,
+      riskLevel: 'SAFE',
+      classification: 'Aguardando Entrada',
+      attackTechnique: 'Nenhuma URL informada',
+      remediationAdvice: 'Insira uma URL ou selecione um payload didático para testar a proteção SSRF.',
+      safeClientExample: generateSafeClientSnippet()
+    };
+  }
 
   let parsed: URL;
   try {

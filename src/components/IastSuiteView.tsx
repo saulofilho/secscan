@@ -70,16 +70,16 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
 
   // Active execution report state
   const [iastReport, setIastReport] = useState<IastExecutionReport>(() => {
-    return report.iastReport || runIastRuntimeEmulation(files, INITIAL_IAST_HOOKS);
+    return report.iastReport || runIastRuntimeEmulation(files, INITIAL_IAST_HOOKS, undefined, report.jsMiner?.dangerousSinks, report.apiEndpoints);
   });
 
   React.useEffect(() => {
     if (report.iastReport) {
       setIastReport(report.iastReport);
     } else {
-      setIastReport(runIastRuntimeEmulation(files, hooks));
+      setIastReport(runIastRuntimeEmulation(files, hooks, undefined, report.jsMiner?.dangerousSinks, report.apiEndpoints));
     }
-  }, [report.iastReport, files]);
+  }, [report.iastReport, files, report.jsMiner?.dangerousSinks, report.apiEndpoints]);
 
   const [selectedFindingId, setSelectedFindingId] = useState<string>(() => {
     return iastReport.findings[0]?.id || '';
@@ -102,7 +102,7 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
   const toggleHook = (hookId: string) => {
     setHooks(prev => {
       const updated = prev.map(h => h.id === hookId ? { ...h, active: !h.active } : h);
-      const newReport = runIastRuntimeEmulation(files, updated);
+      const newReport = runIastRuntimeEmulation(files, updated, undefined, report.jsMiner?.dangerousSinks, report.apiEndpoints);
       setIastReport(newReport);
       return updated;
     });
@@ -111,13 +111,13 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
   const handleRunSimulation = (scenario?: IastSimulationScenario) => {
     setIsEmulating(true);
     setTimeout(() => {
-      const newReport = runIastRuntimeEmulation(files, hooks, scenario);
+      const newReport = runIastRuntimeEmulation(files, hooks, scenario, report.jsMiner?.dangerousSinks, report.apiEndpoints);
       setIastReport(newReport);
       if (newReport.findings.length > 0) {
         setSelectedFindingId(newReport.findings[0].id);
       }
       setIsEmulating(false);
-    }, 600);
+    }, 450);
   };
 
   const handleRunCustomSimulation = () => {
@@ -193,6 +193,24 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
             </button>
           )}
         </div>
+      </div>
+
+      {/* Workspace Context Indicator (Meu Workspace vs Vazio) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-lg bg-black/60 border border-white/10 text-xs font-mono">
+        <div className="flex items-center gap-2">
+          <span className={`w-2.5 h-2.5 rounded-full ${files.length > 0 ? 'bg-cyan-400 animate-pulse' : 'bg-emerald-400'}`} />
+          <span className="text-zinc-300">
+            Origem dos Dados: <strong className="text-white">{files.length > 0 ? `Seu Workspace Real (${files.length} arquivos analisados)` : 'Workspace Limpo (0 arquivos)'}</strong>
+          </span>
+          <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 font-bold uppercase">
+            {files.length > 0 ? 'IAST Ativo no Código' : 'Sem Dados Mockados'}
+          </span>
+        </div>
+        <span className="text-[11px] text-zinc-400">
+          {files.length > 0
+            ? 'Rastreando sinks e endpoints reais detectados no seu código fonte.'
+            : 'Nenhum dado mockado carregado. Faça upload ou audite uma URL para analisar.'}
+        </span>
       </div>
 
       {/* Metric Cards Row */}
@@ -643,12 +661,21 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
             </div>
           </div>
 
-          {selectedFinding && (
+          {selectedFinding ? (
             <IastTaintFlowVisualizer
               finding={selectedFinding}
               allHooks={hooks}
               onSelectFile={onSelectFile}
             />
+          ) : (
+            <div className="p-12 text-center border border-white/10 rounded-xl bg-black/40 space-y-3 font-mono">
+              <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
+              <h3 className="text-sm font-bold text-white">Nenhum Fluxo de Taint Inseguro no Workspace</h3>
+              <p className="text-xs text-zinc-400 max-w-md mx-auto">
+                O workspace está limpo ou nenhum hook detectou propagação de taint vulnerável.
+                {files.length === 0 && ' Envie arquivos de código ou audite uma URL para analisar chamadas dinâmicas.'}
+              </p>
+            </div>
           )}
         </div>
       )}

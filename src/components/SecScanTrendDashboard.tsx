@@ -94,17 +94,47 @@ export interface UnifiedTrendSessionPoint {
  * ensuring rich visualization of posture improvement even on fresh starts.
  */
 function generateSyntheticBaselinePoints(currentReport: ScanReport): UnifiedTrendSessionPoint[] {
-  const currentFindings = currentReport.findings?.length ?? 6;
-  const currentCrit = currentReport.metrics?.criticalCount ?? 1;
-  const currentHigh = currentReport.metrics?.highCount ?? 2;
-  const currentMed = currentReport.metrics?.mediumCount ?? 2;
-  const currentLow = currentReport.metrics?.lowCount ?? 1;
-  const currentScore = currentReport.metrics?.securityScore ?? 75;
-  const currentRisk = currentReport.metrics?.riskScore ?? 35;
-  const currentFiles = currentReport.totalFiles ?? 8;
-  const currentDuration = currentReport.durationMs ?? 145;
+  const currentFiles = currentReport.totalFiles ?? 0;
+  const currentFindings = currentReport.findings?.length ?? 0;
+  const currentCrit = currentReport.metrics?.criticalCount ?? 0;
+  const currentHigh = currentReport.metrics?.highCount ?? 0;
+  const currentMed = currentReport.metrics?.mediumCount ?? 0;
+  const currentLow = currentReport.metrics?.lowCount ?? 0;
+  const currentScore = currentReport.metrics?.securityScore ?? 100;
+  const currentRisk = currentReport.metrics?.riskScore ?? 0;
+  const currentDuration = currentReport.durationMs ?? 10;
 
-  // 7 baseline sessions prior to current (total 8 points)
+  // If workspace is clean (0 files or 0 findings), return genuine clean session (zero mock leaks)
+  if (currentFiles === 0 || currentFindings === 0) {
+    const now = new Date();
+    const currentDateStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    return [{
+      id: currentReport.id || 'clean-scan-point',
+      sessionIndex: 0,
+      sessionNumber: 1,
+      label: currentFiles === 0 ? 'Workspace Limpo (0 arquivos)' : 'Varredura Limpa (0 vulnerabilidades)',
+      shortLabel: '#1',
+      timestamp: currentDateStr,
+      relativeTime: 'Agora',
+      totalFindings: 0,
+      criticalCount: 0,
+      highCount: 0,
+      mediumCount: 0,
+      lowCount: 0,
+      infoCount: 0,
+      securityScore: 100,
+      riskScore: 0,
+      totalFiles: currentFiles,
+      durationMs: currentDuration,
+      deltaFromPrev: 0,
+      deltaFromBaseline: 0,
+      improvementPct: 0,
+      isCurrent: true,
+      status: 'STABLE'
+    }];
+  }
+
+  // 7 baseline sessions prior to current (total 8 points) for demo repositories
   const baselineFactors = [
     { offsetHours: 72, factor: 2.4, critAdd: 3, highAdd: 3, medAdd: 2, scoreSub: 45, riskAdd: 50 },
     { offsetHours: 48, factor: 2.1, critAdd: 2, highAdd: 3, medAdd: 2, scoreSub: 38, riskAdd: 42 },

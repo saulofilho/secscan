@@ -98,7 +98,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
     } catch (e) {
       console.warn('Failed to load saved schedules', e);
     }
-    return DEFAULT_RECURRING_SCHEDULES;
+    return endpoints.length > 0 ? DEFAULT_RECURRING_SCHEDULES : [];
   });
 
   const [executionRecords, setExecutionRecords] = useState<ScheduledScanExecutionRecord[]>(() => {
@@ -116,7 +116,7 @@ export const DastFuzzerView: React.FC<DastFuzzerViewProps> = ({ endpoints, onLog
     } catch (e) {
       console.warn('Failed to load saved execution records', e);
     }
-    return DEFAULT_RECENT_EXECUTION_RECORDS.slice(0, MAX_RECENT_EXECUTION_LOGS);
+    return endpoints.length > 0 ? DEFAULT_RECENT_EXECUTION_RECORDS.slice(0, MAX_RECENT_EXECUTION_LOGS) : [];
   });
 
   const [isSchedulerDaemonActive, setIsSchedulerDaemonActive] = useState(true);

@@ -221,48 +221,32 @@ export const SecurityOnionSocView: React.FC<SecurityOnionSocViewProps> = ({
       }
     }
 
-    // Default seeded cases generated from current critical/high findings
-    const initialCases: SocCase[] = [
-      {
-        id: 'CASE-2026-001',
-        title: 'Vazamento de Credencial AWS IAM em Código Fonte',
-        severity: 'CRITICAL',
-        status: 'INVESTIGATING',
-        assignee: 'SecOps L2 (Incident Team)',
-        category: 'CLOUD_CREDENTIAL',
-        sourceFile: 'src/config/aws.ts',
-        line: 14,
-        mitreTechnique: 'T1552.001 - Credentials In Files',
-        createdAt: '2026-09-17 07:15:00',
-        updatedAt: '2026-09-17 07:22:10',
-        notes: 'Chave com privilégio de escrita detectada. Necessário rotacionar no AWS IAM e verificar logs no CloudTrail.',
-        checklist: [
-          { id: 'c1', text: 'Validar se a chave estava ativa na AWS', completed: true },
-          { id: 'c2', text: 'Inativar credencial e gerar nova no Vault', completed: true },
-          { id: 'c3', text: 'Consultar CloudTrail por chamadas anômalas nas últimas 72h', completed: false },
-          { id: 'c4', text: 'Substituir por variável de ambiente segura no CI/CD', completed: false }
-        ]
-      },
-      {
-        id: 'CASE-2026-002',
-        title: 'Assinatura JWT Fraca e Chave Secreta Exposta',
-        severity: 'HIGH',
-        status: 'TRIAGE',
-        assignee: 'AppSec Analyst (Tier 1)',
-        category: 'AUTH_TOKEN',
-        sourceFile: 'src/auth/jwt.js',
-        line: 22,
-        mitreTechnique: 'T1552.004 - Private Keys',
-        createdAt: '2026-09-17 07:20:00',
-        updatedAt: '2026-09-17 07:25:00',
-        notes: 'O segredo JWT "super-secret-key-123" permite falsificação de tokens de autenticação por atores externos.',
-        checklist: [
-          { id: 'c1', text: 'Revogar tokens existentes emitidos com chave legada', completed: false },
-          { id: 'c2', text: 'Migrar para chave assimétrica RSA/ECDSA com rotação KMS', completed: false },
-          { id: 'c3', text: 'Atualizar testes de integração de autenticação', completed: false }
-        ]
-      }
-    ];
+    // If no findings in report, keep workspace completely clean (zero false positives)
+    if (!report.findings || report.findings.length === 0) {
+      return [];
+    }
+
+    // Seed cases from real findings
+    const initialCases: SocCase[] = report.findings.slice(0, 3).map((f, idx) => ({
+      id: `CASE-${new Date().getFullYear()}-${String(idx + 1).padStart(3, '0')}`,
+      title: `${f.ruleName} em ${f.file}:${f.line}`,
+      severity: f.severity === 'INFO' ? 'LOW' : f.severity,
+      status: 'INVESTIGATING',
+      assignee: 'SecOps Incident Team',
+      findingId: f.id,
+      category: f.category,
+      sourceFile: f.file,
+      line: f.line,
+      mitreTechnique: f.category === 'CLOUD_CREDENTIAL' ? 'T1552 - Unsecured Credentials' : 'T1059 - Command & Scripting',
+      createdAt: new Date().toLocaleString(),
+      updatedAt: new Date().toLocaleString(),
+      notes: `Caso aberto a partir do achado real: ${f.snippet.slice(0, 80)}`,
+      checklist: [
+        { id: 'c1', text: 'Validar contexto e escopo do segredo/sink', completed: false },
+        { id: 'c2', text: 'Aplicar remediação ou rotação', completed: false },
+        { id: 'c3', text: 'Verificar ausência de regressão em testes', completed: false }
+      ]
+    }));
     return initialCases;
   });
 
@@ -595,6 +579,20 @@ rule SecScan_${cleanName}_Detection {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
+      {/* Testing Context Banner */}
+      <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs text-emerald-200">
+        <div className="flex items-center gap-2.5">
+          <Shield className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>
+            <strong className="text-emerald-300 font-bold uppercase font-mono mr-1.5">[Contexto: Laboratório SOC &amp; Resposta a Incidentes]</strong>
+            Triagem defensiva e caça a ameaças. As consultas do Hunt correlacionam eventos reais do seu repositório ({report.findings.length} achados, {report.apiEndpoints.length} rotas).
+          </span>
+        </div>
+        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/70 text-emerald-300 border border-emerald-700/50 uppercase shrink-0 hidden sm:inline">
+          {report.findings.length > 0 ? 'Dados Reais' : 'Workspace Limpo'}
+        </span>
+      </div>
+
       {/* Top Banner: Security Onion SOC & Threat Hunting Suite */}
       <div className="p-4 sm:p-5 rounded-xl border border-emerald-500/30 bg-gradient-to-r from-[#041a11]/90 via-[#03140e]/95 to-[#020b08] shadow-[0_0_25px_rgba(16,185,129,0.1)] relative overflow-hidden">
         <div className="absolute -right-8 -bottom-8 opacity-10 pointer-events-none">

@@ -75,6 +75,7 @@ interface ModuleDefinition {
   id: 'CODE_SAST' | 'API_DAST' | 'CLOUD_INFRA' | 'SOC_EDR' | 'GOV_AI';
   title: string;
   subtitle: string;
+  scopeBadge: string;
   description: string;
   accentColor: string; // e.g. '#00F0FF'
   bgGradient: string;
@@ -82,6 +83,18 @@ interface ModuleDefinition {
   icon: any;
   primaryTab: string;
   tools: ToolDefinition[];
+}
+
+export type TestingContextScope = 'ALL' | 'MY_CODE' | 'SANDBOX' | 'GOV_POSTURE';
+
+export function getToolContextScope(toolId: string): 'MY_CODE' | 'SANDBOX' | 'GOV_POSTURE' {
+  if (['scanner', 'dataflow', 'endpoints', 'entropy', 'jsminer', 'sca', 'iast', 'iac', 'autoremediation', 'refactoring'].includes(toolId)) {
+    return 'MY_CODE';
+  }
+  if (['apisecurity', 'dast', 'headers', 'jwtinspector', 'ssrfvalidator', 'containerscan', 'cloudiam', 'ngfw', 'idsips', 'dnssec', 'sdwan', 'edr', 'soccommand', 'securityonion', 'crowdstrike', 'waf', 'nmap', 'nikto'].includes(toolId)) {
+    return 'SANDBOX';
+  }
+  return 'GOV_POSTURE';
 }
 
 export const AppModulesHub: React.FC<AppModulesHubProps> = ({
@@ -99,6 +112,7 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
 }) => {
   const { t, language } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
+  const [contextFilter, setContextFilter] = useState<TestingContextScope>('ALL');
 
   const criticalCount = report.metrics.criticalCount;
   const highCount = report.metrics.highCount;
@@ -110,6 +124,7 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
       id: 'CODE_SAST',
       title: language === 'pt' ? 'Análise de Código & SAST' : language === 'es' ? 'Análisis de Código y SAST' : 'Code Security & SAST',
       subtitle: language === 'pt' ? 'Segurança Estática, Fluxo de Dados & Remediação' : language === 'es' ? 'Seguridad Estática, Flujo de Datos y Remediación' : 'Static Security, Data Flow & Remediation',
+      scopeBadge: language === 'pt' ? 'Mapeia Seu Código' : language === 'es' ? 'Analiza Su Código' : 'Analyzes Your Code',
       description: language === 'pt' 
         ? 'Inspeção profunda de AST em JavaScript/TypeScript, caçador de segredos por entropia, grafo de contaminação (taint) com visualização de caminhos de ataque e auto-remediação em 1 clique.'
         : language === 'es'
@@ -217,6 +232,7 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
       id: 'API_DAST',
       title: language === 'pt' ? 'APIs, DAST & Perímetro' : language === 'es' ? 'APIs, DAST y Perímetro' : 'APIs, DAST & Perimeter',
       subtitle: language === 'pt' ? 'OWASP API Top 10, Fuzzing & Análise Dinâmica' : language === 'es' ? 'OWASP API Top 10, Fuzzing y Análisis Dinámico' : 'OWASP API Top 10, Fuzzing & Dynamic Testing',
+      scopeBadge: language === 'pt' ? 'Suas APIs & Perímetro' : language === 'es' ? 'Sus APIs y Perímetro' : 'Your APIs & Perimeter',
       description: language === 'pt'
         ? 'Varredura dinâmica de vulnerabilidades (DAST), auditoria de conformidade com OWASP API Security Top 10, validação SSRF para metadados de nuvem e inspeção criptográfica de tokens JWT.'
         : language === 'es'
@@ -284,6 +300,7 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
       id: 'CLOUD_INFRA',
       title: language === 'pt' ? 'Nuvem, Infraestrutura & Redes' : language === 'es' ? 'Nube, Infraestructura y Redes' : 'Cloud, Infra & Network',
       subtitle: language === 'pt' ? 'IaC, Containers, Firewall L7 & Zero-Trust' : language === 'es' ? 'IaC, Contenedores, Firewall L7 y Zero-Trust' : 'IaC, Containers, L7 Firewall & Zero-Trust',
+      scopeBadge: language === 'pt' ? 'Seus Manifestos IaC' : language === 'es' ? 'Sus Manifiestos IaC' : 'Your IaC Manifests',
       description: language === 'pt'
         ? 'Auditoria de manifestos Terraform e Kubernetes, verificação de Dockerfile contra padrões CIS, privilégios mínimos no Cloud IAM e simulação de arquitetura perimetral NGFW/SD-WAN.'
         : language === 'es'
@@ -381,6 +398,7 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
       id: 'SOC_EDR',
       title: language === 'pt' ? 'SOC, Detecção & Resposta' : language === 'es' ? 'SOC, Detección y Respuesta' : 'SOC, Detection & Incident Response',
       subtitle: language === 'pt' ? 'Centro de Operações 24/7, SIEM & Threat Hunting' : language === 'es' ? 'Centro de Operaciones 24/7, SIEM y Threat Hunting' : '24/7 Command Center, SIEM & Threat Hunting',
+      scopeBadge: language === 'pt' ? 'Laboratório de Resposta & SIEM' : language === 'es' ? 'Laboratorio de Respuesta' : 'Response Lab & SIEM',
       description: language === 'pt'
         ? 'Centro de comando para operações de segurança em tempo real, correlação de logs com Security Onion, telemetria CrowdStrike Falcon, regras WAF ModSecurity e varreduras de reconhecimento.'
         : language === 'es'
@@ -458,6 +476,7 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
       id: 'GOV_AI',
       title: language === 'pt' ? 'Governança, Threat Intel & Compliance' : language === 'es' ? 'Gobernanza, Threat Intel y Cumplimiento' : 'Governance, Threat Intel & Compliance',
       subtitle: language === 'pt' ? 'Postura Executiva, OPA Rego, SBOM & IA Segura' : language === 'es' ? 'Postura Ejecutiva, OPA Rego, SBOM e IA Segura' : 'Executive Posture, OPA Rego, SBOM & Secure AI',
+      scopeBadge: language === 'pt' ? 'Conformidade & Postura' : language === 'es' ? 'Conformidad y Postura' : 'Compliance & Posture',
       description: language === 'pt'
         ? 'Painel executivo com matriz de risco e métricas de MTTR, inteligência CTI ao vivo com CISA KEV & OTX, governança declarativa com Open Policy Agent, geração SBOM e auditoria regulatória.'
         : language === 'es'
@@ -633,14 +652,20 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
     }
   ], [language, report]);
 
-  // Filter modules and tools based on search term
+  // Filter modules and tools based on search term AND testing context
   const filteredModules = useMemo(() => {
-    if (!searchTerm.trim()) return MODULES;
     const q = searchTerm.toLowerCase().trim();
 
     return MODULES.map(module => {
-      const titleMatch = module.title.toLowerCase().includes(q) || module.description.toLowerCase().includes(q);
+      const titleMatch = q ? (module.title.toLowerCase().includes(q) || module.description.toLowerCase().includes(q)) : false;
       const matchingTools = module.tools.filter(tool => {
+        // 1. Context Filter check
+        if (contextFilter !== 'ALL' && getToolContextScope(tool.id) !== contextFilter) {
+          return false;
+        }
+
+        // 2. Search query check
+        if (!q) return true;
         const label = t(tool.nameKey) || tool.defaultName;
         const desc = t(tool.descKey) || tool.defaultDesc;
         const badge = typeof tool.badge === 'string' ? tool.badge.toLowerCase() : '';
@@ -648,19 +673,32 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           label.toLowerCase().includes(q) ||
           desc.toLowerCase().includes(q) ||
           tool.id.toLowerCase().includes(q) ||
-          badge.includes(q)
+          badge.includes(q) ||
+          titleMatch
         );
       });
 
-      if (titleMatch || matchingTools.length > 0) {
+      if (matchingTools.length > 0) {
         return {
           ...module,
-          tools: titleMatch ? module.tools : matchingTools
+          tools: matchingTools
         };
       }
       return null;
     }).filter(Boolean) as ModuleDefinition[];
-  }, [MODULES, searchTerm, t]);
+  }, [MODULES, searchTerm, contextFilter, t]);
+
+  const myCodeCount = useMemo(() => {
+    return MODULES.reduce((acc, m) => acc + m.tools.filter(t => getToolContextScope(t.id) === 'MY_CODE').length, 0);
+  }, [MODULES]);
+
+  const sandboxCount = useMemo(() => {
+    return MODULES.reduce((acc, m) => acc + m.tools.filter(t => getToolContextScope(t.id) === 'SANDBOX').length, 0);
+  }, [MODULES]);
+
+  const govCount = useMemo(() => {
+    return MODULES.reduce((acc, m) => acc + m.tools.filter(t => getToolContextScope(t.id) === 'GOV_POSTURE').length, 0);
+  }, [MODULES]);
 
   const totalToolsCount = useMemo(() => {
     return MODULES.reduce((acc, m) => acc + m.tools.length, 0);
@@ -828,6 +866,108 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           </div>
         </div>
 
+        {/* Guia de Contextos de Teste (Transparência Total: O que é do Seu Repositório vs Laboratório) */}
+        <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-[#09090E]/90 border border-white/[0.08] backdrop-blur-md shadow-lg space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3">
+              <span className={`w-3 h-3 rounded-full shrink-0 mt-1 sm:mt-0 ${files.length > 0 ? 'bg-[#00F0FF] shadow-[0_0_10px_#00F0FF] animate-pulse' : 'bg-[#00FF41] shadow-[0_0_10px_#00FF41]'}`} />
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs sm:text-sm font-bold text-white font-mono uppercase tracking-wider">
+                    {files.length > 0 
+                      ? `Workspace Ativo: ${files.length} arquivo(s) real(is) analisado(s)`
+                      : 'Workspace Limpo: 0 arquivos (Pronto para Ingestão)'}
+                  </span>
+                  <span className={`text-[9.5px] font-mono px-2 py-0.5 rounded font-bold uppercase ${files.length > 0 ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-700/60' : 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/60'}`}>
+                    {files.length > 0 ? 'Inspeção do Seu Código' : '100% Zerado · Zero Mock'}
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-400 mt-1">
+                  {files.length > 0 
+                    ? 'SAST, IAST em Runtime, Segredos por Entropia e Rotas LinkFinder são extraídos estritamente dos seus arquivos carregados.' 
+                    : 'A plataforma está operando em modo real e limpo. Nenhuma vulnerabilidade falsa ou mockada é gerada.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Filter Buttons by Testing Context */}
+            <div className="flex items-center gap-2 shrink-0 text-xs font-mono flex-wrap">
+              <span className="text-zinc-500 text-[11px] hidden sm:inline">Filtrar por Contexto:</span>
+              <button
+                type="button"
+                onClick={() => setContextFilter('ALL')}
+                className={`px-3 py-1.5 rounded-lg border font-bold transition-all cursor-pointer ${
+                  contextFilter === 'ALL'
+                    ? 'bg-white/15 text-white border-white/30 shadow-xs'
+                    : 'bg-white/[0.03] text-zinc-400 border-white/[0.08] hover:text-white hover:bg-white/[0.07]'
+                }`}
+              >
+                Todas ({totalToolsCount})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setContextFilter('MY_CODE')}
+                className={`px-3 py-1.5 rounded-lg border font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  contextFilter === 'MY_CODE'
+                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                    : 'bg-cyan-950/30 text-cyan-400/80 border-cyan-800/40 hover:bg-cyan-950/60 hover:text-cyan-200'
+                }`}
+                title="Mostrar apenas ferramentas que analisam diretamente o seu código fonte e dependências"
+              >
+                <span>📁 Meu Código Real ({myCodeCount})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setContextFilter('SANDBOX')}
+                className={`px-3 py-1.5 rounded-lg border font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  contextFilter === 'SANDBOX'
+                    ? 'bg-purple-500/20 text-purple-300 border-purple-500/50 shadow-[0_0_12px_rgba(168,85,247,0.25)]'
+                    : 'bg-purple-950/30 text-purple-400/80 border-purple-800/40 hover:bg-purple-950/60 hover:text-purple-200'
+                }`}
+                title="Mostrar apenas utilitários de teste ativo e sandboxes de simulação"
+              >
+                <span>🧪 Sandboxes de Teste ({sandboxCount})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setContextFilter('GOV_POSTURE')}
+                className={`px-3 py-1.5 rounded-lg border font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  contextFilter === 'GOV_POSTURE'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                    : 'bg-amber-950/30 text-amber-400/80 border-amber-800/40 hover:bg-amber-950/60 hover:text-amber-200'
+                }`}
+                title="Mostrar painéis executivos, métricas, conformidade e modelagem de ameaças"
+              >
+                <span>📋 Governança &amp; Postura ({govCount})</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Context Helper Hint Banner when filtered */}
+          {contextFilter !== 'ALL' && (
+            <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-zinc-400">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                <span>
+                  {contextFilter === 'MY_CODE' && 'Exibindo apenas ferramentas de análise direta do seu código (SAST, Taint, Endpoints, IAST, SCA, Segredos e IaC). 0 dados sintéticos.'}
+                  {contextFilter === 'SANDBOX' && 'Exibindo ferramentas utilitárias e simuladores de teste interativo (DAST, JWT, SSRF, Headers, Firewall L7, IDS, Nmap, Nikto, SOC).'}
+                  {contextFilter === 'GOV_POSTURE' && 'Exibindo módulos de governança, conformidade regulatória (SOC2/ISO), políticas OPA Rego, SBOM e matriz de risco.'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setContextFilter('ALL')}
+                className="text-zinc-400 hover:text-white underline cursor-pointer shrink-0 ml-3"
+              >
+                Ver todas ({totalToolsCount})
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* 5 Modular Domain Cards Grid (Apple Bento Layout) */}
         {filteredModules.length === 0 ? (
           <div className="p-12 text-center rounded-2xl bg-white/[0.02] border border-white/[0.08] space-y-4">
@@ -886,10 +1026,22 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
                         </div>
 
                         <div>
-                          <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight uppercase font-sans">
-                            {module.title}
-                          </h2>
-                          <div className="text-xs font-mono text-zinc-400">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight uppercase font-sans">
+                              {module.title}
+                            </h2>
+                            <span 
+                              className="text-[9.5px] font-mono px-2 py-0.5 rounded font-bold uppercase tracking-wider border shadow-sm"
+                              style={{ 
+                                backgroundColor: `${module.accentColor}18`, 
+                                borderColor: `${module.accentColor}40`,
+                                color: module.accentColor 
+                              }}
+                            >
+                              {module.scopeBadge}
+                            </span>
+                          </div>
+                          <div className="text-xs font-mono text-zinc-400 mt-0.5">
                             {module.subtitle}
                           </div>
                         </div>
@@ -935,6 +1087,25 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
                               </div>
 
                               <div className="flex items-center gap-1.5 shrink-0">
+                                {(() => {
+                                  const toolScope = getToolContextScope(tool.id);
+                                  return (
+                                    <span 
+                                      className={`text-[8px] font-mono px-1.5 py-0.2 rounded font-bold uppercase hidden sm:inline ${
+                                        toolScope === 'MY_CODE' ? 'bg-cyan-950/70 text-cyan-300 border border-cyan-800/40' :
+                                        toolScope === 'SANDBOX' ? 'bg-purple-950/70 text-purple-300 border border-purple-800/40' :
+                                        'bg-amber-950/70 text-amber-300 border border-amber-800/40'
+                                      }`}
+                                      title={
+                                        toolScope === 'MY_CODE' ? 'Analisa diretamente o código do seu workspace' :
+                                        toolScope === 'SANDBOX' ? 'Sandbox e utilitário de teste dinâmico' :
+                                        'Módulo executivo de governança e postura'
+                                      }
+                                    >
+                                      {toolScope === 'MY_CODE' ? 'Código' : toolScope === 'SANDBOX' ? 'Sandbox' : 'Postura'}
+                                    </span>
+                                  );
+                                })()}
                                 {tool.badge !== undefined && (
                                   <span 
                                     className={`text-[9.5px] font-mono px-1.5 py-0.2 rounded font-bold ${

@@ -49,16 +49,21 @@ import {
   Share2,
   Check,
   BarChart3,
-  MoreHorizontal
+  MoreHorizontal,
+  FolderCode,
+  FlaskConical,
+  ClipboardList
 } from 'lucide-react';
-import { ScanReport, ScanProgress } from '../types';
+import { ScanReport, ScanProgress, ScannedFile } from '../types';
 import { useLanguage } from '../lib/i18nContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { getToolContextScope } from './AppModulesHub';
 
 interface HeaderProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   report: ScanReport;
+  files?: ScannedFile[];
   isScanning: boolean;
   scanProgress?: ScanProgress | null;
   onRunScan: () => void;
@@ -100,6 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   report,
+  files = [],
   isScanning,
   scanProgress,
   onRunScan,
@@ -121,6 +127,11 @@ export const Header: React.FC<HeaderProps> = ({
   const isMac = useMemo(() => {
     return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
   }, []);
+
+  const activeToolScope = useMemo(() => {
+    if (activeTab === 'hub') return null;
+    return getToolContextScope(activeTab);
+  }, [activeTab]);
 
   const { t, language } = useLanguage();
 
@@ -237,7 +248,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'frameworks', category: 'GOV_AI', label: t('tab.frameworks'), icon: ShieldCheck, tooltip: t('tab.frameworks_tooltip') },
     { id: 'soccommand', category: 'SOC_EDR', label: t('tab.soccommand'), icon: Radio, badge: 'LIVE', tooltip: t('tab.soccommand_tooltip') },
     { id: 'securityonion', category: 'SOC_EDR', label: t('tab.securityonion'), icon: Layers, badge: report.findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length, tooltip: t('tab.securityonion_tooltip') },
-    { id: 'crowdstrike', category: 'SOC_EDR', label: t('tab.crowdstrike'), icon: Zap, badge: 3, tooltip: t('tab.crowdstrike_tooltip') },
+    { id: 'crowdstrike', category: 'SOC_EDR', label: t('tab.crowdstrike'), icon: Zap, badge: report.findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length || undefined, tooltip: t('tab.crowdstrike_tooltip') },
     { id: 'edr', category: 'CLOUD_INFRA', label: t('tab.edr'), icon: Crosshair, badge: 'eBPF', tooltip: t('tab.edr_tooltip') },
     { id: 'nmap', category: 'SOC_EDR', label: t('tab.nmap'), icon: Globe, badge: 'Recon', tooltip: t('tab.nmap_tooltip') },
     { id: 'nikto', category: 'SOC_EDR', label: t('tab.nikto'), icon: FileSearch, badge: 'Audit', tooltip: t('tab.nikto_tooltip') },
@@ -509,6 +520,7 @@ export const Header: React.FC<HeaderProps> = ({
                     {currentModule.tools.map(tool => {
                       const ToolIcon = tool.icon;
                       const isToolActive = activeTab === tool.id;
+                      const toolScope = getToolContextScope(tool.id);
                       return (
                         <button
                           key={tool.id}
@@ -522,7 +534,12 @@ export const Header: React.FC<HeaderProps> = ({
                         >
                           <div className="flex items-center gap-2.5 min-w-0 pr-2">
                             <ToolIcon className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                            <span className="truncate">{tool.label}</span>
+                            <div className="flex flex-col min-w-0">
+                              <span className="truncate">{tool.label}</span>
+                              <span className="text-[9px] font-sans text-zinc-500">
+                                {toolScope === 'MY_CODE' ? '📁 Meu Código' : toolScope === 'SANDBOX' ? '🧪 Sandbox' : '📋 Governança'}
+                              </span>
+                            </div>
                           </div>
                           {tool.badge !== undefined && (
                             <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-black/40 text-zinc-400 border border-white/[0.08] shrink-0">
@@ -646,6 +663,12 @@ export const Header: React.FC<HeaderProps> = ({
                                       ATIVO
                                     </span>
                                   )}
+                                  {(() => {
+                                    const s = getToolContextScope(tool.id);
+                                    if (s === 'MY_CODE') return <span className="text-[8.5px] font-mono px-1 py-0.2 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/50">Código</span>;
+                                    if (s === 'SANDBOX') return <span className="text-[8.5px] font-mono px-1 py-0.2 rounded bg-purple-950/60 text-purple-300 border border-purple-800/50">Sandbox</span>;
+                                    return <span className="text-[8.5px] font-mono px-1 py-0.2 rounded bg-amber-950/60 text-amber-300 border border-amber-800/50">Governança</span>;
+                                  })()}
                                   {moduleItem && (
                                     <span className="text-[9px] font-mono text-zinc-500 hidden sm:inline">
                                       • {moduleItem.label}
@@ -895,6 +918,109 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
+        </div>
+      </div>
+
+      {/* Workspace Status & Testing Context Sub-Bar */}
+      <div className="border-t border-white/[0.06] bg-[#050508]/90 py-1.5 px-3 sm:px-6 lg:px-8">
+        <div className="max-w-7xl w-full mx-auto flex flex-wrap items-center justify-between gap-2.5 text-xs font-mono">
+          {/* Left: Workspace Clean / Active state indicator */}
+          <div className="flex items-center gap-2 min-w-0">
+            {(!files || files.length === 0) ? (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-300 border border-emerald-800/50 text-[10px] font-bold tracking-tight">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Workspace Limpo (0 arquivos | 0 falsos-positivos)
+                </span>
+                <span className="text-zinc-500 text-[10.5px] hidden md:inline">
+                  Ambiente zerado sem dados mockados. Pronto para analisar código real.
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyan-950/60 text-cyan-300 border border-cyan-800/50 text-[10px] font-bold tracking-tight">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                  Workspace Ativo ({files.length} {files.length === 1 ? 'arquivo' : 'arquivos'})
+                </span>
+                <span className="text-zinc-400 text-[10.5px]">
+                  • {report.findings.length} achados ({report.metrics.criticalCount} críticos)
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Active Tool Context badge and workspace quick-actions */}
+          <div className="flex items-center gap-2 shrink-0">
+            {activeTab !== 'hub' && (
+              <div className="flex items-center gap-1.5 text-[10px]">
+                <span className="text-zinc-500 hidden lg:inline">Escopo do Teste:</span>
+                {activeToolScope === 'MY_CODE' && (
+                  <span className="px-2 py-0.5 rounded bg-cyan-950/70 text-cyan-300 border border-cyan-800/60 font-semibold flex items-center gap-1">
+                    <FolderCode className="w-3 h-3 text-cyan-400" />
+                    Meu Código Real
+                  </span>
+                )}
+                {activeToolScope === 'SANDBOX' && (
+                  <span className="px-2 py-0.5 rounded bg-purple-950/70 text-purple-300 border border-purple-800/60 font-semibold flex items-center gap-1">
+                    <FlaskConical className="w-3 h-3 text-purple-400" />
+                    Sandbox de Teste
+                  </span>
+                )}
+                {activeToolScope === 'GOV_POSTURE' && (
+                  <span className="px-2 py-0.5 rounded bg-amber-950/70 text-amber-300 border border-amber-800/60 font-semibold flex items-center gap-1">
+                    <ClipboardList className="w-3 h-3 text-amber-400" />
+                    Governança & Postura
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Quick action buttons depending on workspace state */}
+            {(!files || files.length === 0) ? (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('scanner')}
+                  className="px-2 py-0.5 rounded bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/[0.1] text-[10px] transition-colors cursor-pointer"
+                  title="Ir ao Scanner SAST para adicionar ou carregar código"
+                >
+                  + Carregar Código
+                </button>
+                {onOpenUrlIngest && (
+                  <button
+                    type="button"
+                    onClick={onOpenUrlIngest}
+                    className="px-2 py-0.5 rounded bg-[#00F0FF]/10 hover:bg-[#00F0FF]/20 text-[#00F0FF] border border-[#00F0FF]/30 text-[10px] transition-colors cursor-pointer"
+                    title="Auditar URL ou repositório remoto diretamente"
+                  >
+                    Auditar URL
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onResetWorkspace}
+                  className="px-2 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 border border-white/[0.08] text-[10px] transition-colors cursor-pointer"
+                  title="Carregar repositório de teste demo"
+                >
+                  Restaurar Demo
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                {onClearWorkspace && (
+                  <button
+                    type="button"
+                    onClick={onClearWorkspace}
+                    className="px-2 py-0.5 rounded bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 hover:text-rose-200 border border-rose-800/40 text-[10px] transition-colors cursor-pointer flex items-center gap-1"
+                    title="Remover todos os arquivos e zerar o workspace"
+                  >
+                    <Trash2 className="w-2.5 h-2.5" />
+                    Limpar Workspace
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

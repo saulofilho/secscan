@@ -1001,7 +1001,7 @@ function assembleScanReport(
   // Run IAST runtime emulation to track runtime dataflow and detect vulnerabilities visible during execution
   let iastReport: any;
   try {
-    iastReport = runIastRuntimeEmulation(files, INITIAL_IAST_HOOKS);
+    iastReport = runIastRuntimeEmulation(files, INITIAL_IAST_HOOKS, undefined, allDangerousSinks, apiEndpoints);
   } catch (e) {
     console.warn('Fallback in IAST runtime emulation:', e);
     iastReport = runIastRuntimeEmulation([], INITIAL_IAST_HOOKS);
