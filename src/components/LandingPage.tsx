@@ -722,9 +722,21 @@ critical_findings[f] {
       <header className="sticky top-0 z-50 bg-[#070709]/90 backdrop-blur-md border-b border-[#1A1A1E]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           {/* Logo & Brand */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-b from-[#1C1C1C] to-[#0A0A0A] border border-[#333] rounded-lg flex items-center justify-center text-[#FF3E00] shadow-[0_0_15px_rgba(255,62,0,0.2)] relative">
-              <ShieldAlert className="w-5 h-5 text-[#FF3E00]" />
+          <div 
+            onClick={() => onEnterApp(false)}
+            className="flex items-center gap-3 cursor-pointer select-none group transition-opacity hover:opacity-90"
+            title="Ir para o Dashboard do App"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onEnterApp(false);
+              }
+            }}
+          >
+            <div className="w-10 h-10 bg-gradient-to-b from-[#1C1C1C] to-[#0A0A0A] border border-[#333] group-hover:border-[#FF3E00]/60 rounded-lg flex items-center justify-center text-[#FF3E00] shadow-[0_0_15px_rgba(255,62,0,0.2)] relative transition-all">
+              <ShieldAlert className="w-5 h-5 text-[#FF3E00] group-hover:scale-110 transition-transform" />
               <span className="absolute -top-1 -right-1 flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00FF41] opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00FF41]" />

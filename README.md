@@ -11,6 +11,27 @@
 
 ---
 
+## ⚡ Atualizações Recentes & Usabilidade Rápida
+
+- **🎯 Navegação Direta ao Dashboard pelo Logo:** Clicar no logotipo **SECSCAN APPSEC** no cabeçalho superior agora redireciona imediatamente para o **Dashboard Executivo**, garantindo que o operador permaneça no fluxo de análise sem sair da aplicação ou retornar à página de apresentação.
+- **🧹 Botão "Limpar / Novo Teste" com 1 Clique:** Inserido botão visível de alta velocidade tanto no menu superior (`#btn-header-clean-new-test`) quanto na **Central de Módulos** (`#hub-btn-new-test-clear`). Permite limpar todos os arquivos, amostras, logs de teste e dados mockados para iniciar uma análise limpa do zero com **0 falsos-positivos**.
+- **🚀 Motor Assíncrono com Pipeline Não-Bloqueante (Correção do Travamento em 92%):**
+  - **Execução Desacoplada:** As etapas pesadas de processamento sintático AST e emulação de runtime foram desacopladas em fases granulares com liberação da thread do navegador (`yield` de 20ms a cada fase):
+    - `0% - 85%`: Varredura estática de arquivos em chunks.
+    - `88%`: LinkFinder & Mineração de endpoints REST/GraphQL.
+    - `92%`: Construção isolada do Grafo de Fluxo de Dados (Data Flow Graph) e Taint Analysis.
+    - `95%`: Emulação IAST de execução dinâmica e rastreamento de sinks.
+    - `98%`: Consolidação de métricas, compliance OPA Rego e Quality Gates.
+    - `100%`: Finalização com feedback visual fluido e liberação instantânea.
+  - **Watchdog de Segurança (10s):** Mecanismo de auto-recuperação que destrava o estado de escaneamento automaticamente caso ocorra qualquer latência ou erro de renderização no navegador.
+  - **Botão com Progresso Visual Integrado (`#hub-btn-run-full-scan`):** Barra de preenchimento neon em tempo real embutida no próprio botão durante a varredura, com indicador `Loader2` animado e tooltip dinâmico de status.
+- **🏛️ Central de Módulos Especializados (AppModulesHub):** Navegação organizada em 5 domínios (`CODE_SAST`, `API_DAST`, `CLOUD_INFRA`, `SOC_EDR`, `GOV_AI`) com filtros rápidos por escopo de teste:
+  - `📁 Meu Código Real`: Ferramentas que analisam exclusivamente o código do repositório.
+  - `🧪 Sandbox de Teste`: Fuzzers, simuladores DAST e testes dinâmicos controlados.
+  - `📋 Governança & Postura`: Políticas OPA Rego, relatórios executivos e conformidade.
+
+---
+
 ## ✨ Principais Módulos e Funcionalidades
 
 ### 1. 📊 Validação de Risk Score Cumulativo do Workspace (0 - 100)

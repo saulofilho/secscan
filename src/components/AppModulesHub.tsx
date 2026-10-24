@@ -42,7 +42,9 @@ import {
   AlertTriangle,
   ExternalLink,
   ChevronRight,
-  Loader2
+  Loader2,
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
 import { ScanReport, ScannedFile, ScanProgress } from '../types';
 import { useLanguage } from '../lib/i18nContext';
@@ -59,6 +61,7 @@ interface AppModulesHubProps {
   onOpenCommandPalette?: () => void;
   onOpenGlossary?: () => void;
   onOpenGitignoreAudit?: () => void;
+  onClearWorkspace?: () => void;
 }
 
 interface ToolDefinition {
@@ -109,7 +112,8 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
   onOpenTour,
   onOpenCommandPalette,
   onOpenGlossary,
-  onOpenGitignoreAudit
+  onOpenGitignoreAudit,
+  onClearWorkspace
 }) => {
   const { t, language } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
@@ -803,6 +807,19 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
               <ShieldAlert className="w-3.5 h-3.5 text-[#FF3E00]" />
               <span>{language === 'pt' ? 'Dashboard' : 'Dashboard'}</span>
             </button>
+
+            {/* Clear All Data / New Test Button */}
+            {onClearWorkspace && (
+              <button
+                id="hub-btn-new-test-clear"
+                onClick={onClearWorkspace}
+                className="h-10 px-3.5 rounded-xl inline-flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider bg-rose-950/30 hover:bg-rose-900/50 text-rose-300 hover:text-rose-100 border border-rose-800/40 hover:border-rose-600/60 transition-all cursor-pointer shadow-sm active:scale-95"
+                title="Limpar todos os dados e arquivos para iniciar um novo teste do zero"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span>{language === 'pt' ? 'Novo Teste' : language === 'es' ? 'Nueva Prueba' : 'New Test'}</span>
+              </button>
+            )}
 
             {/* Export Report */}
             {onOpenExport && (

@@ -654,6 +654,9 @@ export default function App() {
     setSelectedFile(null);
     setValidationNotice(null);
     setIsNoticeDetailsOpen(false);
+    setScanProgress(null);
+    setPreviousWorkspaceSize(undefined);
+    setPreviousDataFlowGraph(undefined);
     executeScan([], rules, ignorePatterns);
     try {
       localStorage.removeItem('secscan_dast_recent_logs_v1');
@@ -665,12 +668,13 @@ export default function App() {
       id: `audit-clear-${Date.now()}`,
       timestamp: new Date().toLocaleTimeString(),
       type: 'SCAN_COMPLETE',
-      message: 'Workspace limpo: arquivos e dados de teste removidos. Ambiente zerado sem dados mockados.',
+      message: 'Workspace limpo: todos os arquivos e dados de teste removidos. Pronto para novo teste do zero.',
       severity: 'LOW',
       details: { action: 'CLEAR_ALL' }
     };
     setAuditLogs(prev => [clearEvent, ...prev].slice(0, 80));
-  }, [executeScan, rules, ignorePatterns]);
+    toast.success('Workspace limpo com sucesso! Todos os dados de teste foram removidos para iniciar uma nova verificação.');
+  }, [executeScan, rules, ignorePatterns, toast]);
 
   const handleStartCleanWorkspace = () => {
     safeSetItem('secscan_welcome_completed', 'true');
@@ -2149,6 +2153,7 @@ export default function App() {
             onOpenCommandPalette={() => setShowCommandPalette(true)}
             onOpenGlossary={handleOpenGlossary}
             onOpenGitignoreAudit={() => setShowGitignoreModal(true)}
+            onClearWorkspace={handleClearAllFilesAndValidation}
           />
         )}
 

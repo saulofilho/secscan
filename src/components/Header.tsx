@@ -355,17 +355,18 @@ export const Header: React.FC<HeaderProps> = ({
               BLOCO 1: IDENTIDADE & HUB (Brand & Core Hub Scope)
              ========================================================================= */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-            {/* Logo & Brand Name */}
+            {/* Logo & Brand Name - Navigates directly to App Dashboard */}
             <div 
-              onClick={onNavigateToLanding || (() => setActiveTab('hub'))}
-              className="flex items-center gap-2.5 cursor-pointer select-none group"
-              title="Ir para a Página Inicial de Apresentação"
+              id="header-brand-logo-btn"
+              onClick={() => setActiveTab('dashboard')}
+              className="flex items-center gap-2.5 cursor-pointer select-none group transition-opacity hover:opacity-90 active:scale-[0.98]"
+              title={language === 'pt' ? 'Ir para o Dashboard do App' : language === 'es' ? 'Ir al Dashboard del App' : 'Go to App Dashboard'}
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
-                  if (onNavigateToLanding) onNavigateToLanding();
-                  else setActiveTab('hub');
+                  e.preventDefault();
+                  setActiveTab('dashboard');
                 }
               }}
             >
@@ -885,6 +886,19 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Language Switcher */}
             <LanguageSwitcher />
+
+            {/* Clear All / Start New Test Button */}
+            {onClearWorkspace && (
+              <button
+                id="btn-header-clean-new-test"
+                onClick={onClearWorkspace}
+                className="h-8 px-2.5 sm:px-3 rounded-lg inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-rose-300 hover:text-white bg-rose-950/30 hover:bg-rose-900/60 border border-rose-800/50 hover:border-rose-600/70 transition-all cursor-pointer shadow-sm active:scale-95"
+                title={language === 'pt' ? 'Limpar todos os dados e arquivos para iniciar um novo teste do zero' : language === 'es' ? 'Limpiar datos e iniciar nueva prueba' : 'Clear all data to start a new test'}
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden sm:inline">{language === 'pt' ? 'Limpar / Novo Teste' : language === 'es' ? 'Nueva Prueba' : 'New Test'}</span>
+              </button>
+            )}
 
             {/* Export Button */}
             <button
