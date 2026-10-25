@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../lib/i18nContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { GoogleAdBanner } from './GoogleAdBanner';
 import { ScannedFile } from '../types';
 
 interface LandingPageProps {
@@ -1221,6 +1222,13 @@ critical_findings[f] {
           </div>
         </div>
       </section>
+
+      {/* Google AdSense Placement (Ad-Free para o Admin e controlado via Envs) */}
+      <div className="max-w-4xl mx-auto px-4 w-full py-2">
+        <GoogleAdBanner
+          className="rounded-xl border border-white/[0.04] bg-white/[0.01]"
+        />
+      </div>
 
       {/* Footer */}
       <footer className="bg-[#040405] border-t border-[#141418] py-8 text-xs font-mono text-zinc-500">

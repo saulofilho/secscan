@@ -58,6 +58,7 @@ import { ScanReport, ScanProgress, ScannedFile } from '../types';
 import { useLanguage } from '../lib/i18nContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { getToolContextScope } from './AppModulesHub';
+import { isAdFreeMode, toggleAdFreeMode } from '../lib/adManager';
 
 interface HeaderProps {
   activeTab: string;
@@ -142,6 +143,18 @@ export const Header: React.FC<HeaderProps> = ({
   const [isModuleMenuOpen, setIsModuleMenuOpen] = useState(false);
   const [isToolMenuOpen, setIsToolMenuOpen] = useState(false);
   const [isUtilsMenuOpen, setIsUtilsMenuOpen] = useState(false);
+  const [localAdFree, setLocalAdFree] = useState<boolean>(() => isAdFreeMode());
+
+  useEffect(() => {
+    const handleAdChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ adFree: boolean }>;
+      if (customEvent.detail) {
+        setLocalAdFree(customEvent.detail.adFree);
+      }
+    };
+    window.addEventListener('secscan_ad_mode_changed', handleAdChange);
+    return () => window.removeEventListener('secscan_ad_mode_changed', handleAdChange);
+  }, []);
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const moduleMenuRef = useRef<HTMLDivElement>(null);
@@ -859,6 +872,28 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     <Share2 className="w-3.5 h-3.5 text-[#00FF41]" />
                     <span>Compartilhar Link</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const next = toggleAdFreeMode();
+                      setLocalAdFree(next);
+                      setIsUtilsMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
+                    title="Alternar visibilidade de anúncios do Google Ads para testes ou modo admin"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <ShieldCheck className={`w-3.5 h-3.5 ${localAdFree ? 'text-[#00FF41]' : 'text-zinc-400'}`} />
+                      <span>{localAdFree ? 'Modo Sem Anúncios (Ativo)' : 'Modo Sem Anúncios (Admin)'}</span>
+                    </div>
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold ${
+                      localAdFree 
+                        ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-800/60' 
+                        : 'bg-zinc-800 text-zinc-400 border border-white/10'
+                    }`}>
+                      {localAdFree ? 'ATIVO' : 'OFF'}
+                    </span>
                   </button>
 
                   <div className="border-t border-white/[0.08] my-1" />
