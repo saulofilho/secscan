@@ -138,6 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const [toolSearchTerm, setToolSearchTerm] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
   const [isCopiedShare, setIsCopiedShare] = useState(false);
   const [isModuleMenuOpen, setIsModuleMenuOpen] = useState(false);
@@ -167,6 +168,7 @@ export const Header: React.FC<HeaderProps> = ({
       const target = event.target as Node;
       if (searchContainerRef.current && !searchContainerRef.current.contains(target)) {
         setIsSearchOpen(false);
+        setIsSearchFocused(false);
       }
       if (moduleMenuRef.current && !moduleMenuRef.current.contains(target)) {
         setIsModuleMenuOpen(false);
@@ -185,6 +187,7 @@ export const Header: React.FC<HeaderProps> = ({
         setIsToolMenuOpen(false);
         setIsUtilsMenuOpen(false);
         setIsSearchOpen(false);
+        setIsSearchFocused(false);
       }
       if (e.key === '/' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
         e.preventDefault();
@@ -192,6 +195,7 @@ export const Header: React.FC<HeaderProps> = ({
         if (input) {
           input.focus();
           setIsSearchOpen(true);
+          setIsSearchFocused(true);
         }
       }
     };
@@ -360,19 +364,19 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="w-full border-b border-white/[0.08] bg-[#07070A]/95 backdrop-blur-xl sticky top-0 z-30 shadow-md">
-      <div className="max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8">
+      <div className="max-w-[1600px] 2xl:max-w-[1800px] w-full mx-auto px-3 sm:px-5 lg:px-8">
         {/* CONCENTRATED SINGLE-MENU BAR (Divided into 3 Scopes/Blocks) */}
-        <div className="h-16 flex items-center justify-between gap-2 sm:gap-4">
+        <div className="h-16 flex items-center justify-between gap-2 sm:gap-3 lg:gap-4 w-full min-w-0 relative">
           
           {/* =========================================================================
               BLOCO 1: IDENTIDADE & HUB (Brand & Core Hub Scope)
              ========================================================================= */}
-          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 lg:gap-3 shrink-0">
             {/* Logo & Brand Name - Navigates directly to App Dashboard */}
             <div 
               id="header-brand-logo-btn"
               onClick={() => setActiveTab('dashboard')}
-              className="flex items-center gap-2.5 cursor-pointer select-none group transition-opacity hover:opacity-90 active:scale-[0.98]"
+              className="flex items-center gap-2 sm:gap-2.5 cursor-pointer select-none group transition-opacity hover:opacity-90 active:scale-[0.98] shrink-0"
               title={language === 'pt' ? 'Ir para o Dashboard do App' : language === 'es' ? 'Ir al Dashboard del App' : 'Go to App Dashboard'}
               role="button"
               tabIndex={0}
@@ -383,7 +387,7 @@ export const Header: React.FC<HeaderProps> = ({
                 }
               }}
             >
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-b from-[#1C1C24] to-[#0A0A0E] border border-white/[0.1] group-hover:border-[#FF3E00]/60 flex items-center justify-center text-[#FF3E00] shadow-[0_0_12px_rgba(255,62,0,0.15)] relative transition-all">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-b from-[#1C1C24] to-[#0A0A0E] border border-white/[0.1] group-hover:border-[#FF3E00]/60 flex items-center justify-center text-[#FF3E00] shadow-[0_0_12px_rgba(255,62,0,0.15)] relative transition-all shrink-0">
                 <ShieldAlert className="w-4 h-4 text-[#FF3E00] group-hover:scale-110 transition-transform" />
                 <span className="absolute -top-1 -right-1 flex h-2 w-2">
                   <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
@@ -394,24 +398,24 @@ export const Header: React.FC<HeaderProps> = ({
                   }`} />
                 </span>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <span className="font-black text-base sm:text-lg tracking-tight text-white uppercase font-sans">
                   SECSCAN
                 </span>
-                <span className="text-[#FF3E00] font-black text-base sm:text-lg uppercase font-sans">
+                <span className="text-[#FF3E00] font-black text-base sm:text-lg uppercase font-sans hidden sm:inline">
                   APPSEC
                 </span>
               </div>
             </div>
 
             {/* Subtle Vertical Divider */}
-            <div className="h-5 w-px bg-white/10 hidden sm:block" />
+            <div className="h-5 w-px bg-white/10 hidden sm:block shrink-0" />
 
             {/* Central de Módulos (Hub) Button */}
             <button
               id="btn-header-modules-hub"
               onClick={() => setActiveTab('hub')}
-              className={`h-8 px-2.5 sm:px-3 rounded-lg inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+              className={`h-8 px-2 sm:px-2.5 lg:px-3 rounded-lg inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer border shrink-0 whitespace-nowrap ${
                 activeTab === 'hub'
                   ? 'bg-[#00F0FF]/15 text-[#00F0FF] border-[#00F0FF]/50 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
                   : 'text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border-white/[0.08] hover:border-[#00F0FF]/40'
@@ -431,7 +435,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* =========================================================================
               BLOCO 2: MÓDULOS & FERRAMENTAS DO ESCOPO (Scoped Module & Tool Selector)
              ========================================================================= */}
-          <div className="flex items-center gap-2 flex-1 max-w-2xl mx-1 sm:mx-3 justify-center">
+          <div className="flex items-center gap-2 flex-1 max-w-2xl mx-1 sm:mx-3 justify-center min-w-0">
             {/* Module Selector Dropdown */}
             <div className="relative" ref={moduleMenuRef}>
               <button
@@ -505,24 +509,24 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            {/* Active Tool Selector inside Module (only shown when inside a specific tool) */}
+            {/* Active Tool Selector inside Module (only shown on wider viewports to avoid overlapping) */}
             {activeTab !== 'hub' && currentModule && (
-              <div className="relative" ref={toolMenuRef}>
+              <div className="relative hidden xl:block shrink-0" ref={toolMenuRef}>
                 <button
                   id="header-btn-tool-selector"
                   onClick={() => setIsToolMenuOpen(!isToolMenuOpen)}
-                  className="h-8 px-2.5 sm:px-3 rounded-lg inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-wider bg-white/[0.03] hover:bg-white/[0.07] text-[#00FF41] border border-[#00FF41]/30 hover:border-[#00FF41]/60 transition-all cursor-pointer whitespace-nowrap"
+                  className="h-8 px-2.5 sm:px-3 rounded-lg inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-wider bg-white/[0.03] hover:bg-white/[0.07] text-[#00FF41] border border-[#00FF41]/30 hover:border-[#00FF41]/60 transition-all cursor-pointer whitespace-nowrap shrink-0"
                   title="Ferramenta Ativa no Módulo"
                 >
                   {activeToolItem ? (
                     <>
                       <activeToolItem.icon className="w-3.5 h-3.5 text-[#00FF41] shrink-0" />
-                      <span className="max-w-[110px] sm:max-w-[150px] truncate">{activeToolItem.label}</span>
+                      <span className="max-w-[110px] sm:max-w-[140px] truncate">{activeToolItem.label}</span>
                     </>
                   ) : (
                     <span>Ferramenta</span>
                   )}
-                  <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform ${isToolMenuOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform shrink-0 ${isToolMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {/* Tool Dropdown Popover */}
@@ -568,14 +572,31 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
 
-            {/* Spotlight Search Box (Apple Style) */}
-            <div ref={searchContainerRef} className="relative hidden md:flex items-center max-w-[200px] lg:max-w-[250px] w-full">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 text-zinc-400 pointer-events-none" />
+            {/* Spotlight Search Box (Expanding on Focus / Selection) */}
+            <div 
+              ref={searchContainerRef} 
+              className={`relative hidden md:flex items-center transition-all duration-300 ease-out z-20 shrink-1 min-w-[100px] ${
+                isSearchFocused || toolSearchTerm.trim().length > 0 
+                  ? 'w-48 sm:w-56 lg:w-64 xl:w-72 shadow-[0_0_20px_rgba(0,240,255,0.2)]' 
+                  : 'w-24 sm:w-28 lg:w-36 xl:w-40'
+              }`}
+            >
+              <Search className={`w-3.5 h-3.5 absolute left-2.5 transition-colors pointer-events-none shrink-0 ${
+                isSearchFocused ? 'text-[#00F0FF]' : 'text-zinc-400'
+              }`} />
               <input
                 id="nav-tool-search-input"
                 type="text"
                 value={toolSearchTerm}
-                onFocus={() => setIsSearchOpen(true)}
+                onFocus={() => {
+                  setIsSearchOpen(true);
+                  setIsSearchFocused(true);
+                }}
+                onBlur={() => {
+                  setTimeout(() => {
+                    setIsSearchFocused(false);
+                  }, 180);
+                }}
                 onChange={(e) => {
                   setToolSearchTerm(e.target.value);
                   setIsSearchOpen(true);
@@ -598,15 +619,23 @@ export const Header: React.FC<HeaderProps> = ({
                       setActiveTab(selected.id);
                       setToolSearchTerm('');
                       setIsSearchOpen(false);
+                      setIsSearchFocused(false);
                     }
                   } else if (e.key === 'Escape') {
                     e.preventDefault();
                     setIsSearchOpen(false);
+                    setIsSearchFocused(false);
                     setToolSearchTerm('');
                   }
                 }}
-                placeholder={t('nav.search_placeholder') || 'Buscar ferramentas (/)...'}
-                className="w-full h-8 pl-8 pr-7 text-[11px] font-mono bg-white/[0.04] hover:bg-white/[0.07] focus:bg-white/[0.09] border border-white/[0.10] focus:border-[#00F0FF]/60 rounded-lg text-zinc-200 placeholder-zinc-500 focus:outline-none transition-all shadow-inner"
+                placeholder={isSearchFocused ? (t('nav.search_placeholder') || 'Buscar ferramentas (/)...') : 'Buscar...'}
+                className={`w-full h-8 pl-8 text-[11px] font-mono border rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none transition-all duration-300 ${
+                  toolSearchTerm ? 'pr-7' : 'pr-6'
+                } ${
+                  isSearchFocused
+                    ? 'bg-[#0D0D14] border-[#00F0FF]/80 shadow-[0_0_14px_rgba(0,240,255,0.3)] ring-1 ring-[#00F0FF]/40'
+                    : 'bg-white/[0.04] hover:bg-white/[0.07] border-white/[0.10]'
+                }`}
               />
               {toolSearchTerm ? (
                 <button
@@ -614,6 +643,7 @@ export const Header: React.FC<HeaderProps> = ({
                   onClick={() => {
                     setToolSearchTerm('');
                     setIsSearchOpen(false);
+                    setIsSearchFocused(false);
                   }}
                   className="absolute right-2 text-zinc-400 hover:text-white cursor-pointer"
                   title="Limpar filtro"
@@ -649,11 +679,13 @@ export const Header: React.FC<HeaderProps> = ({
                           <button
                             key={tool.id}
                             type="button"
+                            onMouseDown={(e) => e.preventDefault()}
                             onMouseEnter={() => setSelectedSearchIndex(idx)}
                             onClick={() => {
                               setActiveTab(tool.id);
                               setToolSearchTerm('');
                               setIsSearchOpen(false);
+                              setIsSearchFocused(false);
                             }}
                             className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-all cursor-pointer ${
                               isSelected 
@@ -723,8 +755,8 @@ export const Header: React.FC<HeaderProps> = ({
           {/* =========================================================================
               BLOCO 3: TELEMETRIA, UTILIDADES & AÇÕES (Telemetry & Actions Scope)
              ========================================================================= */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Risk Score Pill */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 justify-end min-w-0">
+            {/* Risk Score Pill - Only shown on 2xl to preserve space and avoid overlap */}
             <button
               id="header-workspace-risk-score-badge"
               type="button"
@@ -736,10 +768,10 @@ export const Header: React.FC<HeaderProps> = ({
                   if (el) el.scrollIntoView({ behavior: 'smooth' });
                 }, 100);
               }}
-              className="hidden xl:flex items-center gap-1.5 h-8 px-2.5 rounded-lg border font-mono text-[11px] font-bold uppercase transition-all cursor-pointer bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08]"
+              className="hidden 2xl:flex items-center gap-1.5 h-8.5 px-2.5 rounded-lg border font-mono text-[11px] font-bold uppercase transition-all cursor-pointer bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08] shrink-0 whitespace-nowrap select-none"
               title="Score de Risco do Workspace"
             >
-              <span className={`w-2 h-2 rounded-full ${
+              <span className={`w-2 h-2 rounded-full shrink-0 ${
                 (report.metrics.riskScore ?? 0) >= 75 ? 'bg-[#FF3E00]' : (report.metrics.riskScore ?? 0) >= 50 ? 'bg-[#FF7A00]' : 'bg-[#00FF41]'
               }`} />
               <span className="text-zinc-400 text-[10px]">Score:</span>
@@ -747,16 +779,16 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             {/* Consolidated Utilities Dropdown ([⚙️ Utilidades ▾]) */}
-            <div className="relative" ref={utilsMenuRef}>
+            <div className="relative shrink-0" ref={utilsMenuRef}>
               <button
                 id="btn-header-utilities-menu"
                 onClick={() => setIsUtilsMenuOpen(!isUtilsMenuOpen)}
-                className="h-8 px-2.5 rounded-lg inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] hover:border-white/[0.2] transition-all cursor-pointer"
+                className="h-8.5 px-2.5 rounded-lg inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] hover:border-white/[0.2] transition-all cursor-pointer shrink-0 whitespace-nowrap select-none"
                 title="Utilidades e Ferramentas Auxiliares"
               >
-                <MoreHorizontal className="w-4 h-4 text-zinc-400" />
-                <span className="hidden xl:inline">{language === 'pt' ? 'Utilidades' : 'Tools'}</span>
-                <ChevronDown className={`w-3 h-3 text-zinc-500 transition-transform ${isUtilsMenuOpen ? 'rotate-180' : ''}`} />
+                <MoreHorizontal className="w-4 h-4 text-zinc-400 shrink-0" />
+                <span className="hidden 2xl:inline">{language === 'pt' ? 'Utilidades' : 'Tools'}</span>
+                <ChevronDown className={`w-3 h-3 text-zinc-500 transition-transform shrink-0 ${isUtilsMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {/* Utilities Popover */}
@@ -920,18 +952,20 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Language Switcher */}
-            <LanguageSwitcher />
+            <div className="shrink-0">
+              <LanguageSwitcher />
+            </div>
 
             {/* Clear All / Start New Test Button */}
             {onClearWorkspace && (
               <button
                 id="btn-header-clean-new-test"
                 onClick={onClearWorkspace}
-                className="h-8 px-2.5 sm:px-3 rounded-lg inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-rose-300 hover:text-white bg-rose-950/30 hover:bg-rose-900/60 border border-rose-800/50 hover:border-rose-600/70 transition-all cursor-pointer shadow-sm active:scale-95"
+                className="h-8.5 px-2.5 sm:px-3 rounded-xl inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-rose-300 hover:text-white bg-rose-950/30 hover:bg-rose-900/60 border border-rose-800/50 hover:border-rose-600/70 transition-all cursor-pointer shadow-sm active:scale-95 shrink-0 whitespace-nowrap select-none"
                 title={language === 'pt' ? 'Limpar todos os dados e arquivos para iniciar um novo teste do zero' : language === 'es' ? 'Limpiar datos e iniciar nueva prueba' : 'Clear all data to start a new test'}
               >
-                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                <span className="hidden sm:inline">{language === 'pt' ? 'Limpar / Novo Teste' : language === 'es' ? 'Nueva Prueba' : 'New Test'}</span>
+                <Trash2 className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                <span className="hidden 2xl:inline">{language === 'pt' ? 'Limpar' : language === 'es' ? 'Limpiar' : 'Clear'}</span>
               </button>
             )}
 
@@ -939,11 +973,11 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="btn-export-report"
               onClick={onOpenExport}
-              className="h-8 px-2.5 sm:px-3 rounded-lg inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] hover:border-white/[0.2] transition-all cursor-pointer"
+              className="h-8.5 px-2.5 sm:px-3 rounded-xl inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] hover:border-white/[0.2] transition-all cursor-pointer shrink-0 whitespace-nowrap select-none"
               title="Exportar Relatório"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">{t('action.export')}</span>
+              <Download className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden 2xl:inline">{t('action.export')}</span>
             </button>
 
             {/* Primary Action: Run Scan */}
@@ -952,14 +986,14 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onRunScan}
               disabled={isScanning}
               title={`Executar Análise SAST (${isMac ? '⌘S' : 'Ctrl+S'})`}
-              className={`h-8 px-3.5 sm:px-4 rounded-xl inline-flex items-center gap-2 font-mono text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-md shrink-0 ${
+              className={`h-8.5 px-3.5 sm:px-4 rounded-xl inline-flex items-center gap-2 font-mono text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-md shrink-0 whitespace-nowrap select-none ${
                 isScanning
                   ? 'bg-[#262626] text-[#777] cursor-not-allowed border border-[#333]'
-                  : 'bg-[#FF3E00] hover:bg-[#E03700] text-white active:scale-95 shadow-[0_0_15px_rgba(255,62,0,0.3)]'
+                  : 'bg-gradient-to-r from-[#FF3E00] via-[#FF551C] to-[#E03700] hover:from-[#FF551C] hover:to-[#FF3E00] text-white active:scale-95 shadow-[0_0_16px_rgba(255,62,0,0.35)] border border-[#FF3E00]/80'
               }`}
             >
-              <Play className={`w-3 h-3 fill-current ${isScanning ? 'animate-spin' : ''}`} />
-              <span className="whitespace-nowrap">
+              <Play className={`w-3.5 h-3.5 fill-current shrink-0 ${isScanning ? 'animate-spin' : ''}`} />
+              <span className="whitespace-nowrap font-bold">
                 {isScanning 
                   ? `${t('action.scanning')}${scanProgress ? ` (${scanProgress.percentage}%)` : ''}` 
                   : t('action.run_scan')}
@@ -971,8 +1005,8 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Workspace Status & Testing Context Sub-Bar */}
-      <div className="border-t border-white/[0.06] bg-[#050508]/90 py-1.5 px-3 sm:px-6 lg:px-8">
-        <div className="max-w-7xl w-full mx-auto flex flex-wrap items-center justify-between gap-2.5 text-xs font-mono">
+      <div className="border-t border-white/[0.06] bg-[#050508]/90 py-1.5 px-3 sm:px-5 lg:px-8">
+        <div className="max-w-[1600px] 2xl:max-w-[1800px] w-full mx-auto flex flex-wrap items-center justify-between gap-2.5 text-xs font-mono">
           {/* Left: Workspace Clean / Active state indicator */}
           <div className="flex items-center gap-2 min-w-0">
             {(!files || files.length === 0) ? (

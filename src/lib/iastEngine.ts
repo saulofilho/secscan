@@ -551,7 +551,8 @@ export function runIastRuntimeEmulation(
         const isSqlSink = /(\.query\s*\(|db\.execute\s*\(|sequelize\.query\s*\(|mysql\.query\s*\(|pg\.query\s*\()/i.test(trimmed);
         if (isSqlSink) {
           interceptedMap.set('SQL_DATABASE_SINK', (interceptedMap.get('SQL_DATABASE_SINK') || 0) + 1);
-          const isTainted = /(\+|`|\$\{).*(req\.|params|query|body|searchTerm|user_input|id)/i.test(trimmed);
+          const boundedLine = trimmed.length > 250 ? trimmed.slice(0, 250) : trimmed;
+          const isTainted = /(\+|`|\$\{).{0,80}(req\.|params|query|body|searchTerm|user_input|id)/i.test(boundedLine);
           if (isTainted) {
             triggeredMap.set('SQL_DATABASE_SINK', (triggeredMap.get('SQL_DATABASE_SINK') || 0) + 1);
             discoveredFindings.push({
@@ -621,7 +622,8 @@ export function runIastRuntimeEmulation(
         const isCmdSink = /(child_process\.exec|exec\s*\(|spawn\s*\(|execSync\s*\()/i.test(trimmed);
         if (isCmdSink) {
           interceptedMap.set('COMMAND_EXEC_SINK', (interceptedMap.get('COMMAND_EXEC_SINK') || 0) + 1);
-          const isTainted = /(\+|`|\$\{).*(req\.|params|query|body|host|cmd|command|file|input)/i.test(trimmed);
+          const boundedLine = trimmed.length > 250 ? trimmed.slice(0, 250) : trimmed;
+          const isTainted = /(\+|`|\$\{).{0,80}(req\.|params|query|body|host|cmd|command|file|input)/i.test(boundedLine);
           if (isTainted) {
             triggeredMap.set('COMMAND_EXEC_SINK', (triggeredMap.get('COMMAND_EXEC_SINK') || 0) + 1);
             discoveredFindings.push({

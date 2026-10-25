@@ -1272,6 +1272,24 @@ export async function scanSourceFilesAsync(
   let scannedCount = 0;
   let ignoredCount = 0;
 
+  // If workspace has no files, return immediately with zero latency and 100% progress
+  if (!files || files.length === 0) {
+    onProgress?.({
+      percentage: 100,
+      currentFileIndex: 0,
+      totalFiles: 0,
+      currentFileName: '',
+      currentFilePath: '',
+      phase: 'COMPLETED',
+      phaseLabel: 'Workspace pronto (0 arquivos)',
+      findingsFoundCount: 0,
+      scannedCount: 0,
+      ignoredCount: 0,
+      elapsedMs: 0
+    });
+    return assembleScanReport(scanId, startTime, [], 0, 0, [], [], [], [], [], [], [], onLog);
+  }
+
   onLog?.({
     id: `log-${Date.now()}-0`,
     timestamp: new Date().toLocaleTimeString(),

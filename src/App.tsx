@@ -461,6 +461,16 @@ export default function App() {
     targetRules: RegexRule[], 
     targetIgnorePatterns?: IgnorePatternItem[]
   ) => {
+    // If workspace is empty, do not enter async scanning state
+    if (!targetFiles || targetFiles.length === 0) {
+      setIsScanning(false);
+      setScanProgress(null);
+      toast.info('Workspace vazio. Faça upload de arquivos ou carregue a demo para executar a varredura SAST.', {
+        title: 'Nenhum Arquivo'
+      });
+      return;
+    }
+
     const currentSeq = ++activeScanSequenceRef.current;
     setIsScanning(true);
     setScanProgress({
@@ -492,13 +502,12 @@ export default function App() {
     }
     lastScanWorkspaceBytesRef.current = currentWorkspaceBytes;
 
+    // Failsafe watchdog timer to guarantee the UI is never stuck scanning
     const watchdogTimer = setTimeout(() => {
-      if (activeScanSequenceRef.current === currentSeq) {
-        console.warn('Scan watchdog timer reached - auto-unlocking scan state');
-        setIsScanning(false);
-        setScanProgress(null);
-      }
-    }, 10000);
+      console.warn('Scan watchdog timer reached - auto-unlocking scan state');
+      setIsScanning(false);
+      setScanProgress(null);
+    }, 7000);
 
     try {
       const result = await scanSourceFilesAsync(
@@ -517,7 +526,11 @@ export default function App() {
 
       if (activeScanSequenceRef.current === currentSeq) {
         // Evaluate Policy-as-Code against currently active OPA Rego policies
-        result.opaCompliance = evaluateAllOpaPolicies(opaPoliciesRef.current, result);
+        try {
+          result.opaCompliance = evaluateAllOpaPolicies(opaPoliciesRef.current, result);
+        } catch (opaErr) {
+          console.warn('Non-fatal error during OPA policy evaluation:', opaErr);
+        }
 
         setReport(prevReport => {
           if (prevReport?.dataFlowGraph && prevReport.dataFlowGraph.nodes && prevReport.dataFlowGraph.nodes.length > 0) {
@@ -541,17 +554,13 @@ export default function App() {
       });
     } finally {
       clearTimeout(watchdogTimer);
-      if (activeScanSequenceRef.current === currentSeq) {
-        setIsScanning(false);
-        // Give UI 1.2s to show 100% completed badge before clearing scanProgress bar
-        setTimeout(() => {
-          if (activeScanSequenceRef.current === currentSeq) {
-            setScanProgress(null);
-          }
-        }, 1200);
-      }
+      // Guarantee scan state is ALWAYS cleared on completion
+      setIsScanning(false);
+      setTimeout(() => {
+        setScanProgress(null);
+      }, 500);
     }
-  }, [ignorePatterns]);
+  }, [ignorePatterns, toast]);
 
   const handleExploreWithMock = () => {
     safeSetItem('secscan_welcome_completed', 'true');
@@ -653,11 +662,13 @@ export default function App() {
     setFiles([]);
     setSelectedFile(null);
     setValidationNotice(null);
-    setIsNoticeDetailsOpen(false);
     setScanProgress(null);
+    setIsScanning(false);
     setPreviousWorkspaceSize(undefined);
     setPreviousDataFlowGraph(undefined);
-    executeScan([], rules, ignorePatterns);
+    const safePatterns = Array.isArray(ignorePatterns) ? ignorePatterns : DEFAULT_GLOBAL_IGNORE_PATTERNS;
+    const activeIgnoreStrings = safePatterns.filter(p => p && p.enabled).map(p => p.pattern);
+    setReport(scanSourceFiles([], rules, activeIgnoreStrings));
     try {
       localStorage.removeItem('secscan_dast_recent_logs_v1');
       localStorage.removeItem('secscan_falcon_endpoints_v1');
@@ -707,9 +718,8 @@ export default function App() {
     setShowTour(false);
   };
 
-  // Run on first load
+  // Run on first load - setup meta tags and analytics without running auto-scan
   useEffect(() => {
-    executeScan(files, rules, ignorePatterns);
 
     // Sync client-side OpenGraph and Twitter card thumbnail URLs with dynamic origin
     if (typeof window !== 'undefined') {
@@ -1536,7 +1546,7 @@ export default function App() {
       />
 
       {/* Main Container Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">
+      <main className="flex-1 max-w-[1600px] 2xl:max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">
         {/* Workspace Ingestion & Security Validation Banner */}
         {validationNotice && (
           <div 
