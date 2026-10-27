@@ -91,7 +91,7 @@ export const ScaSecurityView: React.FC<ScaSecurityViewProps> = ({ files, onNavig
             </span>
           </div>
           <p className="text-xs text-zinc-400 font-mono mt-1">
-            Varredura automática de manifestos (package.json, requirements.txt) contra bases públicas OSV, CVE e NVD.
+            Varredura de package.json e requirements.txt contra o catálogo local ({report.catalogSize} pacotes). Pacote ausente fica como NOT_IN_CATALOG.
           </p>
         </div>
 

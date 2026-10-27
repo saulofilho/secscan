@@ -163,18 +163,27 @@ export const DEFAULT_OSINT_THREAT_FEEDS: ThreatIntelActivity[] = [
   }
 ];
 
+const LOCAL_THREAT_SOURCES: { name: string; source: ThreatIntelActivity['source'] }[] = [
+  { name: 'AlienVault OTX (amostra local)', source: 'ALIENVAULT_OTX' },
+  { name: 'Abuse.ch URLhaus (amostra local)', source: 'ABUSE_CH_URLHAUS' },
+  { name: 'Abuse.ch ThreatFox (amostra local)', source: 'ABUSE_CH_THREATFOX' },
+  { name: 'Abuse.ch Feodo Tracker (amostra local)', source: 'ABUSE_CH_FEODO' },
+  { name: 'CISA KEV (amostra local)', source: 'CISA_KEV' },
+];
+
 export function getThreatIntelSummary(activities: ThreatIntelActivity[] = DEFAULT_OSINT_THREAT_FEEDS): ThreatIntelFeedSummary {
   return {
+    catalogMode: 'LOCAL_SAMPLE',
     totalIndicators: activities.length,
     activeCampaignsCount: activities.filter(a => a.status === 'ACTIVE').length,
     lastSyncTimestamp: new Date().toISOString(),
-    sourcesOnline: [
-      { name: 'AlienVault OTX (Open Threat Exchange)', source: 'ALIENVAULT_OTX', status: 'ONLINE', indicatorsCount: 1420, latencyMs: 64 },
-      { name: 'Abuse.ch URLhaus (Malicious URLs)', source: 'ABUSE_CH_URLHAUS', status: 'ONLINE', indicatorsCount: 980, latencyMs: 42 },
-      { name: 'Abuse.ch ThreatFox (IOC Tracker)', source: 'ABUSE_CH_THREATFOX', status: 'ONLINE', indicatorsCount: 850, latencyMs: 51 },
-      { name: 'Abuse.ch Feodo Tracker (Botnet C2)', source: 'ABUSE_CH_FEODO', status: 'ONLINE', indicatorsCount: 310, latencyMs: 38 },
-      { name: 'CISA KEV (Known Exploited Vulns)', source: 'CISA_KEV', status: 'ONLINE', indicatorsCount: 1140, latencyMs: 70 },
-    ]
+    sourcesOnline: LOCAL_THREAT_SOURCES.map((source) => ({
+      name: source.name,
+      source: source.source,
+      status: 'LOCAL_CATALOG' as const,
+      indicatorsCount: activities.filter(activity => activity.source === source.source).length,
+      latencyMs: 0,
+    })),
   };
 }
 
@@ -240,9 +249,10 @@ export function lookupThreatIndicator(
       query: '',
       matched: false,
       matchCount: 0,
-      verdict: 'CLEAN_OR_UNKNOWN',
+      verdict: 'QUERY_REQUIRED',
       matches: [],
-      recommendation: 'Insira um termo para pesquisa OSINT.'
+      catalogMode: 'LOCAL_SAMPLE' as const,
+      recommendation: 'Insira um termo para pesquisar no catálogo local.'
     };
   }
 
@@ -259,11 +269,12 @@ export function lookupThreatIndicator(
     query: cleanQuery,
     matched: isLikelyMalicious,
     matchCount: matches.length,
-    verdict: isLikelyMalicious ? 'MALICIOUS_IOC_FOUND' : 'CLEAN_OR_UNKNOWN',
+    verdict: isLikelyMalicious ? 'MALICIOUS_IOC_FOUND' : 'NOT_IN_LOCAL_CATALOG',
     matches,
+    catalogMode: 'LOCAL_SAMPLE' as const,
     recommendation: isLikelyMalicious
-      ? 'IOC catalogado em bases de OSINT ativas. Recomenda-se bloquear e isolar imediatamente.'
-      : 'Nenhum registro adverso encontrado nas bases abertas do AlienVault OTX e Abuse.ch neste momento.'
+      ? 'Indicador presente na amostra local. Confirme em uma fonte primária antes de bloquear.'
+      : 'Indicador ausente desta amostra local. Isso não significa que o alvo está limpo.'
   };
 }
 

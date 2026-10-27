@@ -82,7 +82,7 @@ import { LandingPage } from './components/LandingPage';
 import { UrlIngestModal } from './components/UrlIngestModal';
 import { GitignoreAuditModal } from './components/GitignoreAuditModal';
 import { AnalyticsDashboardModal } from './components/AnalyticsDashboardModal';
-import { AppModulesHub } from './components/AppModulesHub';
+import { AppModulesHub, isLaboratoryTool } from './components/AppModulesHub';
 import { AdSenseBanner } from './components/GoogleAdBanner';
 import { UserSettingsDrawer } from './components/UserSettingsDrawer';
 import { sendAnalyticsEvent, recordLocalTabSessionActivity, recordSecurityAuditLog } from './lib/analyticsTracker';
@@ -2150,6 +2150,17 @@ export default function App() {
               >
                 <X className="w-4 h-4" />
               </button>
+            </div>
+          </div>
+        )}
+
+        {isLaboratoryTool(activeTab) && (
+          <div className="max-w-[1600px] 2xl:max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-amber-100">
+              <p className="text-xs font-mono font-bold uppercase tracking-wide text-amber-300">Laboratório</p>
+              <p className="text-sm text-amber-50/90 mt-1">
+                Esta tela usa cenário de exemplo. Ela não varre rede, host, feed ou console externo.
+              </p>
             </div>
           </div>
         )}

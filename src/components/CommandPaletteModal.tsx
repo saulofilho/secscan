@@ -465,11 +465,11 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       },
       {
         id: 'nav-iast',
-        title: 'Módulo: IAST (Interactive Application Security Testing)',
-        subtitle: 'Hooks de instrumentação em runtime, emulação dinâmica de taint, validação em sinks e zero falsos positivos',
+        title: 'Módulo: IAST (laboratório de payloads)',
+        subtitle: 'Aplica payloads de exemplo sobre trechos do código. Não há agente dentro do processo da aplicação',
         category: 'Navegação',
         icon: Activity,
-        badge: report.iastReport?.findings.length ? `${report.iastReport.findings.length} hooks` : 'IAST',
+        badge: 'LAB',
         badgeColor: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
         action: () => {
           onClose();
@@ -581,7 +581,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         subtitle: 'Console unificado com streaming de logs de auditoria, curvas de MTTR e alertas críticos da suíte',
         category: 'Navegação',
         icon: Radio,
-        badge: 'SOC LIVE',
+        badge: 'LAB',
         badgeColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
         action: () => {
           onClose();

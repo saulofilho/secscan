@@ -1,7 +1,7 @@
 {
-  "name": "react-example",
+  "name": "secscan",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "bin": "./bin/secscan.js",
   "scripts": {

@@ -218,11 +218,11 @@ export const ThreatIntelligenceDashboard: React.FC<ThreatIntelligenceDashboardPr
               }`}
             >
               <div className="flex items-center justify-between text-[9px] mb-1">
-                <span className="flex items-center gap-1 text-[#00FF41]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#00FF41] animate-ping inline-block" />
-                  ONLINE
+                <span className="flex items-center gap-1 text-amber-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-300 inline-block" />
+                  LOCAL
                 </span>
-                <span className="text-[#666]">{src.latencyMs}ms</span>
+                <span className="text-[#666]">amostra</span>
               </div>
               <div className="font-bold text-[11px] text-white truncate">{src.name.split(' ')[0]}</div>
               <div className="text-[10px] text-[#888] truncate">{src.name.split(' ').slice(1).join(' ')}</div>

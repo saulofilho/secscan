@@ -895,10 +895,11 @@ export interface ThreatIntelFeedSummary {
   totalIndicators: number;
   activeCampaignsCount: number;
   lastSyncTimestamp: string;
+  catalogMode: 'LOCAL_SAMPLE';
   sourcesOnline: {
     name: string;
     source: ThreatIntelSource;
-    status: 'ONLINE' | 'DEGRADED' | 'RATE_LIMITED';
+    status: 'LOCAL_CATALOG' | 'DEGRADED' | 'RATE_LIMITED';
     indicatorsCount: number;
     latencyMs: number;
   }[];

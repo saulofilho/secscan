@@ -5,7 +5,13 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import { auditGitignoreSecurity } from './src/lib/gitignoreAuditor';
-import { DEFAULT_OSINT_THREAT_FEEDS } from './src/lib/osintThreatFeedsData';
+import {
+  correlateFindingsWithThreatIntel,
+  DEFAULT_OSINT_THREAT_FEEDS,
+  getThreatIntelSummary,
+  lookupThreatIndicator,
+} from './src/lib/osintThreatFeedsData';
+import { fetchPublicUrl, resolvePublicHttpUrl, UrlIngestRejected } from './src/lib/urlIngestGuard';
 
 dotenv.config();
 
@@ -334,6 +340,22 @@ async function startServer() {
 
   app.use(express.json({ limit: '5mb' }));
 
+  app.use('/api', (req, res, next) => {
+    if (req.path === '/health') return next();
+    const expected = process.env.SECSCAN_API_TOKEN;
+    if (!expected) return next();
+    const header = req.get('authorization') || '';
+    const bearer = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : '';
+    const alternate = req.get('x-secscan-token') || '';
+    if (bearer === expected || alternate === expected) return next();
+    return res.status(401).json({ error: 'Token de API ausente ou inválido.' });
+  });
+
+  function clientIsLoopback(req: express.Request): boolean {
+    const raw = req.socket.remoteAddress || '';
+    return raw === '127.0.0.1' || raw === '::1' || raw === '::ffff:127.0.0.1';
+  }
+
   // API Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
@@ -630,18 +652,7 @@ Responda ESTRITAMENTE em formato JSON com o seguinte formato, sem markdown ou fe
         );
       }
 
-      const summary = {
-        totalIndicators: activities.length,
-        activeCampaignsCount: activities.filter(a => a.status === 'ACTIVE').length,
-        lastSyncTimestamp: new Date().toISOString(),
-        sourcesOnline: [
-          { name: 'AlienVault OTX (Open Threat Exchange)', source: 'ALIENVAULT_OTX', status: 'ONLINE', indicatorsCount: 1420, latencyMs: 64 },
-          { name: 'Abuse.ch URLhaus (Malicious URLs)', source: 'ABUSE_CH_URLHAUS', status: 'ONLINE', indicatorsCount: 980, latencyMs: 42 },
-          { name: 'Abuse.ch ThreatFox (IOC Tracker)', source: 'ABUSE_CH_THREATFOX', status: 'ONLINE', indicatorsCount: 850, latencyMs: 51 },
-          { name: 'Abuse.ch Feodo Tracker (Botnet C2)', source: 'ABUSE_CH_FEODO', status: 'ONLINE', indicatorsCount: 310, latencyMs: 38 },
-          { name: 'CISA KEV (Known Exploited Vulns)', source: 'CISA_KEV', status: 'ONLINE', indicatorsCount: 1140, latencyMs: 70 },
-        ]
-      };
+      const summary = getThreatIntelSummary(activities);
 
       return res.json({
         success: true,
@@ -657,31 +668,11 @@ Responda ESTRITAMENTE em formato JSON com o seguinte formato, sem markdown ou fe
   app.post('/api/threat-intel/lookup', async (req, res) => {
     try {
       const { query = '' } = req.body || {};
-      const cleanQuery = String(query).trim().toLowerCase();
-
-      if (!cleanQuery) {
+      if (!String(query).trim()) {
         return res.status(400).json({ error: 'Termo de busca (query) é obrigatório.' });
       }
 
-      const matches = osintThreatFeedsDatabase.filter(a => 
-        a.indicator.toLowerCase().includes(cleanQuery) ||
-        cleanQuery.includes(a.indicator.toLowerCase()) ||
-        a.title.toLowerCase().includes(cleanQuery) ||
-        (a.malwareFamily && a.malwareFamily.toLowerCase().includes(cleanQuery))
-      );
-
-      const isLikelyMalicious = matches.length > 0;
-
-      return res.json({
-        query: cleanQuery,
-        matched: isLikelyMalicious,
-        matchCount: matches.length,
-        verdict: isLikelyMalicious ? 'MALICIOUS_IOC_FOUND' : 'CLEAN_OR_UNKNOWN',
-        matches,
-        recommendation: isLikelyMalicious
-          ? 'IOC catalogado em bases de OSINT ativas. Recomenda-se bloquear e isolar imediatamente.'
-          : 'Nenhum registro adverso encontrado nas bases abertas do AlienVault OTX e Abuse.ch neste momento.'
-      });
+      return res.json(lookupThreatIndicator(String(query), osintThreatFeedsDatabase));
     } catch (err: any) {
       return res.status(500).json({ error: 'Erro ao processar lookup OSINT: ' + String(err) });
     }
@@ -691,52 +682,11 @@ Responda ESTRITAMENTE em formato JSON com o seguinte formato, sem markdown ou fe
   app.post('/api/threat-intel/correlate', async (req, res) => {
     try {
       const { findings = [], endpoints = [] } = req.body || {};
-      const correlations: any[] = [];
-
-      // Check endpoints and findings against known threat indicators
-      findings.forEach((f: any) => {
-        const text = `${f.snippet || ''} ${f.file || ''} ${f.matchedSecret || ''} ${f.ruleName || ''}`.toLowerCase();
-        
-        osintThreatFeedsDatabase.forEach((threat) => {
-          const ind = threat.indicator.toLowerCase();
-          if (text.includes(ind) || (threat.malwareFamily && text.includes(threat.malwareFamily.toLowerCase()))) {
-            correlations.push({
-              findingId: f.id,
-              findingRule: f.ruleName,
-              file: f.file,
-              line: f.line,
-              threatActivity: threat,
-              correlationType: 'IOC_MATCH_IN_CODE',
-              confidence: 'HIGH'
-            });
-          }
-        });
-      });
-
-      endpoints.forEach((ep: any) => {
-        const epPath = (ep.path || '').toLowerCase();
-        osintThreatFeedsDatabase.forEach((threat) => {
-          const ind = threat.indicator.toLowerCase();
-          if (epPath.includes(ind) || (threat.indicatorType === 'DOMAIN' && epPath.includes(ind))) {
-            correlations.push({
-              endpointId: ep.id,
-              path: ep.path,
-              method: ep.method,
-              threatActivity: threat,
-              correlationType: 'EXTERNAL_C2_MATCH',
-              confidence: 'CRITICAL'
-            });
-          }
-        });
-      });
-
-      return res.json({
-        totalCorrelations: correlations.length,
-        hasThreatAlerts: correlations.length > 0,
-        correlations,
-        checkedFindingsCount: findings.length,
-        checkedEndpointsCount: endpoints.length
-      });
+      return res.json(correlateFindingsWithThreatIntel(
+        Array.isArray(findings) ? findings : [],
+        Array.isArray(endpoints) ? endpoints : [],
+        osintThreatFeedsDatabase
+      ));
     } catch (err: any) {
       return res.status(500).json({ error: 'Erro ao correlacionar achados com feeds OSINT: ' + String(err) });
     }
@@ -752,35 +702,10 @@ Responda ESTRITAMENTE em formato JSON com o seguinte formato, sem markdown ou fe
         return res.status(400).json({ error: 'A URL do site ou API é obrigatória.' });
       }
 
-      let parsedUrl: URL;
-      let targetUrl = url.trim();
-      if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
-        targetUrl = 'https://' + targetUrl;
-      }
-
-      try {
-        parsedUrl = new URL(targetUrl);
-      } catch {
-        return res.status(400).json({ error: 'Formato de URL inválido.' });
-      }
-
-      // Safe hostname restrictions: prevent SSRF to cloud metadata
-      const host = parsedUrl.hostname.toLowerCase();
-      if (host === '169.254.169.254' || host === 'metadata.google.internal' || host === 'instance-data') {
-        return res.status(400).json({ error: 'Acesso a metadados de nuvem é restrito por motivos de segurança.' });
-      }
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 9000);
-
-      const response = await fetch(targetUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 SecScan-Auditor/2.5',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json,*/*;q=0.8',
-        }
-      });
-      clearTimeout(timeout);
+      const initialUrl = await resolvePublicHttpUrl(url);
+      const fetched = await fetchPublicUrl(initialUrl, 9000);
+      const response = fetched.response;
+      const targetUrl = fetched.finalUrl.href;
 
       const contentType = response.headers.get('content-type') || '';
       const text = await response.text();
@@ -857,14 +782,12 @@ Responda ESTRITAMENTE em formato JSON com o seguinte formato, sem markdown ou fe
       for (let i = 0; i < Math.min(scripts.length, 2); i++) {
         const scriptSrc = scripts[i];
         try {
-          const absScriptUrl = new URL(scriptSrc, targetUrl).href;
-          const sController = new AbortController();
-          const sTimeout = setTimeout(() => sController.abort(), 4000);
-          const sRes = await fetch(absScriptUrl, { signal: sController.signal });
-          clearTimeout(sTimeout);
+          const scriptTarget = await resolvePublicHttpUrl(new URL(scriptSrc, targetUrl).href);
+          const scriptFetch = await fetchPublicUrl(scriptTarget, 4000, 1);
+          const sRes = scriptFetch.response;
           if (sRes.ok) {
             const sText = await sRes.text();
-            const sName = path.basename(new URL(absScriptUrl).pathname) || `bundle-${i + 1}.js`;
+            const sName = path.basename(scriptFetch.finalUrl.pathname) || `bundle-${i + 1}.js`;
             const cleanName = sName.endsWith('.js') ? sName : `${sName}.js`;
             let truncated = sText.slice(0, 120000);
             if (!truncated.includes('\n') || truncated.indexOf('\n') > 800) {
@@ -923,6 +846,9 @@ ${endpointsFound.slice(0, 10).map((ep, i) => `export function handleRoute_${i}(r
         }
       });
     } catch (err: any) {
+      if (err instanceof UrlIngestRejected || err?.name === 'UrlIngestRejected') {
+        return res.status(400).json({ error: err.message });
+      }
       return res.status(500).json({ 
         error: 'Falha ao conectar ou auditar URL: ' + (err?.message || String(err)),
         details: 'Verifique se o site está online e acessível publicamente.'
@@ -970,6 +896,11 @@ ${endpointsFound.slice(0, 10).map((ep, i) => `export function handleRoute_${i}(r
   // Audit Gitignore and Working Directory Security (Disk repository)
   app.get('/api/gitignore/audit', (req, res) => {
     try {
+      if (!process.env.SECSCAN_API_TOKEN && !clientIsLoopback(req)) {
+        return res.status(403).json({
+          error: 'A listagem de disco do servidor só responde em localhost. Em produção defina SECSCAN_API_TOKEN.'
+        });
+      }
       const repoRoot = process.cwd();
       const gitignorePath = path.join(repoRoot, '.gitignore');
       let gitignoreContent = '';
@@ -1656,7 +1587,6 @@ ${endpointsFound.slice(0, 10).map((ep, i) => `export function handleRoute_${i}(r
         { id: 'autoremediation', name: '1-Click Auto Remediation', category: 'CODE_SAST' },
         { id: 'refactoring', name: 'AI Security Refactoring', category: 'CODE_SAST' },
         { id: 'sca', name: 'SCA Dependency Audit', category: 'CODE_SAST' },
-        { id: 'iast', name: 'IAST Runtime Hooks', category: 'CODE_SAST' },
         { id: 'entropy', name: 'High-Entropy Secret Detection', category: 'CODE_SAST' },
 
         // CLOUD_INFRA
@@ -1670,6 +1600,7 @@ ${endpointsFound.slice(0, 10).map((ep, i) => `export function handleRoute_${i}(r
         // API_DAST
         { id: 'apisecurity', name: 'OWASP API Security Top 10', category: 'API_DAST' },
         { id: 'dast', name: 'DAST Active Dynamic Scan', category: 'API_DAST' },
+        { id: 'iast', name: 'IAST Simulated Payloads', category: 'API_DAST' },
         { id: 'headers', name: 'HTTP Security Headers', category: 'API_DAST' },
         { id: 'jwtinspector', name: 'JWT Token Inspector', category: 'API_DAST' },
         { id: 'ssrfvalidator', name: 'SSRF Gateway Validator', category: 'API_DAST' },

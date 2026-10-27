@@ -151,14 +151,14 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
             </span>
             <h1 className="text-xl font-bold text-white tracking-wide flex items-center gap-2">
               IAST Runtime Emulation Suite
-              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-bold">
-                Dynamic Taint Hooks
+              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-200 font-bold">
+                Laboratório
               </span>
             </h1>
           </div>
           <p className="text-xs text-white/70 max-w-2xl leading-relaxed">
-            Instrumentação interativa em tempo de execução para complementar a análise estática (SAST). 
-            Detecta vulnerabilidades que só se manifestam dinamicamente na execução (SQLi na AST, RCE em subprocessos, SSRF e Path Traversal).
+            Aplica payloads de exemplo (SQLi, comando, path traversal, SSRF e XSS) sobre trechos que casam com o padrão.
+            Não há agente dentro do processo da aplicação.
           </p>
         </div>
 

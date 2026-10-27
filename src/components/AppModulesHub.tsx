@@ -91,11 +91,38 @@ interface ModuleDefinition {
 
 export type TestingContextScope = 'ALL' | 'MY_CODE' | 'SANDBOX' | 'GOV_POSTURE';
 
+export const LAB_TOOL_IDS = [
+  'iast',
+  'dast',
+  'ngfw',
+  'idsips',
+  'dnssec',
+  'sdwan',
+  'edr',
+  'soccommand',
+  'securityonion',
+  'crowdstrike',
+  'waf',
+  'nmap',
+  'nikto',
+  'ctihub',
+  'soarbuilder',
+  'procyber',
+] as const;
+
+export function isLaboratoryTool(toolId: string): boolean {
+  return (LAB_TOOL_IDS as readonly string[]).includes(toolId);
+}
+
 export function getToolContextScope(toolId: string): 'MY_CODE' | 'SANDBOX' | 'GOV_POSTURE' {
-  if (['scanner', 'dataflow', 'endpoints', 'entropy', 'jsminer', 'sca', 'iast', 'iac', 'autoremediation', 'refactoring'].includes(toolId)) {
+  if ([
+    'scanner', 'dataflow', 'endpoints', 'entropy', 'jsminer', 'sca', 'iac',
+    'autoremediation', 'refactoring', 'apisecurity', 'headers', 'jwtinspector',
+    'ssrfvalidator', 'containerscan', 'cloudiam',
+  ].includes(toolId)) {
     return 'MY_CODE';
   }
-  if (['apisecurity', 'dast', 'headers', 'jwtinspector', 'ssrfvalidator', 'containerscan', 'cloudiam', 'ngfw', 'idsips', 'dnssec', 'sdwan', 'edr', 'soccommand', 'securityonion', 'crowdstrike', 'waf', 'nmap', 'nikto'].includes(toolId)) {
+  if (isLaboratoryTool(toolId)) {
     return 'SANDBOX';
   }
   return 'GOV_POSTURE';
@@ -202,16 +229,6 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           badgeType: 'label'
         },
         {
-          id: 'iast',
-          nameKey: 'tab.iast',
-          defaultName: 'IAST Runtime',
-          descKey: 'tab.iast_tooltip',
-          defaultDesc: 'Instrumentação interativa em tempo de execução',
-          icon: Activity,
-          badge: 'Hooks',
-          badgeType: 'label'
-        },
-        {
           id: 'autoremediation',
           nameKey: 'tab.autoremediation',
           defaultName: 'Auto-Remediação',
@@ -266,7 +283,17 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           descKey: 'tab.dast_tooltip',
           defaultDesc: 'Injeção dinâmica de payloads defensivos e detecção de bypass',
           icon: Crosshair,
-          badge: 'Fuzzer',
+          badge: 'LAB',
+          badgeType: 'label'
+        },
+        {
+          id: 'iast',
+          nameKey: 'tab.iast',
+          defaultName: 'IAST Runtime',
+          descKey: 'tab.iast_tooltip',
+          defaultDesc: 'Laboratório com payloads de exemplo. Não há agente no processo da aplicação.',
+          icon: Activity,
+          badge: 'LAB',
           badgeType: 'label'
         },
         {
@@ -297,6 +324,36 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           defaultDesc: 'Proteção contra requisições forjadas a metadados de nuvem',
           icon: Globe,
           badge: 'Cloud Meta',
+          badgeType: 'label'
+        },
+        {
+          id: 'waf',
+          nameKey: 'tab.waf',
+          defaultName: 'WAF ModSecurity Engine',
+          descKey: 'tab.waf_tooltip',
+          defaultDesc: 'Laboratório de regras de firewall de aplicação. Não há um WAF em linha.',
+          icon: ShieldCheck,
+          badge: 'LAB',
+          badgeType: 'label'
+        },
+        {
+          id: 'nmap',
+          nameKey: 'tab.nmap',
+          defaultName: 'Reconhecimento Nmap',
+          descKey: 'tab.nmap_tooltip',
+          defaultDesc: 'Laboratório com alvos de exemplo. Nenhum pacote sai da máquina.',
+          icon: Globe,
+          badge: 'LAB',
+          badgeType: 'label'
+        },
+        {
+          id: 'nikto',
+          nameKey: 'tab.nikto',
+          defaultName: 'Auditoria Web Nikto',
+          descKey: 'tab.nikto_tooltip',
+          defaultDesc: 'Laboratório com alvos de exemplo. Nenhum site é varrido.',
+          icon: FileSearch,
+          badge: 'LAB',
           badgeType: 'label'
         }
       ]
@@ -352,9 +409,9 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           nameKey: 'tab.ngfw',
           defaultName: 'Next-Gen Firewall (NGFW)',
           descKey: 'tab.ngfw_tooltip',
-          defaultDesc: 'Inspeção de pacotes na camada 7 e políticas IPS defensivas',
+          defaultDesc: 'Laboratório de política L7. Nenhum firewall está em linha.',
           icon: Flame,
-          badge: 'L7 / IPS',
+          badge: 'LAB',
           badgeType: 'label'
         },
         {
@@ -362,9 +419,9 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           nameKey: 'tab.idsips',
           defaultName: 'IDS/IPS Snort Engine',
           descKey: 'tab.idsips_tooltip',
-          defaultDesc: 'Deep Packet Inspection e assinaturas de intrusão',
+          defaultDesc: 'Laboratório de assinaturas. Nenhum pacote é inspecionado.',
           icon: Binary,
-          badge: 'DPI',
+          badge: 'LAB',
           badgeType: 'label'
         },
         {
@@ -372,9 +429,9 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           nameKey: 'tab.dnssec',
           defaultName: 'DNS & DNSSEC',
           descKey: 'tab.dnssec_tooltip',
-          defaultDesc: 'Validação de resolução criptográfica DNS e DNS over HTTPS',
+          defaultDesc: 'Laboratório de resolução. Nenhuma consulta DNS sai da aplicação.',
           icon: Globe,
-          badge: 'DoH',
+          badge: 'LAB',
           badgeType: 'label'
         },
         {
@@ -382,19 +439,9 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           nameKey: 'tab.sdwan',
           defaultName: 'SD-WAN & SASE',
           descKey: 'tab.sdwan_tooltip',
-          defaultDesc: 'Malha de túneis criptografados e arquitetura Zero-Trust',
+          defaultDesc: 'Laboratório de malha de túneis com telemetria de exemplo.',
           icon: Network,
-          badge: 'Zero-Trust',
-          badgeType: 'label'
-        },
-        {
-          id: 'edr',
-          nameKey: 'tab.edr',
-          defaultName: 'Sensor EDR & eBPF',
-          descKey: 'tab.edr_tooltip',
-          defaultDesc: 'Monitoramento comportamental no kernel Linux com eBPF',
-          icon: Crosshair,
-          badge: 'eBPF',
+          badge: 'LAB',
           badgeType: 'label'
         }
       ]
@@ -405,10 +452,10 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
       subtitle: language === 'pt' ? 'Centro de Operações 24/7, SIEM & Threat Hunting' : language === 'es' ? 'Centro de Operaciones 24/7, SIEM y Threat Hunting' : '24/7 Command Center, SIEM & Threat Hunting',
       scopeBadge: language === 'pt' ? 'Laboratório de Resposta & SIEM' : language === 'es' ? 'Laboratorio de Respuesta' : 'Response Lab & SIEM',
       description: language === 'pt'
-        ? 'Centro de comando para operações de segurança em tempo real, correlação de logs com Security Onion, telemetria CrowdStrike Falcon, regras WAF ModSecurity e varreduras de reconhecimento.'
+        ? 'Laboratório de SOC com telemetria de exemplo. Security Onion, CrowdStrike e o sensor EDR não estão conectados a um console real.'
         : language === 'es'
-        ? 'Centro de comando SOC en tiempo real, correlación SIEM con Security Onion, respuesta Falcon EDR, firewall WAF y escaneos de red.'
-        : 'Real-time Security Operations Center dashboard, Security Onion SIEM correlation, CrowdStrike telemetry, WAF ModSecurity engine, and network discovery.',
+        ? 'Laboratorio SOC con telemetría de ejemplo. Security Onion, CrowdStrike y el sensor EDR no están conectados.'
+        : 'SOC laboratory with sample telemetry. Security Onion, CrowdStrike, and the EDR sensor are not connected to a live console.',
       accentColor: '#A78BFA',
       bgGradient: 'from-[#A78BFA]/15 via-transparent to-transparent',
       borderColor: 'group-hover:border-[#A78BFA]/40',
@@ -422,7 +469,7 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           descKey: 'tab.soccommand_tooltip',
           defaultDesc: 'Visão centralizada de alertas, telemetria e feeds em tempo real',
           icon: Radio,
-          badge: 'LIVE SIEM',
+          badge: 'LAB',
           badgeType: 'highlight'
         },
         {
@@ -432,7 +479,7 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           descKey: 'tab.securityonion_tooltip',
           defaultDesc: 'Correlação de segurança de rede e telemetria Zeek/Suricata',
           icon: Layers,
-          badge: 'Zeek / NSM',
+          badge: 'LAB',
           badgeType: 'label'
         },
         {
@@ -440,39 +487,19 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           nameKey: 'tab.crowdstrike',
           defaultName: 'CrowdStrike Falcon IR',
           descKey: 'tab.crowdstrike_tooltip',
-          defaultDesc: 'Telemetria de endpoint e fluxo de resposta a incidentes',
+          defaultDesc: 'Laboratório com o nome CrowdStrike. Não há integração com o Falcon.',
           icon: Zap,
-          badge: 'Falcon EDR',
+          badge: 'LAB',
           badgeType: 'label'
         },
         {
-          id: 'waf',
-          nameKey: 'tab.waf',
-          defaultName: 'WAF ModSecurity Engine',
-          descKey: 'tab.waf_tooltip',
-          defaultDesc: 'Regras de firewall de aplicação web contra ataques OWASP',
-          icon: ShieldCheck,
-          badge: 'ModSec CRS',
-          badgeType: 'label'
-        },
-        {
-          id: 'nmap',
-          nameKey: 'tab.nmap',
-          defaultName: 'Reconhecimento Nmap',
-          descKey: 'tab.nmap_tooltip',
-          defaultDesc: 'Mapeamento de portas abertas, serviços e banners de rede',
-          icon: Globe,
-          badge: 'Port Scan',
-          badgeType: 'label'
-        },
-        {
-          id: 'nikto',
-          nameKey: 'tab.nikto',
-          defaultName: 'Auditoria Web Nikto',
-          descKey: 'tab.nikto_tooltip',
-          defaultDesc: 'Varredura de configurações incorretas e arquivos perigosos',
-          icon: FileSearch,
-          badge: 'Web Audit',
+          id: 'edr',
+          nameKey: 'tab.edr',
+          defaultName: 'Sensor EDR & eBPF',
+          descKey: 'tab.edr_tooltip',
+          defaultDesc: 'Laboratório de endpoint. A árvore de processos é um cenário fixo.',
+          icon: Crosshair,
+          badge: 'LAB',
           badgeType: 'label'
         }
       ]
@@ -483,10 +510,10 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
       subtitle: language === 'pt' ? 'Postura Executiva, OPA Rego, SBOM & IA Segura' : language === 'es' ? 'Postura Ejecutiva, OPA Rego, SBOM e IA Segura' : 'Executive Posture, OPA Rego, SBOM & Secure AI',
       scopeBadge: language === 'pt' ? 'Conformidade & Postura' : language === 'es' ? 'Conformidad y Postura' : 'Compliance & Posture',
       description: language === 'pt'
-        ? 'Painel executivo com matriz de risco e métricas de MTTR, inteligência CTI ao vivo com CISA KEV & OTX, governança declarativa com Open Policy Agent, geração SBOM e auditoria regulatória.'
+        ? 'Painel executivo, compliance e SBOM saem do scan. O threat intel é uma amostra local, sem feed ao vivo.'
         : language === 'es'
-        ? 'Panel ejecutivo con matriz de riesgo y MTTR, feeds CTI en vivo (CISA KEV), gobernanza declarativa OPA Rego, SBOM y auditoría regulatoria.'
-        : 'Executive risk dashboard and MTTR trends, live CTI feeds (CISA KEV & OTX), declarative Rego Policy-as-Code, SBOM generation, and regulatory compliance.',
+        ? 'Panel ejecutivo, compliance y SBOM salen del scan. La threat intel es una muestra local, sin feed en vivo.'
+        : 'Executive dashboard, compliance, and SBOM come from the scan. Threat intel is a local sample, with no live feed.',
       accentColor: '#F59E0B',
       bgGradient: 'from-[#F59E0B]/15 via-transparent to-transparent',
       borderColor: 'group-hover:border-[#F59E0B]/40',
@@ -520,7 +547,7 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           descKey: 'tab.ctihub_tooltip',
           defaultDesc: 'Feeds de inteligência CISA KEV, AlienVault OTX e IoCs ativos',
           icon: Globe,
-          badge: 'CISA / OTX',
+          badge: 'LAB',
           badgeType: 'highlight'
         },
         {
@@ -600,7 +627,7 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           descKey: 'tab.soarbuilder_tooltip',
           defaultDesc: 'Arquiteto visual de playbooks de automação de resposta a incidentes',
           icon: Workflow,
-          badge: 'Automate',
+          badge: 'LAB',
           badgeType: 'label'
         },
         {
@@ -610,7 +637,7 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
           descKey: 'tab.procyber_tooltip',
           defaultDesc: 'Utilitários avançados de criptografia, hash, codificação e análise',
           icon: ShieldAlert,
-          badge: '10 PRO',
+          badge: 'LAB',
           badgeType: 'label'
         },
         {
@@ -1004,9 +1031,9 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
                 <span>
-                  {contextFilter === 'MY_CODE' && 'Exibindo apenas ferramentas de análise direta do seu código (SAST, Taint, Endpoints, IAST, SCA, Segredos e IaC). 0 dados sintéticos.'}
-                  {contextFilter === 'SANDBOX' && 'Exibindo ferramentas utilitárias e simuladores de teste interativo (DAST, JWT, SSRF, Headers, Firewall L7, IDS, Nmap, Nikto, SOC).'}
-                  {contextFilter === 'GOV_POSTURE' && 'Exibindo módulos de governança, conformidade regulatória (SOC2/ISO), políticas OPA Rego, SBOM e matriz de risco.'}
+                  {contextFilter === 'MY_CODE' && 'Ferramentas que leem o artefato enviado: código, manifesto, header, JWT, política IAM e Dockerfile.'}
+                  {contextFilter === 'SANDBOX' && 'Laboratório com cenário de exemplo: DAST, IAST, Nmap, Nikto, firewall, SOC, EDR e threat intel.'}
+                  {contextFilter === 'GOV_POSTURE' && 'Governança derivada do relatório: compliance, OPA, SBOM, quality gate e configuração.'}
                 </span>
               </div>
               <button

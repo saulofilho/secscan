@@ -458,10 +458,10 @@ git apply fix-jwt-secret.patch`
   iast: {
     id: 'iast',
     name: 'IAST (Interactive Application Security Testing)',
-    category: 'AppSec & SAST',
-    badge: 'Runtime Hooks',
-    shortSummary: 'Testes de segurança interativos em tempo de execução com instrumentação de ganchos (hooks) em sinks perigosos para flagrar contaminação ativa de dados.',
-    howItWorks: `Diferente do SAST tradicional (que analisa apenas texto parado), o IAST inspeciona o comportamento do código em execução:
+    category: 'Laboratório',
+    badge: 'LAB',
+    shortSummary: 'Laboratório que aplica payloads de exemplo sobre trechos do código. Não instala hooks no processo da aplicação.',
+    howItWorks: `O módulo reproduz um IAST em cenário fixo. Ele não inspeciona um processo em execução:
 1. Injeta wrappers e proxies transparentes (runtime hooks) em funções críticas da runtime:
    - eval(), Function(), setTimeout(string)
    - document.innerHTML, outerHTML, document.write()
@@ -1186,7 +1186,7 @@ jobs:
     id: 'soccommand',
     name: 'Security Operations Center (SOC) Command View',
     category: 'Defesa & Runtime',
-    badge: 'SOC LIVE',
+    badge: 'LAB',
     shortSummary: 'Console operacional centralizado de operações de segurança: consolidação em tempo real de logs de auditoria, curvas analíticas de MTTR e alertas de segurança críticos da suíte.',
     howItWorks: 'Ingere fluxos de telemetria e auditoria de todos os scanners (SAST, Secrets, IaC, OWASP API, SCA, EDR), mapeia curvas de tendência temporal (1h, 6h, 24h, 7d, 30d) e monitora MTTR versus metas de SLA.',
     stepByStepGuide: [

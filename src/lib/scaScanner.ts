@@ -22,7 +22,7 @@ export interface DependencyPackage {
   type: 'direct' | 'transitive' | 'dev';
   manifestFile: string;
   license: string;
-  licenseRisk: 'PERMISSIVE' | 'MEDIUM_RISK' | 'HIGH_RISK';
+  licenseRisk: 'PERMISSIVE' | 'MEDIUM_RISK' | 'HIGH_RISK' | 'NOT_IN_CATALOG';
   licenseExplanation: string;
   isDeprecated?: boolean;
   isTyposquattingRisk?: boolean;
@@ -42,9 +42,11 @@ export interface ScaAnalysisReport {
   packages: DependencyPackage[];
   allVulnerabilities: ScaVulnerability[];
   manifestsFound: string[];
+  catalogMode: 'CURATED_LOCAL';
+  catalogSize: number;
 }
 
-// Built-in Knowledge Base of Common Package Vulnerabilities (OSV/NVD/GitHub Advisory DB)
+// Curated local sample. Packages absent from this map are reported as NOT_IN_CATALOG.
 const KNOWN_CVE_DATABASE: Record<string, {
   versions: Array<{
     minInclusive?: string;
@@ -242,9 +244,9 @@ export function scanSoftwareCompositionAnalysis(files: ScannedFile[]): ScaAnalys
             const vulns: ScaVulnerability[] = [];
             let recommendedVersion = cleanVersion;
 
-            let license = dbInfo?.license || 'MIT';
-            let licenseRisk: 'PERMISSIVE' | 'MEDIUM_RISK' | 'HIGH_RISK' = dbInfo?.licenseRisk || 'PERMISSIVE';
-            let licenseExplanation = dbInfo?.licenseExplanation || 'Licença permissiva padrão detectada.';
+            let license = dbInfo?.license || 'NOT_IN_CATALOG';
+            let licenseRisk: 'PERMISSIVE' | 'MEDIUM_RISK' | 'HIGH_RISK' | 'NOT_IN_CATALOG' = dbInfo?.licenseRisk || 'NOT_IN_CATALOG';
+            let licenseExplanation = dbInfo?.licenseExplanation || 'Pacote ausente do catálogo local. Licença e CVEs não foram consultados.';
 
             if (dbInfo && dbInfo.versions) {
               for (const vulnRule of dbInfo.versions) {
@@ -340,9 +342,9 @@ export function scanSoftwareCompositionAnalysis(files: ScannedFile[]): ScaAnalys
             version,
             type: 'direct',
             manifestFile: file.path,
-            license: dbInfo?.license || 'Apache-2.0',
-            licenseRisk: dbInfo?.licenseRisk || 'PERMISSIVE',
-            licenseExplanation: dbInfo?.licenseExplanation || 'Licença permissiva.',
+            license: dbInfo?.license || 'NOT_IN_CATALOG',
+            licenseRisk: dbInfo?.licenseRisk || 'NOT_IN_CATALOG',
+            licenseExplanation: dbInfo?.licenseExplanation || 'Pacote ausente do catálogo local. Licença e CVEs não foram consultados.',
             vulnerabilities: vulns,
             recommendedVersion: vulns.length > 0 ? vulns[0].fixedVersion : undefined
           });
@@ -368,6 +370,8 @@ export function scanSoftwareCompositionAnalysis(files: ScannedFile[]): ScaAnalys
     copyleftRiskCount,
     packages,
     allVulnerabilities,
-    manifestsFound
+    manifestsFound,
+    catalogMode: 'CURATED_LOCAL',
+    catalogSize: Object.keys(KNOWN_CVE_DATABASE).length
   };
 }

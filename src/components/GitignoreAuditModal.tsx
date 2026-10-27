@@ -73,8 +73,12 @@ export const GitignoreAuditModal: React.FC<GitignoreAuditModalProps> = ({
     try {
       const response = await fetch('/api/gitignore/audit');
       const contentType = response.headers.get('content-type') || '';
-      if (!response.ok || !contentType.includes('application/json')) {
-        throw new Error(`Servidor indisponível ou resposta não formatada em JSON.`);
+      if (!response.ok) {
+        const data = contentType.includes('application/json') ? await response.json() : null;
+        throw new Error(data?.error || `Servidor respondeu HTTP ${response.status}.`);
+      }
+      if (!contentType.includes('application/json')) {
+        throw new Error('Servidor indisponível ou resposta não formatada em JSON.');
       }
       const data: GitignoreAuditResult = await response.json();
       setDiskAuditResult(data);

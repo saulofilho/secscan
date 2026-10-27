@@ -3,11 +3,15 @@
 [![CI/CD Security Analysis](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=github-actions&logoColor=white)](.github/workflows/ci-cd.yml)
 [![Node.js 22](https://img.shields.io/badge/Node.js-22%20LTS-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![SARIF 2.1.0](https://img.shields.io/badge/SARIF-2.1.0%20Standard-4B32C3?logo=github&logoColor=white)](https://sarifweb.azurewebsites.net/)
-[![OWASP & Snyk Verified](https://img.shields.io/badge/Advisories-OWASP%20%7C%20Snyk%20%7C%20CWE-00FF41)](https://owasp.org/)
+[![Referências OWASP, CWE e Snyk Learn](https://img.shields.io/badge/Refer%C3%AAncias-OWASP%20%7C%20CWE%20%7C%20Snyk%20Learn-00FF41)](https://owasp.org/)
 [![Quality Gate](https://img.shields.io/badge/Quality%20Gate-Max%20Risk%20Score%20(0--100)-FF3E00)](README.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 **SecScan AppSec Suite** é uma plataforma avançada e modular de **Análise Estática de Segurança de Aplicações (SAST)**, auditoria de código JavaScript/TypeScript, detecção de segredos de alta entropia e inteligência de superfície de ataque. Desenvolvida para engenheiros de DevSecOps, AppSec, pesquisadores de Bug Bounty e desenvolvedores full-stack, a suíte reúne um motor de **Risk Score Cumulativo do Workspace (0-100)** para Quality Gates, painel de evolução temporal com gráficos Recharts (**SecScan Trend Dashboard**), painel de **Logs de Auditoria de Segurança com barra de busca, gráfico de linhas de frequência e detecção de anomalias estatísticas com alertas de picos maliciosos**, grafo de fluxo de dados (**DataFlow Taint Analysis & Attack Path Visualization: API Inspector ➔ Motor SAST**), auditoria de rotas (**OWASP API Security & LinkFinder**), validação contra metadados de nuvem (**SSRF & Webhook Validator**), avaliação declarativa (**Policy-as-Code OPA Rego**) e uma base unificada de remediação com links oficiais para **OWASP**, **Snyk Learn** e **MITRE CWE** diretamente nos cards de achados.
+
+As telas marcadas como **LAB** (Nmap, Nikto, EDR, firewall, DNS, SD-WAN, SOC, CrowdStrike, Security Onion, SOAR, IAST, DAST e threat intel) mostram cenário de exemplo. Elas não falam com rede, host ou feed externo. O threat intel ausente no catálogo local volta como `NOT_IN_LOCAL_CATALOG`, não como alvo limpo.
+
+Em produção, defina `SECSCAN_API_TOKEN`. Com a variável presente, as rotas `/api/*` (exceto `/api/health`) exigem `Authorization: Bearer <token>`. Sem a variável, a listagem de disco em `GET /api/gitignore/audit` só responde em localhost. O `POST /api/url-ingest` recusa rede privada, metadata, localhost e redirecionamento para esses destinos.
 
 ---
 
@@ -20,15 +24,15 @@
     - `0% - 85%`: Varredura estática de arquivos em chunks.
     - `88%`: LinkFinder & Mineração de endpoints REST/GraphQL.
     - `92%`: Construção isolada do Grafo de Fluxo de Dados (Data Flow Graph) e Taint Analysis.
-    - `95%`: Emulação IAST de execução dinâmica e rastreamento de sinks.
+    - `95%`: IAST com payloads de exemplo (laboratório, sem agente no processo).
     - `98%`: Consolidação de métricas, compliance OPA Rego e Quality Gates.
-    - `100%`: Finalização com feedback visual fluido e liberação instantânea.
-  - **Watchdog de Segurança (10s):** Mecanismo de auto-recuperação que destrava o estado de escaneamento automaticamente caso ocorra qualquer latência ou erro de renderização no navegador.
-  - **Botão com Progresso Visual Integrado (`#hub-btn-run-full-scan`):** Barra de preenchimento neon em tempo real embutida no próprio botão durante a varredura, com indicador `Loader2` animado e tooltip dinâmico de status.
-- **🏛️ Central de Módulos Especializados (AppModulesHub):** Navegação organizada em 5 domínios (`CODE_SAST`, `API_DAST`, `CLOUD_INFRA`, `SOC_EDR`, `GOV_AI`) com filtros rápidos por escopo de teste:
-  - `📁 Meu Código Real`: Ferramentas que analisam exclusivamente o código do repositório.
-  - `🧪 Sandbox de Teste`: Fuzzers, simuladores DAST e testes dinâmicos controlados.
-  - `📋 Governança & Postura`: Políticas OPA Rego, relatórios executivos e conformidade.
+    - `100%`: Finalização.
+- **🏛️ Central de Módulos:** Cinco domínios (`CODE_SAST`, `API_DAST`, `CLOUD_INFRA`, `SOC_EDR`, `GOV_AI`) e três filtros:
+  - **Meu código:** scanner, entropia, rotas, JS Miner, grafo, SCA, IaC, headers, JWT, classificador SSRF, Dockerfile, política IAM e remediação. O IAST não entra aqui.
+  - **Laboratório:** IAST, DAST, Nmap, Nikto, WAF, NGFW, IDS, DNS, SD-WAN, EDR, SOC, Security Onion, CrowdStrike, SOAR, threat intel e a suíte Pro. O selo é `LAB`. O cenário é de exemplo.
+  - **Governança:** dashboard, compliance, OPA, SBOM, quality gate, regras, CLI e CI.
+- **IAST:** fica em **APIs, DAST & Perímetro**. Aplica payloads de exemplo sobre trechos do código. Não instala agente no processo.
+- **CLI:** `bin/secscan.js` usa as mesmas regras de `src/lib/defaultRules.ts`.
 
 ---
 
@@ -88,7 +92,7 @@
 ---
 
 ### 3. 📦 SCA — Software Composition Analysis (Dependências, CVEs & Licenças)
-- **O que é e Como Funciona:** Analisa o arquivo `package.json` ou manifests de dependências, mapeando bibliotecas de terceiros contra bases conhecidas de vulnerabilidades (NVD/MITRE) e checando termos de licenciamento. Calcula o score de risco das dependências e alerta sobre bibliotecas obsoletas ou licenças copyleft (ex.: GPL v3) incompatíveis com softwares comerciais.
+- **O que é e Como Funciona:** Lê `package.json` e `requirements.txt` e compara os pacotes com um catálogo local curado, embutido em `src/lib/scaScanner.ts`. Pacote fora dessa lista recebe `NOT_IN_CATALOG`. O SecScan não consulta OSV, NVD nem GitHub Advisory em tempo de execução.
 - **Como Usar no Sistema:**
   1. Acesse a aba **"SCA (Dependências & CVEs)"**.
   2. Cole o conteúdo de um `package.json` no painel esquerdo ou utilize o projeto pré-carregado no workspace.
@@ -150,8 +154,8 @@
 
 ---
 
-### 5. 🎯 DAST — Dynamic Application Security Testing (Fuzzer & Headers)
-- **O que é e Como Funciona:** Simula ataques dinâmicos do ponto de vista externo (Black-Box / Gray-Box). Testa rotas HTTP e endpoints REST enviando payloads de fuzzer (SQLi, XSS, Path Traversal, Command Injection) e audita os cabeçalhos de segurança HTTP da resposta do servidor (CSP, HSTS, X-Frame-Options, Permissions-Policy).
+### 5. 🎯 DAST — laboratório de fuzzer
+- **O que é e Como Funciona:** O fuzzer devolve status e tempo simulados. Ele não envia o payload ao alvo. A auditoria de headers, na aba própria, lê os cabeçalhos colados ou os capturados pelo ingest de URL.
 - **Como Usar no Sistema:**
   1. Acesse a aba **"DAST (Fuzzer & Headers)"**.
   2. Configure a URL alvo (ex: `https://api.empresa.com/v1/search`), método HTTP (`GET`, `POST`) e o parâmetro a fuzzer (ex: `q` ou `id`).
@@ -239,12 +243,10 @@
 
 ---
 
-### 10. ⚡ IAST — Interactive Application Security Testing (Runtime Hooks)
-- **O que é e Como Funciona:** O motor IAST injeta sensores (hooks) nos sinks de execução mais sensíveis da aplicação Node.js (`eval()`, `Function()`, `child_process.exec()`, consultas de banco de dados e métodos de resposta HTTP). Diferente do SAST puro, o IAST rastreia o valor concreto das variáveis durante a execução, confirmando se dados não confiáveis realmente alcançam o destino perigoso.
-- **Como Usar no Sistema:**
-  1. Acesse a aba **"IAST (Runtime Hooks)"**.
-  2. Visualize os sinks monitorados e os gatilhos disparados em tempo real.
-  3. Execute testes interativos enviando requisições com dados manipulados para observar a captura de stack trace e o fluxo de dados em memória.
+### 10. ⚡ IAST — laboratório de payloads
+- **Onde fica:** gaveta **APIs, DAST & Perímetro**, filtro **Laboratório**. Não fica em **Meu código**.
+- **O que faz:** aplica payloads de exemplo (SQLi, comando, path traversal, SSRF e XSS) sobre trechos que casam com o padrão. Não instala hook em `eval`, `child_process` nem no processo da aplicação.
+- **Como abrir:** aba **IAST**, selo `LAB`.
 
 ---
 
@@ -319,8 +321,8 @@
 
 ---
 
-### 16. 🛡️ Defesa e Infraestrutura de Aplicações Web (WAF - Web Application Firewall)
-- **Painel de Inspeção & Telemetria em Tempo Real:** Monitoramento dinâmico de tráfego HTTP/HTTPS com estatísticas de requisições inspecionadas, taxa de bloqueio (Block Rate), RPS e latência de inspeção (P95/P99).
+### 16. 🛡️ WAF — laboratório
+As regras têm regex de SQLi, XSS e path traversal. Os contadores de bloqueio e a telemetria são cenário de exemplo. Não há um WAF em linha.
 - **Cobertura OWASP Top 10 & Virtual Patching:**
   - `SQL Injection (SQLi)`: Detecção de UNION, boolean/time-based payloads.
   - `Cross-Site Scripting (XSS)`: Sanitização de scripts reflexivos e baseados em DOM.
@@ -332,8 +334,8 @@
 
 ---
 
-### 17. 🌐 SD-WAN Corporativo (Software-Defined WAN Suite)
-- **Topologia de Túneis e Edge Routers:** Visualização da malha SD-WAN com nós de borda (Hub HQ, Branch Offices, Multi-Cloud Gateways AWS/GCP/Azure).
+### 17. 🌐 SD-WAN — laboratório
+A topologia, a latência e o failover são telemetria fixa. Nenhuma malha é configurada.
 - **Políticas de Roteamento Baseadas em SLA (Application-Aware Routing):**
   - Monitoramento contínuo de Latência (ms), Jitter (ms) e Perda de Pacotes (%).
   - Steering automático de tráfego crítico (VoIP, Videoconferência, SaaS ERP) para links primários (MPLS, Fibra Dedicada) ou failover inteligente para 5G/Banda Larga.
@@ -342,9 +344,8 @@
 
 ---
 
-### 18. 🎯 EDR (Endpoint Detection & Response) & Live Response Suite
-- **Inventário de Endpoints & Telemetria em Tempo Real:**
-  - Descoberta e monitoramento de hosts com status de saúde do agente, carga de CPU/Memória e integridade do driver eBPF.
+### 18. 🎯 EDR — laboratório
+Fica na gaveta **SOC**. A árvore de processos, o isolamento e o terminal de resposta são cenário fixo. Não há sensor eBPF no host.
   - Ações cirúrgicas de contenção host com isolamento preventivo a nível de kernel (Zero Trust Host Containment).
 - **Árvore de Execução & Parent-Child Process Tracking:**
   - Rastreamento hierárquico de processos (`PID`, `PPID`, usuário, integrity level e linha de comando executada).
@@ -365,9 +366,8 @@
 
 ---
 
-### 19. 🛡️ Módulos Complementares de Segurança de Rede
-- **Proteção DNS (DNS Security):** Detecção de DNS Tunneling, filtragem de domínios maliciosos e DGA (Domain Generation Algorithms), e validação de DNSSEC / DoH.
-- **Firewall de Próxima Geração (NGFW) & IDS/IPS:** Inspeção profunda de pacotes (DPI), controle de aplicações L7 e assinaturas de intrusão Snort/Suricata.
+### 19. 🛡️ DNS, NGFW e IDS/IPS — laboratório
+Ficam na gaveta **Nuvem & Infra**. Nenhuma consulta DNS sai da aplicação e nenhum pacote é inspecionado.
 
 ---
 
@@ -446,7 +446,7 @@ O SecScan serve como suíte preparatória e de auditoria de código para program
 | **Ataques de Injeção (SQLi / Command)** | *DataFlow Taint Analysis*, *SAST Engine*, *DAST Fuzzer* | Rastrear sinks `db.query` e `child_process.exec` recebendo fontes desprotegidas de `req.body` ou `req.query`. |
 | **SSRF (Server-Side Request Forgery)** | *SSRF & Webhook Validator* | Identificar requisições HTTP internas sem whitelist de domínios, mirando `169.254.169.254` ou redes privadas. |
 | **IDOR / BOLA** | *API Security (BOLA/OWASP)*, *LinkFinder* | Validar rotas REST com IDs (`/api/v1/orders/:id`, `/account/:accId`) sem checagem de autorização do usuário logado. |
-| **Remote Code Execution (RCE)** | *DataFlow Sinks*, *IAST Runtime Hooks* | Desserializações inseguras (`unserialize`, `pickle`), chamadas a `eval()` dinâmico e execução de comandos de shell. |
+| **Remote Code Execution (RCE)** | *DataFlow Sinks*, *IAST (laboratório)* | Desserializações inseguras (`unserialize`, `pickle`), chamadas a `eval()` dinâmico e execução de comandos de shell. O IAST aplica payload de exemplo; não executa o comando no host. |
 | **Directory Traversal / LFI** | *SAST Custom Rules*, *DataFlow* | Verificação de chamadas `fs.readFile` e `path.join` manipulando variáveis externas com sequências `../`. |
 | **Roubo de Contas (Account Takeover)** | *JWT & Token Forensics*, *DAST Fuzzer* | Tokens sem assinatura (`alg: none`), chaves fracas HMAC e endpoints de autenticação sem rate limiting. |
 | **Funcionalidades Financeiras / Cashback** | *Policy-as-Code*, *LinkFinder*, *Custom Rules* | Mapeamento de endpoints de crédito/débito, validação de tipos de dados (`amount < 0`) e regras de concorrência. |
@@ -501,16 +501,16 @@ O SecScan serve como suíte preparatória e de auditoria de código para program
 - **O que é e Como Funciona:** Refatoração completa da diagramação inicial e fluxo de navegação do SecScan. Em vez de despejar mais de 40 ferramentas de uma vez em barras de rolagem horizontais confusas, a aplicação agora recebe o usuário na **Central de Módulos (Hub)**: uma interface limpa, equilibrada e espaçosa inspirada nas diretrizes de design da **Apple** (macOS System Settings, App Store e Apple Developer Portal).
 
 - **Agrupamento por 5 Núcleos Especializados de Escopo Semelhante:**
-  1. **Análise de Código & SAST (9 ferramentas):**
-     - *Scanner SAST*, *Grafo DataFlow & Caminhos de Ataque*, *Mapeador de Endpoints & Rotas*, *Caçador de Segredos por Entropia de Shannon*, *JSMiner Assets & Bundles*, *Dependências SCA & CVEs*, *IAST Runtime Hooks*, *Auto-Remediação em 1-Clique* e *Refatoração Segura & Modernização*.
-  2. **APIs, DAST & Superfície Externa (5 ferramentas):**
-     - *API Security Inspector (OWASP API Top 10)*, *DAST Web Fuzzer*, *Auditor de Headers de Segurança HTTP (CSP, HSTS)*, *Inspetor Forense de Tokens JWT (RFC 7519)* e *Validador de SSRF & Metadados Cloud*.
-  3. **Nuvem, Infraestrutura & Redes (8 ferramentas):**
-     - *IaC Security (Terraform & Kubernetes)*, *Segurança de Containers & Dockerfile (CIS)*, *Cloud IAM & Privilégios Mínimos*, *Next-Gen Firewall (NGFW L7 & IPS)*, *IDS/IPS Snort Engine*, *DNSSEC & DoH Validator*, *SD-WAN & SASE Mesh Overlay* e *Sensor EDR & eBPF*.
-  4. **SOC, Detecção & Resposta a Incidentes (6 ferramentas):**
-     - *SOC Command Center 24/7 (Live SIEM)*, *Security Onion NSM (Zeek/Suricata)*, *CrowdStrike Falcon Incident Response*, *WAF ModSecurity Engine (OWASP CRS)*, *Reconhecimento de Portas Nmap* e *Auditoria Web Server Nikto*.
+  1. **Análise de Código & SAST (8 ferramentas):**
+     - *Scanner SAST*, *Grafo DataFlow & Caminhos de Ataque*, *Mapeador de Endpoints & Rotas*, *Caçador de Segredos por Entropia de Shannon*, *JSMiner Assets & Bundles*, *Dependências SCA & CVEs*, *Auto-Remediação em 1-Clique* e *Refatoração Segura & Modernização*.
+  2. **APIs, DAST & Superfície Externa (9 ferramentas):**
+     - *API Security Inspector (OWASP API Top 10)*, *DAST Web Fuzzer*, *IAST com payloads de exemplo (laboratório)*, *Auditor de Headers de Segurança HTTP (CSP, HSTS)*, *Inspetor Forense de Tokens JWT (RFC 7519)*, *Validador de SSRF & Metadados Cloud*, *WAF (laboratório)*, *Nmap (laboratório)* e *Nikto (laboratório)*.
+  3. **Nuvem, Infraestrutura & Redes (7 ferramentas):**
+     - *IaC*, *Containers / Dockerfile*, *Cloud IAM*, *NGFW (laboratório)*, *IDS/IPS (laboratório)*, *DNS (laboratório)* e *SD-WAN (laboratório)*.
+  4. **SOC, Detecção & Resposta (4 ferramentas, todas laboratório):**
+     - *SOC Command Center*, *Security Onion*, *CrowdStrike* e *EDR*. Os nomes não indicam integração com esses produtos.
   5. **Governança, Threat Intel & Compliance (16 ferramentas):**
-     - *Dashboard Executivo & Matriz de Risco*, *Tendências & MTTR (Recharts)*, *CTI Threat Intel Hub (CISA KEV & OTX)*, *Modelagem de Ameaças STRIDE*, *Policy-as-Code Declarativo (OPA Rego)*, *Gerador SBOM (CycloneDX & SPDX)*, *Auditoria de Conformidade (SOC 2, ISO 27001, HIPAA)*, *Frameworks & Matriz CIS*, *Gestão de SLA & ASOC*, *OWASP LLM & IA*, *Arquiteto de Playbooks SOAR*, *10 Ferramentas Pro Cyber*, *Editor de Regras Customizadas (Regex)*, *Terminal SecScan CLI*, *Pipeline Flow DevSecOps* e *Templates CI/CD*.
+     - *Dashboard*, *Tendências*, *CTI (catálogo local, selo LAB)*, *STRIDE*, *OPA Rego*, *SBOM*, *Compliance*, *Frameworks*, *SLA*, *OWASP LLM*, *SOAR (laboratório)*, *Pro Cyber (laboratório)*, *Regras*, *CLI*, *Pipeline* e *CI/CD*.
 
 - **Padrões de Design Apple Adotados:**
   - **Zero-Pill Discipline:** Eliminação de pílulas estáticas repetitivas em favor de tipografia limpa com separadores sutis (`·`), hierarquia visual clara e espaçamento generoso.
@@ -525,7 +525,7 @@ O SecScan serve como suíte preparatória e de auditoria de código para program
 
 ## 💻 Interface de Linha de Comando (CLI)
 
-A suíte inclui o executável nativo em Node.js (`bin/secscan.js`):
+A suíte inclui `bin/secscan.js`, que executa `src/cli/secscan.ts` com as regras de `src/lib/defaultRules.ts` (as mesmas da interface). Regras extras entram só por `--rules`.
 
 ```bash
 # Executar auditoria completa no diretório atual
@@ -558,7 +558,7 @@ node bin/secscan.js . --rules ./my-custom-rules.json
 | `--max-risk <score>` | **Quality Gate:** Retorna exit code `1` se o Risk Score Cumulativo (0-100) exceder o limite | Desativado |
 | `--fail-on <severidade>` | Retorna exit code `1` se houver alertas (`critical`, `high`, `medium`) | Desativado |
 | `--format <formato>` | Formato de saída (`table`, `json`, `sarif`, `csv`) | `table` |
-| `--rules <arquivo.json>` | Arquivo JSON com regras regex customizadas | Regras internas |
+| `--rules <arquivo.json>` | Regras extras, somadas a `src/lib/defaultRules.ts` | Só as regras padrão |
 | `--ignore <patterns>` | Padrões glob adicionais a ignorar | `node_modules, vendor, dist...` |
 | `--output <arquivo>` | Salva a saída no arquivo indicado | `stdout` |
 
@@ -628,19 +628,13 @@ npm run build
 
 ## 🌍 Portabilidade e Hospedagem Externa (Deploy fora do AI Studio)
 
-**Sim, todo o código do repositório é 100% funcional e portável!** 
+A aplicação é uma SPA em **React 19 + TypeScript + Vite 6 + Tailwind CSS**. O servidor Express em `server.ts` serve a interface e as rotas `/api`.
 
-A aplicação foi construída como uma SPA (Single Page Application) moderna em **React 18 + TypeScript + Vite + Tailwind CSS**, sem dependências proprietárias travadas ao AI Studio:
-
-- **Hospedagem Estática Imediata:** Pode ser hospedada gratuitamente em plataformas como **Vercel**, **Netlify**, **Cloudflare Pages**, **GitHub Pages**, **AWS S3/CloudFront** ou qualquer servidor web tradicional (Nginx, Apache, Caddy).
-  - Basta executar `npm run build`, e o diretório `dist/` resultante conterá todos os arquivos HTML, CSS e bundles JS estáticos e otimizados.
-- **Configuração Simples para Vercel / Netlify:**
-  - **Build Command:** `npm run build`
-  - **Output Directory:** `dist`
-  - **Node Version:** 18+ ou 20+
-- **Execução em Containers Docker:**
-  - O projeto pode ser facilmente empacotado em uma imagem Docker com Nginx Alpine para servir o conteúdo estático ou orquestrado em Kubernetes / AWS ECS / Google Cloud Run.
-- **Autonomia da CLI:** O utilitário `bin/secscan.js` roda de forma 100% independente em pipelines CI/CD (GitHub Actions, GitLab CI, Jenkins, Azure DevOps) precisando apenas do runtime Node.js padrão.
+- **Build:** `npm run build`. O diretório `dist/` recebe o frontend. `npm start` sobe `dist/server.cjs`.
+- **Node:** 22.
+- **Antes de publicar:** defina `SECSCAN_API_TOKEN`. Com a variável, `/api/*` (exceto `/api/health`) exige `Authorization: Bearer <token>`. Sem ela, `GET /api/gitignore/audit` só responde em localhost.
+- **Ingest de URL:** `POST /api/url-ingest` recusa localhost, metadata, rede privada e redirecionamento para esses destinos.
+- **CLI no CI:** `node bin/secscan.js` precisa de Node 22 e das dependências instaladas (`tsx` resolve o entry TypeScript).
 
 ---
 
