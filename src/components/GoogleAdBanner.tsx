@@ -109,7 +109,7 @@ export const GoogleAdBanner: React.FC<GoogleAdBannerProps> = ({
   className = ''
 }) => {
   const [adFree, setAdFree] = useState<boolean>(() => isAdFreeMode());
-  const adPushAttemptedRef = useRef(false);
+  const initializedSlotsRef = useRef<WeakSet<Element>>(new WeakSet());
 
   // Lê variáveis de ambiente do Vite de forma segura
   const envClient = import.meta.env.VITE_ADSENSE_CLIENT_ID || '';
@@ -137,28 +137,20 @@ export const GoogleAdBanner: React.FC<GoogleAdBannerProps> = ({
     return () => window.removeEventListener('secscan_ad_mode_changed', handleModeChange);
   }, []);
 
-  // Efeito responsável pelo carregamento condicional do script do AdSense e inicialização do slot
-  useEffect(() => {
-    // Se o modo sem anúncios estiver ativo ou as chaves não estiverem configuradas, ABORTA
-    if (adFree || !isConfigured) {
+  const handleAdSlotRef = (node: HTMLModElement | null) => {
+    if (!node || initializedSlotsRef.current.has(node)) {
       return;
     }
 
-    // 1. Carrega o SDK externo somente quando as chaves estiverem presentes
+    initializedSlotsRef.current.add(node);
     loadAdSenseScript(effectiveClient);
 
-    // 2. Inicializa o bloco de anúncio uma única vez para este nó
-    if (!adPushAttemptedRef.current) {
-      adPushAttemptedRef.current = true;
-      try {
-        if (typeof window !== 'undefined') {
-          (window.adsbygoogle = window.adsbygoogle || []).push({});
-        }
-      } catch (err) {
-        console.debug('AdSense slot initialization:', err);
-      }
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch (err) {
+      console.debug('AdSense slot initialization:', err);
     }
-  }, [adFree, isConfigured, effectiveClient]);
+  };
 
   // Se o Modo Admin estiver ativo ou se as chaves de ambiente estiverem ausentes, NÃO renderiza nada
   if (adFree || !isConfigured) {
@@ -170,6 +162,7 @@ export const GoogleAdBanner: React.FC<GoogleAdBannerProps> = ({
   return (
     <div className={`overflow-hidden my-4 flex justify-center items-center min-h-[90px] w-full ${className}`} data-ad-slot-active={effectiveSlot}>
       <ins
+        ref={handleAdSlotRef}
         className="adsbygoogle"
         style={{ display: 'block' }}
         data-ad-client={formattedClient}
