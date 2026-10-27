@@ -362,20 +362,278 @@ export const Header: React.FC<HeaderProps> = ({
     });
   }, [navItems, toolSearchTerm, SECOPS_MODULES]);
 
-  useEffect(() => {
-    setSelectedSearchIndex(0);
-  }, [toolSearchTerm]);
+  const actionsBarNode = (
+    <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2 shrink-0 justify-end min-w-0 flex-nowrap">
+      {/* User Profile & Settings Drawer Button */}
+      {onOpenSettings && (
+        <button
+          id="btn-header-user-settings-drawer"
+          type="button"
+          onClick={onOpenSettings}
+          className="h-8.5 px-2.5 rounded-lg inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] hover:border-[#00F0FF]/40 transition-all cursor-pointer shrink-0 whitespace-nowrap select-none"
+          title={language === 'pt' ? 'Configurações do Usuário, Perfil & Banners do AdSense' : 'User Settings, Profile & AdSense Banners'}
+        >
+          <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-cyan-950 to-blue-900 border border-cyan-400/40 flex items-center justify-center text-[9px] font-mono text-cyan-300 font-bold shrink-0">
+            SE
+          </div>
+          <span className="hidden xl:inline">{language === 'pt' ? 'Configurações' : 'Settings'}</span>
+          {localAdFree && (
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00FF41] shadow-[0_0_6px_#00FF41]" title="Modo Sem Anúncios Ativo (Ad-Free)" />
+          )}
+        </button>
+      )}
+
+      {/* Consolidated Utilities Dropdown ([⚙️ Utilidades ▾]) */}
+      <div className="relative shrink-0" ref={utilsMenuRef}>
+        <button
+          id="btn-header-utilities-menu"
+          onClick={() => setIsUtilsMenuOpen(!isUtilsMenuOpen)}
+          className="h-8.5 px-2.5 rounded-lg inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] hover:border-white/[0.2] transition-all cursor-pointer shrink-0 whitespace-nowrap select-none"
+          title="Utilidades e Ferramentas Auxiliares"
+        >
+          <MoreHorizontal className="w-4 h-4 text-zinc-400 shrink-0" />
+          <span className="hidden 2xl:inline">{language === 'pt' ? 'Utilidades' : 'Tools'}</span>
+          <ChevronDown className={`w-3 h-3 text-zinc-500 transition-transform shrink-0 ${isUtilsMenuOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {/* Utilities Popover */}
+        {isUtilsMenuOpen && (
+          <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-[#0D0D14]/98 backdrop-blur-2xl border border-white/[0.12] shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-2.5 py-1 text-[10px] font-mono uppercase font-bold text-zinc-400 border-b border-white/[0.08] mb-1">
+              {language === 'pt' ? 'Recursos & Suporte' : 'Resources & Tools'}
+            </div>
+
+            {onOpenToolGuide && (
+              <button
+                onClick={() => { onOpenToolGuide(activeTab); setIsUtilsMenuOpen(false); }}
+                className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-[#00F0FF]" />
+                <span>💡 {language === 'pt' ? 'Como Usar & Exemplos' : 'How to Use & Examples'}</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => { onOpenTour(); setIsUtilsMenuOpen(false); }}
+              className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
+            >
+              <Compass className="w-3.5 h-3.5 text-[#FF3E00]" />
+              <span>{t('action.tutorial')}</span>
+            </button>
+
+            {onOpenCommandPalette && (
+              <button
+                onClick={() => { onOpenCommandPalette(); setIsUtilsMenuOpen(false); }}
+                className="w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Command className="w-3.5 h-3.5 text-[#FF3E00]" />
+                  <span>{t('action.commands')}</span>
+                </div>
+                <kbd className="text-[9px] px-1 py-0.2 rounded bg-black/40 text-zinc-400 border border-white/10 font-mono">
+                  {isMac ? '⌘K' : 'Ctrl+K'}
+                </kbd>
+              </button>
+            )}
+
+            {onOpenGlossary && (
+              <button
+                onClick={() => { onOpenGlossary(); setIsUtilsMenuOpen(false); }}
+                className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-zinc-400" />
+                <span>{t('action.glossary')}</span>
+              </button>
+            )}
+
+            {onOpenIgnoreModal && (
+              <button
+                onClick={() => { onOpenIgnoreModal(); setIsUtilsMenuOpen(false); }}
+                className="w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Ban className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>{t('action.exclusions')}</span>
+                </div>
+                {activeIgnoreCount !== undefined && (
+                  <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-[#00FF41]/10 text-[#00FF41] border border-[#00FF41]/30">
+                    {activeIgnoreCount}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {onOpenGitignoreAudit && (
+              <button
+                onClick={() => { onOpenGitignoreAudit(); setIsUtilsMenuOpen(false); }}
+                className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-emerald-300 hover:text-white cursor-pointer"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{t('action.gitignore')}</span>
+              </button>
+            )}
+
+            {onOpenUrlIngest && (
+              <button
+                onClick={() => { onOpenUrlIngest(); setIsUtilsMenuOpen(false); }}
+                className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-[#00F0FF] hover:text-white cursor-pointer"
+              >
+                <Globe className="w-3.5 h-3.5 text-[#00F0FF]" />
+                <span>Auditar URL Direta</span>
+              </button>
+            )}
+
+            {onOpenAnalytics && (
+              <button
+                onClick={() => { onOpenAnalytics(); setIsUtilsMenuOpen(false); }}
+                className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-emerald-300 hover:text-white cursor-pointer"
+              >
+                <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Analytics & Telemetria</span>
+              </button>
+            )}
+
+            {onOpenShortcuts && (
+              <button
+                onClick={() => { onOpenShortcuts(); setIsUtilsMenuOpen(false); }}
+                className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-400 hover:text-white cursor-pointer"
+              >
+                <Keyboard className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Atalhos de Teclado</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => { handleShareLink(); setIsUtilsMenuOpen(false); }}
+              className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-400 hover:text-white cursor-pointer"
+            >
+              <Share2 className="w-3.5 h-3.5 text-[#00FF41]" />
+              <span>Compartilhar Link</span>
+            </button>
+
+            {onOpenSettings && (
+              <button
+                onClick={() => { onOpenSettings(); setIsUtilsMenuOpen(false); }}
+                className="w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-[#00F0FF] hover:text-white cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Settings className="w-3.5 h-3.5 text-[#00F0FF]" />
+                  <span>{language === 'pt' ? 'Configurações & Anúncios' : 'Settings & AdSense'}</span>
+                </div>
+                <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/30 font-mono">
+                  ⚙️ Drawer
+                </span>
+              </button>
+            )}
+
+            <button
+              onClick={() => {
+                const next = toggleAdFreeMode();
+                setLocalAdFree(next);
+                setIsUtilsMenuOpen(false);
+              }}
+              className="w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
+              title="Alternar visibilidade de anúncios do Google Ads para testes ou modo admin"
+            >
+              <div className="flex items-center gap-2.5">
+                <ShieldCheck className={`w-3.5 h-3.5 ${localAdFree ? 'text-[#00FF41]' : 'text-zinc-400'}`} />
+                <span>{localAdFree ? 'Modo Sem Anúncios (Ativo)' : 'Modo Sem Anúncios (Admin)'}</span>
+              </div>
+              <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold ${
+                localAdFree 
+                  ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-800/60' 
+                  : 'bg-zinc-800 text-zinc-400 border border-white/10'
+              }`}>
+                {localAdFree ? 'ATIVO' : 'OFF'}
+              </span>
+            </button>
+
+            <div className="border-t border-white/[0.08] my-1" />
+
+            <button
+              onClick={() => { onResetWorkspace(); setIsUtilsMenuOpen(false); }}
+              className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-400 hover:text-white cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Restaurar Demo</span>
+            </button>
+
+            {onClearWorkspace && (
+              <button
+                onClick={() => { onClearWorkspace(); setIsUtilsMenuOpen(false); }}
+                className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Limpar Workspace</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Language Switcher */}
+      <div className="shrink-0">
+        <LanguageSwitcher />
+      </div>
+
+      {/* Clear All / Start New Test Button */}
+      {onClearWorkspace && (
+        <button
+          id="btn-header-clean-new-test"
+          onClick={onClearWorkspace}
+          className="hidden sm:inline-flex h-8.5 px-2.5 sm:px-3 rounded-xl items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-rose-300 hover:text-white bg-rose-950/30 hover:bg-rose-900/60 border border-rose-800/50 hover:border-rose-600/70 transition-all cursor-pointer shadow-sm active:scale-95 shrink-0 whitespace-nowrap select-none"
+          title={language === 'pt' ? 'Limpar todos os dados e arquivos para iniciar um novo teste do zero' : language === 'es' ? 'Limpiar datos e iniciar nueva prueba' : 'Clear all data to start a new test'}
+        >
+          <Trash2 className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+          <span className="hidden 2xl:inline">{language === 'pt' ? 'Limpar' : language === 'es' ? 'Limpiar' : 'Clear'}</span>
+        </button>
+      )}
+
+      {/* Export Button */}
+      <button
+        id="btn-export-report"
+        onClick={onOpenExport}
+        className="hidden sm:inline-flex h-8.5 px-2.5 sm:px-3 rounded-xl items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] hover:border-white/[0.2] transition-all cursor-pointer shrink-0 whitespace-nowrap select-none"
+        title="Exportar Relatório"
+      >
+        <Download className="w-3.5 h-3.5 shrink-0" />
+        <span className="hidden 2xl:inline">{t('action.export')}</span>
+      </button>
+
+      {/* Primary Action: Run Scan */}
+      <button
+        id="btn-run-scan"
+        onClick={onRunScan}
+        disabled={isScanning}
+        title={`Executar Análise SAST (${isMac ? '⌘S' : 'Ctrl+S'})`}
+        className={`h-8.5 px-3.5 sm:px-4 rounded-xl inline-flex items-center gap-2 font-mono text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-md shrink-0 whitespace-nowrap select-none ${
+          isScanning
+            ? 'bg-[#262626] text-[#777] cursor-not-allowed border border-[#333]'
+            : 'bg-gradient-to-r from-[#FF3E00] via-[#FF551C] to-[#E03700] hover:from-[#FF551C] hover:to-[#FF3E00] text-white active:scale-95 shadow-[0_0_16px_rgba(255,62,0,0.35)] border border-[#FF3E00]/80'
+        }`}
+      >
+        <Play className={`w-3.5 h-3.5 fill-current shrink-0 ${isScanning ? 'animate-spin' : ''}`} />
+        <span className="whitespace-nowrap font-bold">
+          {isScanning 
+            ? `${t('action.scanning')}${scanProgress ? ` (${scanProgress.percentage}%)` : ''}` 
+            : t('action.run_scan')}
+        </span>
+      </button>
+    </div>
+  );
 
   return (
     <header className="w-full border-b border-white/[0.08] bg-[#07070A]/95 backdrop-blur-xl sticky top-0 z-30 shadow-md">
-      <div className="max-w-[1600px] 2xl:max-w-[1800px] w-full mx-auto px-3 sm:px-5 lg:px-8">
-        {/* CONCENTRATED SINGLE-MENU BAR (Divided into 3 Scopes/Blocks) */}
-        <div className="h-16 flex items-center justify-between gap-2 sm:gap-3 lg:gap-4 w-full min-w-0 relative">
+      <div className="max-w-[1600px] 2xl:max-w-[1800px] w-full mx-auto px-3 sm:px-5 lg:px-8 py-2">
+        {/* MULTI-ROW STRUCTURED NAVIGATION HEADER */}
+        <div className="w-full min-w-0 flex flex-col gap-2 relative">
           
           {/* =========================================================================
-              BLOCO 1: IDENTIDADE & HUB (Brand & Core Hub Scope)
+              LINHA 1: IDENTIDADE, HUB & AÇÕES EXECUTIVAS
              ========================================================================= */}
-          <div className="flex items-center gap-2 sm:gap-2.5 lg:gap-3 shrink-0">
+          <div className="w-full flex items-center justify-between gap-2 sm:gap-4 min-w-0">
+            {/* BLOCO 1: IDENTIDADE & HUB (Brand & Core Hub Scope) */}
+            <div className="flex items-center gap-2 sm:gap-2.5 lg:gap-3 shrink-0 min-w-0">
             {/* Logo & Brand Name - Navigates directly to App Dashboard */}
             <div 
               id="header-brand-logo-btn"
@@ -436,10 +694,16 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* =========================================================================
-              BLOCO 2: MÓDULOS & FERRAMENTAS DO ESCOPO (Scoped Module & Tool Selector)
-             ========================================================================= */}
-          <div className="flex items-center gap-2 flex-1 max-w-2xl mx-1 sm:mx-3 justify-center min-w-0">
+          {/* Ações Executivas da Linha 1 */}
+          {actionsBarNode}
+        </div>
+
+        {/* =========================================================================
+            LINHA 2: MÓDULOS ESPECIALIZADOS, FERRAMENTAS & BUSCA SPOTLIGHT
+           ========================================================================= */}
+        <div className="w-full flex items-center justify-between gap-2.5 sm:gap-4 min-w-0 pt-2 border-t border-white/[0.06]">
+          {/* BLOCO 2: MÓDULOS & FERRAMENTAS DO ESCOPO */}
+          <div className="flex items-center gap-2 flex-1 max-w-4xl min-w-0">
             {/* Module Selector Dropdown */}
             <div className="relative" ref={moduleMenuRef}>
               <button
@@ -579,10 +843,10 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Spotlight Search Box (Expanding on Focus / Selection) */}
             <div 
               ref={searchContainerRef} 
-              className={`relative hidden md:flex items-center transition-all duration-300 ease-out z-20 shrink-1 min-w-[100px] ${
+              className={`relative hidden md:flex items-center transition-all duration-300 ease-out z-20 shrink min-w-0 ${
                 isSearchFocused || toolSearchTerm.trim().length > 0 
-                  ? 'w-48 sm:w-56 lg:w-64 xl:w-72 shadow-[0_0_20px_rgba(0,240,255,0.2)]' 
-                  : 'w-24 sm:w-28 lg:w-36 xl:w-40'
+                  ? 'w-44 sm:w-52 lg:w-60 xl:w-68 max-w-full shadow-[0_0_20px_rgba(0,240,255,0.2)]' 
+                  : 'w-24 sm:w-28 lg:w-32 xl:w-40 max-w-full'
               }`}
             >
               <Search className={`w-3.5 h-3.5 absolute left-2.5 transition-colors pointer-events-none shrink-0 ${
@@ -755,12 +1019,8 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
           </div>
-
-          {/* =========================================================================
-              BLOCO 3: TELEMETRIA, UTILIDADES & AÇÕES (Telemetry & Actions Scope)
-             ========================================================================= */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 justify-end min-w-0">
-            {/* Risk Score Pill - Only shown on 2xl to preserve space and avoid overlap */}
+          {/* STATUS DO WORKSPACE / SCORE DE RISCO (Linha 2 Direita) */}
+          <div className="flex items-center gap-2 shrink-0 justify-end min-w-0">
             <button
               id="header-workspace-risk-score-badge"
               type="button"
@@ -772,275 +1032,20 @@ export const Header: React.FC<HeaderProps> = ({
                   if (el) el.scrollIntoView({ behavior: 'smooth' });
                 }, 100);
               }}
-              className="hidden 2xl:flex items-center gap-1.5 h-8.5 px-2.5 rounded-lg border font-mono text-[11px] font-bold uppercase transition-all cursor-pointer bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08] shrink-0 whitespace-nowrap select-none"
-              title="Score de Risco do Workspace"
+              className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border font-mono text-[11px] font-bold uppercase transition-all cursor-pointer bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08] shrink-0 whitespace-nowrap select-none"
+              title="Score de Risco Cumulativo do Workspace (clique para rolar até as métricas detalhadas)"
             >
               <span className={`w-2 h-2 rounded-full shrink-0 ${
                 (report.metrics.riskScore ?? 0) >= 75 ? 'bg-[#FF3E00]' : (report.metrics.riskScore ?? 0) >= 50 ? 'bg-[#FF7A00]' : 'bg-[#00FF41]'
               }`} />
-              <span className="text-zinc-400 text-[10px]">Score:</span>
+              <span className="text-zinc-400 text-[10px]">Score de Risco:</span>
               <span className="text-white font-mono font-bold">{report.metrics.riskScore ?? 0}/100</span>
             </button>
-
-            {/* User Profile & Settings Drawer Button */}
-            {onOpenSettings && (
-              <button
-                id="btn-header-user-settings-drawer"
-                type="button"
-                onClick={onOpenSettings}
-                className="h-8.5 px-2.5 rounded-lg inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] hover:border-[#00F0FF]/40 transition-all cursor-pointer shrink-0 whitespace-nowrap select-none"
-                title={language === 'pt' ? 'Configurações do Usuário, Perfil & Banners do AdSense' : 'User Settings, Profile & AdSense Banners'}
-              >
-                <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-cyan-950 to-blue-900 border border-cyan-400/40 flex items-center justify-center text-[9px] font-mono text-cyan-300 font-bold shrink-0">
-                  SE
-                </div>
-                <span className="hidden xl:inline">{language === 'pt' ? 'Configurações' : 'Settings'}</span>
-                {localAdFree && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#00FF41] shadow-[0_0_6px_#00FF41]" title="Modo Sem Anúncios Ativo (Ad-Free)" />
-                )}
-              </button>
-            )}
-
-            {/* Consolidated Utilities Dropdown ([⚙️ Utilidades ▾]) */}
-            <div className="relative shrink-0" ref={utilsMenuRef}>
-              <button
-                id="btn-header-utilities-menu"
-                onClick={() => setIsUtilsMenuOpen(!isUtilsMenuOpen)}
-                className="h-8.5 px-2.5 rounded-lg inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] hover:border-white/[0.2] transition-all cursor-pointer shrink-0 whitespace-nowrap select-none"
-                title="Utilidades e Ferramentas Auxiliares"
-              >
-                <MoreHorizontal className="w-4 h-4 text-zinc-400 shrink-0" />
-                <span className="hidden 2xl:inline">{language === 'pt' ? 'Utilidades' : 'Tools'}</span>
-                <ChevronDown className={`w-3 h-3 text-zinc-500 transition-transform shrink-0 ${isUtilsMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* Utilities Popover */}
-              {isUtilsMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-[#0D0D14]/98 backdrop-blur-2xl border border-white/[0.12] shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="px-2.5 py-1 text-[10px] font-mono uppercase font-bold text-zinc-400 border-b border-white/[0.08] mb-1">
-                    {language === 'pt' ? 'Recursos & Suporte' : 'Resources & Tools'}
-                  </div>
-
-                  {onOpenToolGuide && (
-                    <button
-                      onClick={() => { onOpenToolGuide(activeTab); setIsUtilsMenuOpen(false); }}
-                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
-                    >
-                      <BookOpen className="w-3.5 h-3.5 text-[#00F0FF]" />
-                      <span>💡 {language === 'pt' ? 'Como Usar & Exemplos' : 'How to Use & Examples'}</span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => { onOpenTour(); setIsUtilsMenuOpen(false); }}
-                    className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
-                  >
-                    <Compass className="w-3.5 h-3.5 text-[#FF3E00]" />
-                    <span>{t('action.tutorial')}</span>
-                  </button>
-
-                  {onOpenCommandPalette && (
-                    <button
-                      onClick={() => { onOpenCommandPalette(); setIsUtilsMenuOpen(false); }}
-                      className="w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Command className="w-3.5 h-3.5 text-[#FF3E00]" />
-                        <span>{t('action.commands')}</span>
-                      </div>
-                      <kbd className="text-[9px] px-1 py-0.2 rounded bg-black/40 text-zinc-400 border border-white/10 font-mono">
-                        {isMac ? '⌘K' : 'Ctrl+K'}
-                      </kbd>
-                    </button>
-                  )}
-
-                  {onOpenGlossary && (
-                    <button
-                      onClick={() => { onOpenGlossary(); setIsUtilsMenuOpen(false); }}
-                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
-                    >
-                      <BookOpen className="w-3.5 h-3.5 text-zinc-400" />
-                      <span>{t('action.glossary')}</span>
-                    </button>
-                  )}
-
-                  {onOpenIgnoreModal && (
-                    <button
-                      onClick={() => { onOpenIgnoreModal(); setIsUtilsMenuOpen(false); }}
-                      className="w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Ban className="w-3.5 h-3.5 text-zinc-400" />
-                        <span>{t('action.exclusions')}</span>
-                      </div>
-                      {activeIgnoreCount !== undefined && (
-                        <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-[#00FF41]/10 text-[#00FF41] border border-[#00FF41]/30">
-                          {activeIgnoreCount}
-                        </span>
-                      )}
-                    </button>
-                  )}
-
-                  {onOpenGitignoreAudit && (
-                    <button
-                      onClick={() => { onOpenGitignoreAudit(); setIsUtilsMenuOpen(false); }}
-                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-emerald-300 hover:text-white cursor-pointer"
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>{t('action.gitignore')}</span>
-                    </button>
-                  )}
-
-                  {onOpenUrlIngest && (
-                    <button
-                      onClick={() => { onOpenUrlIngest(); setIsUtilsMenuOpen(false); }}
-                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-[#00F0FF] hover:text-white cursor-pointer"
-                    >
-                      <Globe className="w-3.5 h-3.5 text-[#00F0FF]" />
-                      <span>Auditar URL Direta</span>
-                    </button>
-                  )}
-
-                  {onOpenAnalytics && (
-                    <button
-                      onClick={() => { onOpenAnalytics(); setIsUtilsMenuOpen(false); }}
-                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-emerald-300 hover:text-white cursor-pointer"
-                    >
-                      <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Analytics & Telemetria</span>
-                    </button>
-                  )}
-
-                  {onOpenShortcuts && (
-                    <button
-                      onClick={() => { onOpenShortcuts(); setIsUtilsMenuOpen(false); }}
-                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-400 hover:text-white cursor-pointer"
-                    >
-                      <Keyboard className="w-3.5 h-3.5 text-zinc-400" />
-                      <span>Atalhos de Teclado</span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => { handleShareLink(); setIsUtilsMenuOpen(false); }}
-                    className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-400 hover:text-white cursor-pointer"
-                  >
-                    <Share2 className="w-3.5 h-3.5 text-[#00FF41]" />
-                    <span>Compartilhar Link</span>
-                  </button>
-
-                  {onOpenSettings && (
-                    <button
-                      onClick={() => { onOpenSettings(); setIsUtilsMenuOpen(false); }}
-                      className="w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-[#00F0FF] hover:text-white cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Settings className="w-3.5 h-3.5 text-[#00F0FF]" />
-                        <span>{language === 'pt' ? 'Configurações & Anúncios' : 'Settings & AdSense'}</span>
-                      </div>
-                      <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/30 font-mono">
-                        ⚙️ Drawer
-                      </span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => {
-                      const next = toggleAdFreeMode();
-                      setLocalAdFree(next);
-                      setIsUtilsMenuOpen(false);
-                    }}
-                    className="w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-300 hover:text-white cursor-pointer"
-                    title="Alternar visibilidade de anúncios do Google Ads para testes ou modo admin"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <ShieldCheck className={`w-3.5 h-3.5 ${localAdFree ? 'text-[#00FF41]' : 'text-zinc-400'}`} />
-                      <span>{localAdFree ? 'Modo Sem Anúncios (Ativo)' : 'Modo Sem Anúncios (Admin)'}</span>
-                    </div>
-                    <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold ${
-                      localAdFree 
-                        ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-800/60' 
-                        : 'bg-zinc-800 text-zinc-400 border border-white/10'
-                    }`}>
-                      {localAdFree ? 'ATIVO' : 'OFF'}
-                    </span>
-                  </button>
-
-                  <div className="border-t border-white/[0.08] my-1" />
-
-                  <button
-                    onClick={() => { onResetWorkspace(); setIsUtilsMenuOpen(false); }}
-                    className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-zinc-400 hover:text-white cursor-pointer"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>Restaurar Demo</span>
-                  </button>
-
-                  {onClearWorkspace && (
-                    <button
-                      onClick={() => { onClearWorkspace(); setIsUtilsMenuOpen(false); }}
-                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left font-mono text-xs hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Limpar Workspace</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Language Switcher */}
-            <div className="shrink-0">
-              <LanguageSwitcher />
-            </div>
-
-            {/* Clear All / Start New Test Button */}
-            {onClearWorkspace && (
-              <button
-                id="btn-header-clean-new-test"
-                onClick={onClearWorkspace}
-                className="h-8.5 px-2.5 sm:px-3 rounded-xl inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-rose-300 hover:text-white bg-rose-950/30 hover:bg-rose-900/60 border border-rose-800/50 hover:border-rose-600/70 transition-all cursor-pointer shadow-sm active:scale-95 shrink-0 whitespace-nowrap select-none"
-                title={language === 'pt' ? 'Limpar todos os dados e arquivos para iniciar um novo teste do zero' : language === 'es' ? 'Limpiar datos e iniciar nueva prueba' : 'Clear all data to start a new test'}
-              >
-                <Trash2 className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                <span className="hidden 2xl:inline">{language === 'pt' ? 'Limpar' : language === 'es' ? 'Limpiar' : 'Clear'}</span>
-              </button>
-            )}
-
-            {/* Export Button */}
-            <button
-              id="btn-export-report"
-              onClick={onOpenExport}
-              className="h-8.5 px-2.5 sm:px-3 rounded-xl inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] hover:border-white/[0.2] transition-all cursor-pointer shrink-0 whitespace-nowrap select-none"
-              title="Exportar Relatório"
-            >
-              <Download className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden 2xl:inline">{t('action.export')}</span>
-            </button>
-
-            {/* Primary Action: Run Scan */}
-            <button
-              id="btn-run-scan"
-              onClick={onRunScan}
-              disabled={isScanning}
-              title={`Executar Análise SAST (${isMac ? '⌘S' : 'Ctrl+S'})`}
-              className={`h-8.5 px-3.5 sm:px-4 rounded-xl inline-flex items-center gap-2 font-mono text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-md shrink-0 whitespace-nowrap select-none ${
-                isScanning
-                  ? 'bg-[#262626] text-[#777] cursor-not-allowed border border-[#333]'
-                  : 'bg-gradient-to-r from-[#FF3E00] via-[#FF551C] to-[#E03700] hover:from-[#FF551C] hover:to-[#FF3E00] text-white active:scale-95 shadow-[0_0_16px_rgba(255,62,0,0.35)] border border-[#FF3E00]/80'
-              }`}
-            >
-              <Play className={`w-3.5 h-3.5 fill-current shrink-0 ${isScanning ? 'animate-spin' : ''}`} />
-              <span className="whitespace-nowrap font-bold">
-                {isScanning 
-                  ? `${t('action.scanning')}${scanProgress ? ` (${scanProgress.percentage}%)` : ''}` 
-                  : t('action.run_scan')}
-              </span>
-            </button>
           </div>
-
         </div>
+
       </div>
+    </div>
 
       {/* Workspace Status & Testing Context Sub-Bar */}
       <div className="border-t border-white/[0.06] bg-[#050508]/90 py-1.5 px-3 sm:px-5 lg:px-8">
