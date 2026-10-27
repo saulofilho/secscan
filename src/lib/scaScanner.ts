@@ -42,8 +42,9 @@ export interface ScaAnalysisReport {
   packages: DependencyPackage[];
   allVulnerabilities: ScaVulnerability[];
   manifestsFound: string[];
-  catalogMode: 'CURATED_LOCAL';
+  catalogMode: 'CURATED_LOCAL' | 'OSV';
   catalogSize: number;
+  osvStatus: 'NOT_QUERIED' | 'OK' | 'UNREACHABLE';
 }
 
 // Curated local sample. Packages absent from this map are reported as NOT_IN_CATALOG.
@@ -372,6 +373,153 @@ export function scanSoftwareCompositionAnalysis(files: ScannedFile[]): ScaAnalys
     allVulnerabilities,
     manifestsFound,
     catalogMode: 'CURATED_LOCAL',
-    catalogSize: Object.keys(KNOWN_CVE_DATABASE).length
+    catalogSize: Object.keys(KNOWN_CVE_DATABASE).length,
+    osvStatus: 'NOT_QUERIED'
   };
+}
+
+type OsvFetch = (input: string, init?: RequestInit) => Promise<Response>;
+
+function ecosystemForManifest(manifestFile: string): 'npm' | 'PyPI' {
+  return manifestFile.toLowerCase().endsWith('requirements.txt') ? 'PyPI' : 'npm';
+}
+
+function osvSeverity(vuln: Record<string, unknown>): { severity: ScaVulnerability['severity']; cvssScore: number } {
+  const databaseSpecific = vuln.database_specific as { severity?: string } | undefined;
+  const label = String(databaseSpecific?.severity || '').toUpperCase();
+  if (label === 'CRITICAL') return { severity: 'CRITICAL', cvssScore: 9 };
+  if (label === 'HIGH') return { severity: 'HIGH', cvssScore: 7.5 };
+  if (label === 'MODERATE' || label === 'MEDIUM') return { severity: 'MEDIUM', cvssScore: 5 };
+  if (label === 'LOW') return { severity: 'LOW', cvssScore: 2 };
+
+  const scores = Array.isArray(vuln.severity) ? vuln.severity : [];
+  for (const entry of scores) {
+    const raw = String((entry as { score?: string }).score || '');
+    const numeric = Number(raw);
+    const score = Number.isFinite(numeric) ? numeric : Number((raw.match(/(\d+\.\d+)/) || [])[1]);
+    if (!Number.isFinite(score) || score <= 0) continue;
+    if (score >= 9) return { severity: 'CRITICAL', cvssScore: score };
+    if (score >= 7) return { severity: 'HIGH', cvssScore: score };
+    if (score >= 4) return { severity: 'MEDIUM', cvssScore: score };
+    return { severity: 'LOW', cvssScore: score };
+  }
+  return { severity: 'MEDIUM', cvssScore: 0 };
+}
+
+function osvFixedVersion(vuln: Record<string, unknown>): string {
+  const affected = Array.isArray(vuln.affected) ? vuln.affected : [];
+  for (const item of affected) {
+    const ranges = Array.isArray((item as { ranges?: unknown }).ranges) ? (item as { ranges: unknown[] }).ranges : [];
+    for (const range of ranges) {
+      const events = Array.isArray((range as { events?: unknown }).events) ? (range as { events: unknown[] }).events : [];
+      const fixed = events.find((event) => typeof (event as { fixed?: string }).fixed === 'string') as { fixed?: string } | undefined;
+      if (fixed?.fixed) return fixed.fixed;
+    }
+  }
+  return 'ver advisory';
+}
+
+function osvToVulnerability(vuln: Record<string, unknown>, pkg: DependencyPackage): ScaVulnerability | null {
+  const id = String(vuln.id || '');
+  if (!id) return null;
+  const aliases = Array.isArray(vuln.aliases) ? vuln.aliases.map(String) : [];
+  const ids = [id, ...aliases];
+  const cveId = ids.find((value) => value.startsWith('CVE-')) || id;
+  const ghsaId = ids.find((value) => value.startsWith('GHSA-'));
+  const already = pkg.vulnerabilities.some((known) => known.cveId === cveId || (ghsaId && known.ghsaId === ghsaId));
+  if (already) return null;
+
+  const ranked = osvSeverity(vuln);
+  const references = (Array.isArray(vuln.references) ? vuln.references : [])
+    .map((item) => String((item as { url?: string }).url || ''))
+    .filter(Boolean)
+    .slice(0, 3);
+  references.push(`https://osv.dev/vulnerability/${id}`);
+
+  return {
+    id: `osv-${pkg.name}-${id}`,
+    cveId,
+    ghsaId,
+    title: String(vuln.summary || id),
+    description: String(vuln.details || vuln.summary || 'Advisory publicado no OSV.'),
+    severity: ranked.severity,
+    cvssScore: ranked.cvssScore,
+    vulnerableVersions: pkg.version,
+    fixedVersion: osvFixedVersion(vuln),
+    cweId: String((vuln.database_specific as { cwe_ids?: string[] } | undefined)?.cwe_ids?.[0] || ''),
+    affectedPackage: `${pkg.name}@${pkg.version}`,
+    references
+  };
+}
+
+function recountSca(packages: DependencyPackage[], base: ScaAnalysisReport, osvStatus: ScaAnalysisReport['osvStatus']): ScaAnalysisReport {
+  const allVulnerabilities = packages.flatMap((pkg) => pkg.vulnerabilities);
+  return {
+    ...base,
+    packages,
+    allVulnerabilities,
+    vulnerableCount: packages.filter((pkg) => pkg.vulnerabilities.length > 0).length,
+    criticalCount: allVulnerabilities.filter((vuln) => vuln.severity === 'CRITICAL').length,
+    highCount: allVulnerabilities.filter((vuln) => vuln.severity === 'HIGH').length,
+    mediumCount: allVulnerabilities.filter((vuln) => vuln.severity === 'MEDIUM').length,
+    lowCount: allVulnerabilities.filter((vuln) => vuln.severity === 'LOW').length,
+    catalogMode: osvStatus === 'OK' ? 'OSV' : 'CURATED_LOCAL',
+    osvStatus
+  };
+}
+
+/**
+ * Asks api.osv.dev for advisories. Package names and versions leave the browser.
+ * A failed request leaves the local catalog unchanged.
+ */
+export async function enrichScaReportWithOsv(
+  report: ScaAnalysisReport,
+  fetchImpl: OsvFetch = fetch
+): Promise<ScaAnalysisReport> {
+  if (report.packages.length === 0) return report;
+
+  const queried = report.packages.slice(0, 100);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetchImpl('https://api.osv.dev/v1/querybatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        queries: queried.map((pkg) => ({
+          package: { name: pkg.name, ecosystem: ecosystemForManifest(pkg.manifestFile) },
+          version: pkg.version
+        }))
+      }),
+      signal: controller.signal
+    });
+    const contentType = response.headers.get('content-type') || '';
+    if (!response.ok || !contentType.includes('application/json')) {
+      return { ...report, osvStatus: 'UNREACHABLE' };
+    }
+    const body = await response.json() as { results?: Array<{ vulns?: Record<string, unknown>[] }> };
+    const results = Array.isArray(body.results) ? body.results : [];
+    const packages = report.packages.map((pkg, index) => {
+      const remote = results[index]?.vulns;
+      if (!Array.isArray(remote)) return pkg;
+      const added = remote
+        .map((vuln) => osvToVulnerability(vuln, pkg))
+        .filter((vuln): vuln is ScaVulnerability => vuln !== null);
+      const licenseExplanation = pkg.license === 'NOT_IN_CATALOG'
+        ? (added.length > 0
+          ? 'Licença ausente do catálogo local. Vulnerabilidades desta versão vieram do OSV.'
+          : 'Licença ausente do catálogo local. O OSV não publicou vulnerabilidade para esta versão.')
+        : pkg.licenseExplanation;
+      return {
+        ...pkg,
+        licenseExplanation,
+        vulnerabilities: [...pkg.vulnerabilities, ...added]
+      };
+    });
+    return recountSca(packages, report, 'OK');
+  } catch {
+    return { ...report, osvStatus: 'UNREACHABLE' };
+  } finally {
+    clearTimeout(timer);
+  }
 }

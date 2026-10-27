@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { ScannedFile } from '../types';
 import { useLanguage } from '../lib/i18nContext';
+import { readServerJson } from '../lib/serverApi';
 import { useToast } from '../lib/toastContext';
 
 interface UrlIngestModalProps {
@@ -96,7 +97,10 @@ export const UrlIngestModal: React.FC<UrlIngestModalProps> = ({
       clearTimeout(stepTimer1);
       clearTimeout(stepTimer2);
 
-      const data = await response.json();
+      const data = await readServerJson<{ success?: boolean; error?: string; files: ScannedFile[] }>(
+        response,
+        language === 'es' ? 'es' : language === 'en' ? 'en' : 'pt'
+      );
 
       if (!response.ok || !data.success) {
         throw new Error(data.error || (language === 'en' ? 'Failed to audit URL.' : 'Falha ao auditar URL.'));

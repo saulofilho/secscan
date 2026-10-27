@@ -31,6 +31,7 @@ import {
   IgnoredFileAuditItem,
   SECURITY_BEST_PRACTICE_RULES
 } from '../lib/gitignoreAuditor';
+import { ServerApiUnavailableError } from '../lib/serverApi';
 
 interface GitignoreAuditModalProps {
   isOpen: boolean;
@@ -73,14 +74,13 @@ export const GitignoreAuditModal: React.FC<GitignoreAuditModalProps> = ({
     try {
       const response = await fetch('/api/gitignore/audit');
       const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new ServerApiUnavailableError('pt');
+      }
+      const data = await response.json() as GitignoreAuditResult & { error?: string };
       if (!response.ok) {
-        const data = contentType.includes('application/json') ? await response.json() : null;
         throw new Error(data?.error || `Servidor respondeu HTTP ${response.status}.`);
       }
-      if (!contentType.includes('application/json')) {
-        throw new Error('Servidor indisponível ou resposta não formatada em JSON.');
-      }
-      const data: GitignoreAuditResult = await response.json();
       setDiskAuditResult(data);
     } catch (err: any) {
       setDiskError(err.message || 'Falha ao conectar à API do servidor.');

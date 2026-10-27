@@ -37,6 +37,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useLanguage } from '../lib/i18nContext';
+import { readServerJson } from '../lib/serverApi';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { GoogleAdBanner } from './GoogleAdBanner';
 import { ScannedFile } from '../types';
@@ -77,7 +78,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: targetUrl })
       });
-      const data = await res.json();
+      const data = await readServerJson<{ success?: boolean; error?: string; files: ScannedFile[] }>(
+        res,
+        language === 'es' ? 'es' : language === 'en' ? 'en' : 'pt'
+      );
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Falha ao auditar URL.');
       }
@@ -293,7 +297,8 @@ critical_findings[f] {
       ctaBannerSub: "Acesse o sistema completo com um clique. Explore o dashboard com métricas ao vivo, gerencie seus arquivos e execute varreduras instantâneas.",
       btnEnterHome: "Ir para a Home do App",
       btnEnterDemo: "Carregar com Projeto Demo",
-      footerTagline: "SecScan AppSec Enterprise Suite · Plataforma Avançada de Cibersegurança e Inteligência de Ameaças",
+      footerTagline: "SecScan AppSec Suite",
+      footerDisclaimer: "Ferramenta de teste. Serve para olhar código e treinar o olho. Tem tela de laboratório, com cenário de exemplo: não varre rede, host nem console de verdade, e o resultado não é laudo.",
       navFeatures: "Recursos",
       navArchitecture: "Arquitetura",
       navDomains: "Domínios SecOps",
@@ -497,7 +502,8 @@ critical_findings[f] {
       ctaBannerSub: "Access the full platform with a single click. Explore live metrics on the dashboard, manage workspace files, and run instant security audits.",
       btnEnterHome: "Go to System Home",
       btnEnterDemo: "Launch with Demo Project",
-      footerTagline: "SecScan AppSec Enterprise Suite · Advanced Application Security & Threat Intelligence",
+      footerTagline: "SecScan AppSec Suite",
+      footerDisclaimer: "A test tool. Use it to read code and train your eye. Some screens are a lab with a sample scenario: they don't scan a network, a host, or a real console, and the result isn't an audit report.",
       navFeatures: "Features",
       navArchitecture: "Architecture",
       navDomains: "SecOps Domains",
@@ -701,7 +707,8 @@ critical_findings[f] {
       ctaBannerSub: "Acceda al sistema completo con un solo clic. Explore el panel de control con métricas en tiempo real, gestione archivos y ejecute análisis instantáneos.",
       btnEnterHome: "Ir a la Home del Sistema",
       btnEnterDemo: "Iniciar con Proyecto Demo",
-      footerTagline: "SecScan AppSec Enterprise Suite · Plataforma Avanzada de Ciberseguridad e Inteligencia de Amenazas",
+      footerTagline: "SecScan AppSec Suite",
+      footerDisclaimer: "Herramienta de prueba. Sirve para mirar código y entrenar el ojo. Hay pantallas de laboratorio, con un escenario de ejemplo: no barren red, host ni consola de verdad, y el resultado no es un informe.",
       navFeatures: "Recursos",
       navArchitecture: "Arquitectura",
       navDomains: "Dominios SecOps",
@@ -1232,14 +1239,14 @@ critical_findings[f] {
 
       {/* Footer */}
       <footer className="bg-[#040405] border-t border-[#141418] py-8 text-xs font-mono text-zinc-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-zinc-300">SECSCAN APPSEC SUITE</span>
-            <span>·</span>
-            <span>v2.5 ENTERPRISE</span>
-          </div>
-
-          <div className="text-center sm:text-right">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col gap-4">
+          <p className="text-zinc-400 leading-relaxed max-w-3xl">{t.footerDisclaimer}</p>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-zinc-300">SECSCAN APPSEC SUITE</span>
+              <span>·</span>
+              <span>v0.1.0</span>
+            </div>
             <span>{t.footerTagline}</span>
           </div>
         </div>

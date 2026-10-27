@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
   Package, 
   ShieldAlert, 
@@ -15,7 +15,7 @@ import {
   Check
 } from 'lucide-react';
 import { ScannedFile } from '../types';
-import { scanSoftwareCompositionAnalysis, DependencyPackage, ScaVulnerability } from '../lib/scaScanner';
+import { enrichScaReportWithOsv, scanSoftwareCompositionAnalysis, DependencyPackage, ScaVulnerability } from '../lib/scaScanner';
 
 interface ScaSecurityViewProps {
   files: ScannedFile[];
@@ -28,9 +28,20 @@ export const ScaSecurityView: React.FC<ScaSecurityViewProps> = ({ files, onNavig
   const [selectedPkg, setSelectedPkg] = useState<DependencyPackage | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const report = useMemo(() => {
-    return scanSoftwareCompositionAnalysis(files);
-  }, [files]);
+  const localReport = useMemo(() => scanSoftwareCompositionAnalysis(files), [files]);
+  const [report, setReport] = useState(localReport);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReport(localReport);
+    if (localReport.packages.length === 0) return;
+    enrichScaReportWithOsv(localReport).then((next) => {
+      if (!cancelled) setReport(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [localReport]);
 
   const filteredPackages = useMemo(() => {
     return report.packages.filter(pkg => {
@@ -91,7 +102,11 @@ export const ScaSecurityView: React.FC<ScaSecurityViewProps> = ({ files, onNavig
             </span>
           </div>
           <p className="text-xs text-zinc-400 font-mono mt-1">
-            Varredura de package.json e requirements.txt contra o catálogo local ({report.catalogSize} pacotes). Pacote ausente fica como NOT_IN_CATALOG.
+            {report.osvStatus === 'OK'
+              ? `Vulnerabilidades cruzadas com o OSV. A licença segue o catálogo local (${report.catalogSize} pacotes) e ausente continua NOT_IN_CATALOG.`
+              : report.osvStatus === 'UNREACHABLE'
+              ? `OSV indisponível. Resultado limitado ao catálogo local (${report.catalogSize} pacotes).`
+              : `Catálogo local (${report.catalogSize} pacotes). ${localReport.packages.length > 0 ? 'Consultando o OSV…' : 'Nenhum manifesto para consultar.'}`}
           </p>
         </div>
 

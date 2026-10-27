@@ -2694,7 +2694,15 @@ export default function App() {
       </div>
 
       {/* Footer Status Bar with Shortcuts Bar */}
-      <footer className="border-t border-[#1F1F1F] bg-[#0A0A0A] py-3 px-4 sm:px-8 text-[11px] font-mono text-[#666] flex flex-col sm:flex-row items-center justify-between gap-2">
+      <footer className="border-t border-[#1F1F1F] bg-[#0A0A0A] py-3 px-4 sm:px-8 text-[11px] font-mono text-[#666] flex flex-col gap-2">
+        <p className="text-zinc-500 leading-relaxed max-w-3xl">
+          {language === 'en'
+            ? 'A test tool. Use it to read code and train your eye. Some screens are a lab with a sample scenario: they don\'t scan a network, a host, or a real console, and the result isn\'t an audit report.'
+            : language === 'es'
+            ? 'Herramienta de prueba. Sirve para mirar código y entrenar el ojo. Hay pantallas de laboratorio, con un escenario de ejemplo: no barren red, host ni consola de verdad, y el resultado no es un informe.'
+            : 'Ferramenta de teste. Serve para olhar código e treinar o olho. Tem tela de laboratório, com cenário de exemplo: não varre rede, host nem console de verdade, e o resultado não é laudo.'}
+        </p>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
         <div className="flex items-center gap-3.5 flex-wrap">
           <span className="flex items-center gap-1.5 text-white font-bold">
             <span className="w-2 h-2 rounded-none bg-[#00FF41] inline-block animate-pulse"></span>
@@ -2734,6 +2742,7 @@ export default function App() {
           <span>NODE 22 LTS SAST SPECIFICATION</span>
           <span className="text-[#444]">|</span>
           <span className="text-[#FF3E00] font-bold">ZERO_DEPENDENCY_LEAK</span>
+        </div>
         </div>
       </footer>
 

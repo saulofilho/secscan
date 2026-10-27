@@ -11,7 +11,7 @@
 
 As telas marcadas como **LAB** (Nmap, Nikto, EDR, firewall, DNS, SD-WAN, SOC, CrowdStrike, Security Onion, SOAR, IAST, DAST e threat intel) mostram cenário de exemplo. Elas não falam com rede, host ou feed externo. O threat intel ausente no catálogo local volta como `NOT_IN_LOCAL_CATALOG`, não como alvo limpo.
 
-Em produção, defina `SECSCAN_API_TOKEN`. Com a variável presente, as rotas `/api/*` (exceto `/api/health`) exigem `Authorization: Bearer <token>`. Sem a variável, a listagem de disco em `GET /api/gitignore/audit` só responde em localhost. O `POST /api/url-ingest` recusa rede privada, metadata, localhost e redirecionamento para esses destinos.
+O site na Vercel publica a interface estática (`vite build`). Ingest de URL e a listagem de disco do `.gitignore` precisam do servidor Express (`npm run dev` ou `npm start`); no site publicado, a tela avisa que a rota não está no ar. A SCA consulta o OSV no navegador e, se a consulta falhar, permanece no catálogo local. `SECSCAN_API_TOKEN` só vale nesse processo Express: com a variável, `/api/*` (exceto `/api/health`) exige `Authorization: Bearer <token>`. Sem ela, `GET /api/gitignore/audit` só responde em localhost. O `POST /api/url-ingest` recusa rede privada, metadata, localhost e redirecionamento para esses destinos.
 
 ---
 
@@ -632,7 +632,8 @@ A aplicação é uma SPA em **React 19 + TypeScript + Vite 6 + Tailwind CSS**. O
 
 - **Build:** `npm run build`. O diretório `dist/` recebe o frontend. `npm start` sobe `dist/server.cjs`.
 - **Node:** 22.
-- **Antes de publicar:** defina `SECSCAN_API_TOKEN`. Com a variável, `/api/*` (exceto `/api/health`) exige `Authorization: Bearer <token>`. Sem ela, `GET /api/gitignore/audit` só responde em localhost.
+- **Vercel:** o deploy estático não executa `/api`. Ingest de URL e auditoria de disco do `.gitignore` pedem o servidor Express. A SCA chama `api.osv.dev` no navegador.
+- **Servidor Express:** defina `SECSCAN_API_TOKEN` se esse processo for publicado. Com a variável, `/api/*` (exceto `/api/health`) exige `Authorization: Bearer <token>`. Sem ela, `GET /api/gitignore/audit` só responde em localhost.
 - **Ingest de URL:** `POST /api/url-ingest` recusa localhost, metadata, rede privada e redirecionamento para esses destinos.
 - **CLI no CI:** `node bin/secscan.js` precisa de Node 22 e das dependências instaladas (`tsx` resolve o entry TypeScript).
 

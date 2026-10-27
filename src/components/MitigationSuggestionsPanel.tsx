@@ -133,7 +133,8 @@ export const MitigationSuggestionsPanel: React.FC<MitigationSuggestionsPanelProp
         }),
       });
 
-      if (!response.ok) {
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('application/json')) {
         throw new Error(`Servidor retornou HTTP ${response.status}`);
       }
 

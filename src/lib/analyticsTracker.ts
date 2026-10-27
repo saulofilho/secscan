@@ -347,11 +347,10 @@ export async function sendAnalyticsEvent(payload: {
 export async function fetchAnalyticsSummary(): Promise<AnalyticsSummary | null> {
   try {
     const res = await fetch('/api/analytics/summary');
-    if (!res.ok) throw new Error('Falha ao obter métricas de telemetria');
-    const data = await res.json();
-    return data;
-  } catch (err) {
-    console.warn('Erro ao carregar resumo de analytics:', err);
+    const contentType = res.headers.get('content-type') || '';
+    if (!res.ok || !contentType.includes('application/json')) return null;
+    return await res.json();
+  } catch {
     return null;
   }
 }

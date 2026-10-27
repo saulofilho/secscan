@@ -1,7 +1,7 @@
 export interface ToolGuideItem {
   id: string;
   name: string;
-  category: 'AppSec & SAST' | 'Defesa & Runtime' | 'Infraestrutura & DevSecOps' | 'Conformidade & Governança';
+  category: 'AppSec & SAST' | 'Defesa & Runtime' | 'Infraestrutura & DevSecOps' | 'Conformidade & Governança' | 'Laboratório';
   badge: string;
   shortSummary: string;
   howItWorks: string;

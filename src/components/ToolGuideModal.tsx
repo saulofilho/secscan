@@ -43,7 +43,7 @@ export const ToolGuideModal: React.FC<ToolGuideModalProps> = ({
     }
   }, [activeTab, isOpen]);
 
-  const categories = ['ALL', 'Conformidade & Governança', 'AppSec & SAST', 'Defesa & Runtime', 'Infraestrutura & DevSecOps'];
+  const categories = ['ALL', 'Conformidade & Governança', 'AppSec & SAST', 'Defesa & Runtime', 'Infraestrutura & DevSecOps', 'Laboratório'];
 
   const filteredTools = useMemo(() => {
     const list = Object.values(TOOL_GUIDES);
