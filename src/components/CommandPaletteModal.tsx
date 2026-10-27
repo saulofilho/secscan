@@ -79,6 +79,7 @@ interface CommandPaletteModalProps {
   onClearWorkspace?: () => void;
   onOpenShortcuts: () => void;
   onOpenGitignoreAudit?: () => void;
+  onOpenSettings?: () => void;
   files: ScannedFile[];
   onSelectFile: (file: ScannedFile) => void;
   rules: RegexRule[];
@@ -101,6 +102,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   onClearWorkspace,
   onOpenShortcuts,
   onOpenGitignoreAudit,
+  onOpenSettings,
   files,
   onSelectFile,
   rules,
@@ -227,6 +229,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           onOpenGitignoreAudit();
         },
         keywords: ['gitignore', 'git', 'auditoria', 'chaves', 'secrets', 'env', 'credenciais', 'seguranca', 'diretorio', 'ignore']
+      }] : []),
+      ...(onOpenSettings ? [{
+        id: 'cmd-user-settings-drawer',
+        title: 'Configurações do Usuário & Anúncios (AdSense)',
+        subtitle: 'Alternar banners do Google AdSense, preferências do app e perfil do auditor',
+        category: 'Ações Rápidas' as const,
+        icon: SlidersHorizontal,
+        badge: 'Preferências',
+        badgeColor: 'bg-[#00F0FF]/15 text-[#00F0FF] border-[#00F0FF]/30',
+        action: () => {
+          onClose();
+          onOpenSettings();
+        },
+        keywords: ['configuracoes', 'settings', 'adsense', 'anuncios', 'ads', 'banners', 'perfil', 'usuario', 'desativar anuncios', 'adfree']
       }] : []),
       {
         id: 'cmd-open-tour',

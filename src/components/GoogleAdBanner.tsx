@@ -180,3 +180,6 @@ export const GoogleAdBanner: React.FC<GoogleAdBannerProps> = ({
     </div>
   );
 };
+
+export const AdSenseBanner = GoogleAdBanner;
+export default GoogleAdBanner;

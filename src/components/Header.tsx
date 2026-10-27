@@ -52,7 +52,9 @@ import {
   MoreHorizontal,
   FolderCode,
   FlaskConical,
-  ClipboardList
+  ClipboardList,
+  Settings,
+  User
 } from 'lucide-react';
 import { ScanReport, ScanProgress, ScannedFile } from '../types';
 import { useLanguage } from '../lib/i18nContext';
@@ -82,6 +84,7 @@ interface HeaderProps {
   onNavigateToLanding?: () => void;
   onOpenUrlIngest?: () => void;
   onOpenAnalytics?: () => void;
+  onOpenSettings?: () => void;
 }
 
 interface NavToolItem {
@@ -123,7 +126,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenGitignoreAudit,
   onNavigateToLanding,
   onOpenUrlIngest,
-  onOpenAnalytics
+  onOpenAnalytics,
+  onOpenSettings
 }) => {
   const isMac = useMemo(() => {
     return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -778,6 +782,25 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="text-white font-mono font-bold">{report.metrics.riskScore ?? 0}/100</span>
             </button>
 
+            {/* User Profile & Settings Drawer Button */}
+            {onOpenSettings && (
+              <button
+                id="btn-header-user-settings-drawer"
+                type="button"
+                onClick={onOpenSettings}
+                className="h-8.5 px-2.5 rounded-lg inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] hover:border-[#00F0FF]/40 transition-all cursor-pointer shrink-0 whitespace-nowrap select-none"
+                title={language === 'pt' ? 'Configurações do Usuário, Perfil & Banners do AdSense' : 'User Settings, Profile & AdSense Banners'}
+              >
+                <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-cyan-950 to-blue-900 border border-cyan-400/40 flex items-center justify-center text-[9px] font-mono text-cyan-300 font-bold shrink-0">
+                  SE
+                </div>
+                <span className="hidden xl:inline">{language === 'pt' ? 'Configurações' : 'Settings'}</span>
+                {localAdFree && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#00FF41] shadow-[0_0_6px_#00FF41]" title="Modo Sem Anúncios Ativo (Ad-Free)" />
+                )}
+              </button>
+            )}
+
             {/* Consolidated Utilities Dropdown ([⚙️ Utilidades ▾]) */}
             <div className="relative shrink-0" ref={utilsMenuRef}>
               <button
@@ -905,6 +928,21 @@ export const Header: React.FC<HeaderProps> = ({
                     <Share2 className="w-3.5 h-3.5 text-[#00FF41]" />
                     <span>Compartilhar Link</span>
                   </button>
+
+                  {onOpenSettings && (
+                    <button
+                      onClick={() => { onOpenSettings(); setIsUtilsMenuOpen(false); }}
+                      className="w-full flex items-center justify-between p-2 rounded-xl text-left font-mono text-xs hover:bg-white/[0.06] text-[#00F0FF] hover:text-white cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Settings className="w-3.5 h-3.5 text-[#00F0FF]" />
+                        <span>{language === 'pt' ? 'Configurações & Anúncios' : 'Settings & AdSense'}</span>
+                      </div>
+                      <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/30 font-mono">
+                        ⚙️ Drawer
+                      </span>
+                    </button>
+                  )}
 
                   <button
                     onClick={() => {

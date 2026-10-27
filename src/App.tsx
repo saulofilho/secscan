@@ -83,6 +83,8 @@ import { UrlIngestModal } from './components/UrlIngestModal';
 import { GitignoreAuditModal } from './components/GitignoreAuditModal';
 import { AnalyticsDashboardModal } from './components/AnalyticsDashboardModal';
 import { AppModulesHub } from './components/AppModulesHub';
+import { AdSenseBanner } from './components/GoogleAdBanner';
+import { UserSettingsDrawer } from './components/UserSettingsDrawer';
 import { sendAnalyticsEvent, recordLocalTabSessionActivity, recordSecurityAuditLog } from './lib/analyticsTracker';
 import { auditGitignoreSecurity } from './lib/gitignoreAuditor';
 import { useLanguage } from './lib/i18nContext';
@@ -170,6 +172,7 @@ export default function App() {
   const [showGitignoreModal, setShowGitignoreModal] = useState<boolean>(false);
   const [showUrlIngestModal, setShowUrlIngestModal] = useState<boolean>(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState<boolean>(false);
+  const [showSettingsDrawer, setShowSettingsDrawer] = useState<boolean>(false);
   const [shortcutToast, setShortcutToast] = useState<{ message: string; key?: string } | null>(null);
 
   // Policy-as-Code (Open Policy Agent - OPA Rego) State
@@ -1543,6 +1546,7 @@ export default function App() {
         onNavigateToLanding={handleNavigateToLanding}
         onOpenUrlIngest={() => setShowUrlIngestModal(true)}
         onOpenAnalytics={() => setShowAnalyticsModal(true)}
+        onOpenSettings={() => setShowSettingsDrawer(true)}
       />
 
       {/* Main Container Content */}
@@ -2673,6 +2677,11 @@ export default function App() {
         )}
       </main>
 
+      {/* Non-intrusive AdSense Placement (Ad-Free para o Admin e controlado via Envs) */}
+      <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 w-full py-2">
+        <AdSenseBanner className="rounded-xl border border-white/[0.04] bg-white/[0.01]" />
+      </div>
+
       {/* Footer Status Bar with Shortcuts Bar */}
       <footer className="border-t border-[#1F1F1F] bg-[#0A0A0A] py-3 px-4 sm:px-8 text-[11px] font-mono text-[#666] flex flex-col sm:flex-row items-center justify-between gap-2">
         <div className="flex items-center gap-3.5 flex-wrap">
@@ -2775,6 +2784,7 @@ export default function App() {
         onClearWorkspace={handleClearAllFilesAndValidation}
         onOpenShortcuts={() => setShowShortcutsModal(true)}
         onOpenGitignoreAudit={() => setShowGitignoreModal(true)}
+        onOpenSettings={() => setShowSettingsDrawer(true)}
         files={files}
         onSelectFile={(f) => {
           setSelectedFile(f);
@@ -2841,6 +2851,13 @@ export default function App() {
         scanHistory={scanHistory}
         currentReport={report}
         onTriggerScan={() => executeScan(files, rules, ignorePatterns)}
+      />
+
+      {/* User Settings & AdSense Configuration Drawer */}
+      <UserSettingsDrawer
+        isOpen={showSettingsDrawer}
+        onClose={() => setShowSettingsDrawer(false)}
+        onOpenMttrConfig={() => setShowMttrConfigModal(true)}
       />
 
       {/* Non-intrusive Shortcut Toast Feedback */}
