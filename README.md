@@ -1,5 +1,9 @@
 # 🛡️ SecScan AppSec Suite - Advanced SAST, Secret Matrix, DataFlow & Quality Gate Platform
 
+**Português** · [English](README.en.md)
+
+Este arquivo é o README em português. A versão em inglês está em [README.en.md](README.en.md).
+
 [![CI/CD Security Analysis](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=github-actions&logoColor=white)](.github/workflows/ci-cd.yml)
 [![Node.js 22](https://img.shields.io/badge/Node.js-22%20LTS-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![SARIF 2.1.0](https://img.shields.io/badge/SARIF-2.1.0%20Standard-4B32C3?logo=github&logoColor=white)](https://sarifweb.azurewebsites.net/)
@@ -7,11 +11,28 @@
 [![Quality Gate](https://img.shields.io/badge/Quality%20Gate-Max%20Risk%20Score%20(0--100)-FF3E00)](README.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-**SecScan AppSec Suite** é uma plataforma avançada e modular de **Análise Estática de Segurança de Aplicações (SAST)**, auditoria de código JavaScript/TypeScript, detecção de segredos de alta entropia e inteligência de superfície de ataque. Desenvolvida para engenheiros de DevSecOps, AppSec, pesquisadores de Bug Bounty e desenvolvedores full-stack, a suíte reúne um motor de **Risk Score Cumulativo do Workspace (0-100)** para Quality Gates, painel de evolução temporal com gráficos Recharts (**SecScan Trend Dashboard**), painel de **Logs de Auditoria de Segurança com barra de busca, gráfico de linhas de frequência e detecção de anomalias estatísticas com alertas de picos maliciosos**, grafo de fluxo de dados (**DataFlow Taint Analysis & Attack Path Visualization: API Inspector ➔ Motor SAST**), auditoria de rotas (**OWASP API Security & LinkFinder**), validação contra metadados de nuvem (**SSRF & Webhook Validator**), avaliação declarativa (**Policy-as-Code OPA Rego**) e uma base unificada de remediação com links oficiais para **OWASP**, **Snyk Learn** e **MITRE CWE** diretamente nos cards de achados.
+**SecScan é uma ferramenta para rodar na sua máquina.** Você baixa o código, sobe o servidor local e analisa os arquivos ali. O relatório (achados, quality gate, SARIF, correções sugeridas) sai desse processo. Não precisa de Docker. Não precisa publicar o site para o scan funcionar.
 
-As telas marcadas como **LAB** (Nmap, Nikto, EDR, firewall, DNS, SD-WAN, SOC, CrowdStrike, Security Onion, SOAR, IAST, DAST e threat intel) mostram cenário de exemplo. Elas não falam com rede, host ou feed externo. O threat intel ausente no catálogo local volta como `NOT_IN_LOCAL_CATALOG`, não como alvo limpo.
+O tutorial passo a passo está em dois idiomas:
 
-O site na Vercel publica a interface estática (`vite build`). Ingest de URL e a listagem de disco do `.gitignore` precisam do servidor Express (`npm run dev` ou `npm start`); no site publicado, a tela avisa que a rota não está no ar. A SCA consulta o OSV no navegador e, se a consulta falhar, permanece no catálogo local. `SECSCAN_API_TOKEN` só vale nesse processo Express: com a variável, `/api/*` (exceto `/api/health`) exige `Authorization: Bearer <token>`. Sem ela, `GET /api/gitignore/audit` só responde em localhost. O `POST /api/url-ingest` recusa rede privada, metadata, localhost e redirecionamento para esses destinos.
+- [Português: usar localmente](docs/uso-local.md)
+- [English: run it locally](docs/local-use.md)
+
+Resumo do que essa execução local faz: a varredura do código que você cola ou envia acontece no navegador. A auditoria de URL, a listagem de disco do `.gitignore` e a mitigação pelo modelo passam pelo Express em `http://localhost:3000`. As telas **LAB** (Nmap, Nikto, EDR, firewall, DNS, SD-WAN, SOC, CrowdStrike, Security Onion, SOAR, IAST, DAST e threat intel) mostram cenário de exemplo. Um site estático (Vercel ou GitHub Pages) só entrega a interface. Lá essas rotas `/api` não respondem.
+
+## Rodar na sua máquina
+
+Docker não é necessário. O requisito é Node.js 22 e npm. O passo a passo, com o que cada comando faz e o que você deve ver na tela, está em [docs/uso-local.md](docs/uso-local.md).
+
+```bash
+node -v          # v22.x
+npm install
+npm run dev      # http://localhost:3000
+```
+
+Deixe `SECSCAN_API_TOKEN` sem definir. A interface não envia esse header. `GEMINI_API_KEY` no `.env` é opcional: sem ela, a mitigação usa o motor local.
+
+Um site estático publica só a interface. A auditoria de URL e a listagem de disco do `.gitignore` pedem este processo Express. O `POST /api/url-ingest` recusa localhost, metadata, rede privada e redirecionamento para esses destinos. O CLI (`node bin/secscan.js`) também roda na máquina, com Node 22 e as dependências instaladas.
 
 ---
 
@@ -611,32 +632,4 @@ jobs:
 
 ---
 
-## 🛠️ Execução Local do Dashboard Web
-
-```bash
-# Instalar dependências
-npm install
-
-# Iniciar servidor de desenvolvimento (Porta 3000)
-npm run dev
-
-# Compilar para produção
-npm run build
-```
-
----
-
-## 🌍 Portabilidade e Hospedagem Externa (Deploy fora do AI Studio)
-
-A aplicação é uma SPA em **React 19 + TypeScript + Vite 6 + Tailwind CSS**. O servidor Express em `server.ts` serve a interface e as rotas `/api`.
-
-- **Build:** `npm run build`. O diretório `dist/` recebe o frontend. `npm start` sobe `dist/server.cjs`.
-- **Node:** 22.
-- **Vercel:** o deploy estático não executa `/api`. Ingest de URL e auditoria de disco do `.gitignore` pedem o servidor Express. A SCA chama `api.osv.dev` no navegador.
-- **Servidor Express:** defina `SECSCAN_API_TOKEN` se esse processo for publicado. Com a variável, `/api/*` (exceto `/api/health`) exige `Authorization: Bearer <token>`. Sem ela, `GET /api/gitignore/audit` só responde em localhost.
-- **Ingest de URL:** `POST /api/url-ingest` recusa localhost, metadata, rede privada e redirecionamento para esses destinos.
-- **CLI no CI:** `node bin/secscan.js` precisa de Node 22 e das dependências instaladas (`tsx` resolve o entry TypeScript).
-
----
-
-*SecScan AppSec Suite • Análise Estática de Segurança, Rastreamento de Fluxo de Dados e Quality Gates com referências oficiais OWASP, Snyk e MITRE CWE.*
+*SecScan AppSec Suite • Análise estática na sua máquina, com referências OWASP, CWE e Snyk Learn.*
