@@ -61,7 +61,8 @@ export function generateCycloneDxSbom(files: ScannedFile[]): SbomDocument {
   }
 
   const components: SbomComponent[] = sca.packages.map(pkg => {
-    const purl = `pkg:npm/${pkg.name}@${pkg.version}`;
+    const ecosystem = pkg.manifestFile.toLowerCase().endsWith('requirements.txt') ? 'pypi' : 'npm';
+    const purl = `pkg:${ecosystem}/${pkg.name}@${pkg.version}`;
     const hashes = generateDeterministicHash(purl);
     return {
       name: pkg.name,
@@ -156,7 +157,8 @@ export function generateSpdxSbom(files: ScannedFile[]): SbomDocument {
   }
 
   const components: SbomComponent[] = sca.packages.map(pkg => {
-    const purl = `pkg:npm/${pkg.name}@${pkg.version}`;
+    const ecosystem = pkg.manifestFile.toLowerCase().endsWith('requirements.txt') ? 'pypi' : 'npm';
+    const purl = `pkg:${ecosystem}/${pkg.name}@${pkg.version}`;
     const hashes = generateDeterministicHash(purl);
     return {
       name: pkg.name,

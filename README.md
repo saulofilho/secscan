@@ -546,7 +546,7 @@ O SecScan serve como suíte preparatória e de auditoria de código para program
 
 ## 💻 Interface de Linha de Comando (CLI)
 
-A suíte inclui `bin/secscan.js`, que executa `src/cli/secscan.ts` com as regras de `src/lib/defaultRules.ts` (as mesmas da interface). Regras extras entram só por `--rules`.
+A suíte inclui `bin/secscan.js`, que executa `src/cli/secscan.ts`. Sem subcomando, ou com `scan`, ele aplica as regras de `src/lib/defaultRules.ts`. Os outros subcomandos chamam um motor só. O laboratório (Nmap, DAST, IAST, EDR, SOC, threat intel) não tem comando: aquelas telas não varrem alvo.
 
 ```bash
 # Executar auditoria completa no diretório atual
@@ -569,13 +569,29 @@ node bin/secscan.js . --ignore "tests/*,docs/*,temp"
 
 # Carregar regras regex customizadas corporativas
 node bin/secscan.js . --rules ./my-custom-rules.json
+
+# Um motor por vez
+node bin/secscan.js sca .
+node bin/secscan.js iac .
+node bin/secscan.js entropy .
+node bin/secscan.js endpoints .
+node bin/secscan.js sbom .
+node bin/secscan.js compliance .
+node bin/secscan.js dockerfile ./Dockerfile
+node bin/secscan.js iam ./politica.json
+node bin/secscan.js headers ./resposta.txt
+node bin/secscan.js jwt "eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0."
+node bin/secscan.js ssrf "http://169.254.169.254/"
 ```
+
+`sca` não chama o OSV. A licença ausente continua `NOT_IN_CATALOG`. `ssrf` só classifica a URL e não envia requisição. `sbom` avisa que os hashes são placeholders, não o digest dos arquivos. `--format json` vale para qualquer subcomando. `sarif` e `csv` valem para o scan.
 
 ### Parâmetros da CLI
 
 | Parâmetro | Descrição | Padrão |
 |---|---|---|
-| `[diretório]` | Caminho do diretório raiz a ser auditado | `.` |
+| `[comando]` | `scan` (padrão), `sca`, `iac`, `entropy`, `endpoints`, `headers`, `jwt`, `ssrf`, `dockerfile`, `iam`, `sbom`, `compliance` | `scan` |
+| `[alvo]` | Diretório, arquivo, JWT ou URL, conforme o comando | `.` no scan |
 | `--max-risk <score>` | **Quality Gate:** Retorna exit code `1` se o Risk Score Cumulativo (0-100) exceder o limite | Desativado |
 | `--fail-on <severidade>` | Retorna exit code `1` se houver alertas (`critical`, `high`, `medium`) | Desativado |
 | `--format <formato>` | Formato de saída (`table`, `json`, `sarif`, `csv`) | `table` |

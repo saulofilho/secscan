@@ -143,7 +143,25 @@ Dentro do próprio repositório do SecScan, a pasta atual é o alvo:
 node bin/secscan.js .
 ```
 
-A saída em tabela lista regra, arquivo e severidade. O exit code fica 0 quando o comando termina a leitura.
+Esse comando, e o equivalente `node bin/secscan.js scan .`, aplicam as regras estáticas. Para um motor só:
+
+```bash
+node bin/secscan.js sca .
+node bin/secscan.js iac .
+node bin/secscan.js entropy .
+node bin/secscan.js endpoints .
+node bin/secscan.js sbom .
+node bin/secscan.js compliance .
+node bin/secscan.js dockerfile ./Dockerfile
+node bin/secscan.js iam ./politica.json
+node bin/secscan.js headers ./resposta.txt
+node bin/secscan.js jwt "eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0."
+node bin/secscan.js ssrf "http://169.254.169.254/"
+```
+
+`sca` lê `package.json` e `requirements.txt` e não chama o OSV. `ssrf` classifica a URL e não envia pedido. `sbom` monta o CycloneDX e avisa que os hashes não são o digest dos arquivos. `headers` lê um arquivo de texto com linhas `Nome: valor`. Nmap, DAST, IAST, EDR, SOC e threat intel não têm subcomando.
+
+A saída em tabela lista o resumo. `--format json` grava o objeto inteiro. O exit code fica 0 quando o comando termina a leitura.
 
 Para falhar o comando se o score passar de 50:
 

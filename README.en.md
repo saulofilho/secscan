@@ -33,16 +33,27 @@ Leave `SECSCAN_API_TOKEN` unset. The interface does not send that header. `GEMIN
 
 On the entry page, load the demo project or upload your own files. The progress bar reaches 100% in the browser. The footer states that this is a test tool.
 
-`POST /api/url-ingest` refuses localhost, cloud metadata, private networks, and redirects to those destinations. The CLI also runs on the machine, with Node 22 and the dependencies installed:
+`POST /api/url-ingest` refuses localhost, cloud metadata, private networks, and redirects to those destinations. The CLI also runs on the machine, with Node 22 and the dependencies installed. With no subcommand, or with `scan`, it applies `src/lib/defaultRules.ts`. Each other subcommand calls one engine. Laboratory screens have no command.
 
 ```bash
 node bin/secscan.js .
 node bin/secscan.js . --max-risk 50
 node bin/secscan.js . --fail-on critical
 node bin/secscan.js . --format sarif --output secscan-results.sarif
+node bin/secscan.js sca .
+node bin/secscan.js iac .
+node bin/secscan.js entropy .
+node bin/secscan.js endpoints .
+node bin/secscan.js sbom .
+node bin/secscan.js compliance .
+node bin/secscan.js dockerfile ./Dockerfile
+node bin/secscan.js iam ./policy.json
+node bin/secscan.js headers ./response.txt
+node bin/secscan.js jwt "eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0."
+node bin/secscan.js ssrf "http://169.254.169.254/"
 ```
 
-The CLI reads `src/lib/defaultRules.ts`, the same default rules as the interface. It does not need the server on port 3000. It does need `npm install`.
+`sca` does not call OSV. A missing license stays `NOT_IN_CATALOG`. `ssrf` classifies the URL and does not send a request. `sbom` says its hashes are placeholders, not file digests. `--format json` works for every subcommand. `sarif` and `csv` apply to `scan`. The CLI does not need the server on port 3000. It does need `npm install`.
 
 ## What runs where
 
