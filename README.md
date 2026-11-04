@@ -32,7 +32,7 @@ npm run dev      # http://localhost:3000
 
 Deixe `SECSCAN_API_TOKEN` sem definir. A interface não envia esse header. `GEMINI_API_KEY` no `.env` é opcional: sem ela, a mitigação usa o motor local.
 
-Um site estático publica só a interface. A auditoria de URL e a listagem de disco do `.gitignore` pedem este processo Express. O `POST /api/url-ingest` recusa localhost, metadata, rede privada e redirecionamento para esses destinos. O CLI (`node bin/secscan.js`) também roda na máquina, com Node 22 e as dependências instaladas.
+Um site estático publica só a interface. A auditoria de URL e a listagem de disco do `.gitignore` pedem este processo Express. O `POST /api/url-ingest` recusa localhost, metadata, rede privada e redirecionamento para esses destinos. O CLI também roda na máquina, sem esse servidor: `node bin/secscan.js list`.
 
 ---
 
@@ -53,7 +53,7 @@ Um site estático publica só a interface. A auditoria de URL e a listagem de di
   - **Laboratório:** IAST, DAST, Nmap, Nikto, WAF, NGFW, IDS, DNS, SD-WAN, EDR, SOC, Security Onion, CrowdStrike, SOAR, threat intel e a suíte Pro. O selo é `LAB`. O cenário é de exemplo.
   - **Governança:** dashboard, compliance, OPA, SBOM, quality gate, regras, CLI e CI.
 - **IAST:** fica em **APIs, DAST & Perímetro**. Aplica payloads de exemplo sobre trechos do código. Não instala agente no processo.
-- **CLI:** `bin/secscan.js` usa as mesmas regras de `src/lib/defaultRules.ts`.
+- **CLI:** `node bin/secscan.js list` mostra um comando por módulo. O passo a passo está na seção 7 de [docs/uso-local.md](docs/uso-local.md). O scan sem subcomando usa `src/lib/defaultRules.ts`.
 
 ---
 
@@ -546,57 +546,29 @@ O SecScan serve como suíte preparatória e de auditoria de código para program
 
 ## 💻 Interface de Linha de Comando (CLI)
 
-A suíte inclui `bin/secscan.js`, que executa `src/cli/secscan.ts`. Sem subcomando, ou com `scan`, ele aplica as regras de `src/lib/defaultRules.ts`. Os outros subcomandos chamam um motor só. O laboratório (Nmap, DAST, IAST, EDR, SOC, threat intel) não tem comando: aquelas telas não varrem alvo.
+`bin/secscan.js` executa `src/cli/secscan.ts`. Não precisa do servidor na porta 3000. Precisa do `npm install`. O tutorial, com os três jeitos de chamar (pasta, arquivo ou token, cenário de laboratório), está na seção 7 de [docs/uso-local.md](docs/uso-local.md). A versão em inglês está na seção 7 de [docs/local-use.md](docs/local-use.md).
 
 ```bash
-# Executar auditoria completa no diretório atual
+node bin/secscan.js list
 node bin/secscan.js .
-
-# Executar via atalho do npm
+node bin/secscan.js dataflow .
+node bin/secscan.js nmap
 npm run secscan
-
-# Bloquear pipeline caso o Risk Score Cumulativo ultrapasse 50 (Quality Gate)
-node bin/secscan.js . --max-risk 50
-
-# Bloquear pipeline caso existam achados com severidade crítica
-node bin/secscan.js . --fail-on critical
-
-# Gerar relatório SARIF 2.1.0 para GitHub Code Scanning
-node bin/secscan.js . --format sarif --output secscan-results.sarif
-
-# Ignorar pastas de teste ou dependências adicionais
-node bin/secscan.js . --ignore "tests/*,docs/*,temp"
-
-# Carregar regras regex customizadas corporativas
-node bin/secscan.js . --rules ./my-custom-rules.json
-
-# Um motor por vez
-node bin/secscan.js sca .
-node bin/secscan.js iac .
-node bin/secscan.js entropy .
-node bin/secscan.js endpoints .
-node bin/secscan.js sbom .
-node bin/secscan.js compliance .
-node bin/secscan.js dockerfile ./Dockerfile
-node bin/secscan.js iam ./politica.json
-node bin/secscan.js headers ./resposta.txt
-node bin/secscan.js jwt "eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0."
-node bin/secscan.js ssrf "http://169.254.169.254/"
 ```
 
-`sca` não chama o OSV. A licença ausente continua `NOT_IN_CATALOG`. `ssrf` só classifica a URL e não envia requisição. `sbom` avisa que os hashes são placeholders, não o digest dos arquivos. `--format json` vale para qualquer subcomando. `sarif` e `csv` valem para o scan.
+`list` imprime um comando por módulo, nos mesmos grupos da interface. Sem subcomando, ou com `scan`, valem as regras de `src/lib/defaultRules.ts`. Comandos de arquivo usam o diretório atual quando o alvo falta. Nmap, Nikto, WAF, NGFW, IDS, DNS, SD-WAN, EDR, CrowdStrike, SOC, SOAR, Pro Cyber e threat intel repetem o cenário da tela e dizem isso na primeira linha. `sca` não chama o OSV. `ssrf` e `dast` não enviam pedido. `sbom` avisa que os hashes são placeholders. `--format json` vale para qualquer comando. `sarif` e `csv` valem para o scan.
 
 ### Parâmetros da CLI
 
 | Parâmetro | Descrição | Padrão |
 |---|---|---|
-| `[comando]` | `scan` (padrão), `sca`, `iac`, `entropy`, `endpoints`, `headers`, `jwt`, `ssrf`, `dockerfile`, `iam`, `sbom`, `compliance` | `scan` |
+| `[comando]` | Qualquer módulo de `node bin/secscan.js list`. Sem comando, vale `scan` | `scan` |
 | `[alvo]` | Diretório, arquivo, JWT ou URL, conforme o comando | `.` no scan |
 | `--max-risk <score>` | **Quality Gate:** Retorna exit code `1` se o Risk Score Cumulativo (0-100) exceder o limite | Desativado |
 | `--fail-on <severidade>` | Retorna exit code `1` se houver alertas (`critical`, `high`, `medium`) | Desativado |
 | `--format <formato>` | Formato de saída (`table`, `json`, `sarif`, `csv`) | `table` |
-| `--rules <arquivo.json>` | Regras extras, somadas a `src/lib/defaultRules.ts` | Só as regras padrão |
-| `--ignore <patterns>` | Padrões glob adicionais a ignorar | `node_modules, vendor, dist...` |
+| `--rules <arquivo.json>` | Lista de regras extras, somada às regras padrão. Vale para `scan` e `compliance` | Só as regras padrão |
+| `--ignore <fragmentos>` | Fragmentos separados por vírgula. O caminho que contém o fragmento fica de fora | `node_modules`, `vendor`, `dist` já entram |
 | `--output <arquivo>` | Salva a saída no arquivo indicado | `stdout` |
 
 ---

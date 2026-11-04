@@ -13,6 +13,7 @@ import { auditDockerfile } from '../lib/containerSecurityEngine';
 import { auditIamPolicy } from '../lib/cloudIamEngine';
 import { generateCycloneDxSbom } from '../lib/sbomGenerator';
 import { evaluateComplianceReadiness } from '../lib/complianceEngine';
+import { consoleListLines, resolveConsoleCommand, runConsoleModule } from '../lib/consoleWorkspace';
 import type { ScannedFile, ScanFinding } from '../types';
 
 const TOOLS = new Set([
@@ -93,7 +94,10 @@ Usage:
   secscan [scan] [directory] [options]
   secscan <tool> <target>
 
-Tools that read your files:
+Every module in the app has a command. secscan list prints them.
+Commands that read your files use the current directory when you omit the target.
+Commands marked as a screen scenario repeat that screen. They do not scan a network, host, feed, or console.
+
   scan          Static rules from src/lib/defaultRules.ts. Default when the first argument is a directory.
   sca           package.json and requirements.txt against the local catalog
   iac           Dockerfile, Compose, Kubernetes and Terraform
@@ -106,8 +110,6 @@ Tools that read your files:
   iam           One IAM policy JSON file
   sbom          CycloneDX from the manifests. Hashes are placeholders, not file digests
   compliance    Readiness from the same static findings as scan
-
-Laboratory screens (Nmap, DAST, IAST, EDR, SOC, threat intel) have no CLI. They do not scan a target.
 
 Options:
   --format <table|json|sarif|csv>   Output format (Default: table). sarif and csv apply to scan
@@ -149,7 +151,10 @@ function toScanned(filePath: string): ScannedFile {
   const content = fs.readFileSync(filePath, 'utf8');
   return {
     name: path.basename(filePath),
-    path: path.relative(process.cwd(), filePath) || filePath,
+    path: (() => {
+      const relative = path.relative(process.cwd(), filePath);
+      return !relative || relative.startsWith('..') ? filePath : relative;
+    })(),
     content,
     size: Buffer.byteLength(content),
     extension: path.extname(filePath).replace(/^\./, '') || path.basename(filePath),
@@ -375,6 +380,49 @@ function collectFindings(targetDir: string, customIgnores: string[], rules: type
   return findings;
 }
 
+function positionals(args: string[]): string[] {
+  const flagged = new Set<number>();
+  args.forEach((arg, index) => {
+    if (arg.startsWith('--') && args[index + 1] && !args[index + 1].startsWith('--')) flagged.add(index + 1);
+  });
+  return args.filter((arg, index) => !arg.startsWith('--') && !flagged.has(index));
+}
+
+function runWorkspace(id: string, kind: 'workspace' | 'text' | 'sample', args: string[]): void {
+  const tokens = positionals(args);
+  const fileFlag = flag(args, '--file');
+  let files: ScannedFile[] = [];
+  let findings: ScanFinding[] = [];
+  let target = path.resolve('.');
+  let text: string | undefined;
+  let artifact: { name: string; content: string } | undefined;
+
+  if (kind === 'workspace') {
+    target = path.resolve(tokens[0] || '.');
+    files = walkFiles(target, (name) => /\.(js|jsx|ts|tsx|mjs|cjs|py|java|go|rb|php|vue|json|ya?ml|env)$/i.test(name)).map(toScanned);
+    findings = collectFindings(target, [], DEFAULT_RULES.filter((rule) => rule.enabled !== false)).map(toScanFinding);
+  }
+
+  if (kind === 'text') {
+    const token = tokens[0];
+    if (token && fs.existsSync(token) && fs.statSync(token).isFile()) text = readText(token);
+    else text = tokens.join(' ');
+    if (id === 'llmsecurity' && !(text || '').trim()) {
+      console.error('[SecScan] Falta o prompt. secscan llmsecurity <arquivo-ou-texto>');
+      process.exit(1);
+    }
+  }
+
+  if (fileFlag) artifact = { name: path.basename(fileFlag), content: readText(fileFlag) };
+  if (id === 'procyber' && tokens[0] && fs.existsSync(tokens[0]) && fs.statSync(tokens[0]).isDirectory()) {
+    target = path.resolve(tokens[0]);
+    files = walkFiles(target, (name) => /\.(js|jsx|ts|tsx|mjs|cjs|py|json|ya?ml|env|txt)$/i.test(name)).map(toScanned);
+  }
+
+  const result = runConsoleModule(id, { target, files, findings, text, artifact });
+  emit(result.lines, result.payload, args);
+}
+
 function run(): void {
   const raw = process.argv.slice(2);
 
@@ -383,8 +431,19 @@ function run(): void {
     process.exit(0);
   }
 
-  const command = raw[0] && TOOLS.has(raw[0]) ? raw[0] : 'scan';
-  const args = command === 'scan' && raw[0] && TOOLS.has(raw[0]) ? raw.slice(1) : (command === 'scan' ? raw : raw.slice(1));
+  if (raw[0] === 'list') {
+    console.log(consoleListLines().join('\n'));
+    return;
+  }
+
+  const resolved = raw[0] ? resolveConsoleCommand(raw[0]) : null;
+  if (resolved && resolved.kind !== 'existing') {
+    runWorkspace(resolved.id, resolved.kind, raw.slice(1));
+    return;
+  }
+
+  const command = resolved ? resolved.command : (raw[0] && TOOLS.has(raw[0]) ? raw[0] : 'scan');
+  const args = resolved || (raw[0] && TOOLS.has(raw[0])) ? raw.slice(1) : raw;
   if (command !== 'scan') {
     runTool(command, args);
     return;

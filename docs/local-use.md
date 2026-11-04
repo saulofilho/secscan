@@ -10,7 +10,7 @@ A published site (Vercel or GitHub Pages) only shows the interface. URL audit an
 
 1. The interface open at `http://localhost:3000`.
 2. A scan of a file you uploaded, or of the demo project.
-3. A terminal report, if you point the CLI at a folder on disk.
+3. The same modules in the terminal, without opening a browser, if you stop after `npm install` and use the CLI.
 
 ## What must already be installed
 
@@ -43,7 +43,7 @@ Docker, a database, Redis, and a Vercel account are not required.
 | A mitigation without that key | On the local rule engine, in the page itself |
 | A package lookup against OSV | In the browser, directly to `api.osv.dev` |
 | Screens badged LAB | A sample scenario. They do not scan a network, a host, or a console |
-| `node bin/secscan.js` | In the terminal, against the folder you pass |
+| `node bin/secscan.js list` and `node bin/secscan.js <module>` | In the terminal. The server on port 3000 is not required |
 
 ## 1. Download the code
 
@@ -101,7 +101,7 @@ If port 3000 is already taken, the process exits with `EADDRINUSE`. Close the ot
 
 **Your code.** Scanner, entropy, routes, JS Miner, the graph, SCA, IaC, headers, JWT, the SSRF classifier, Dockerfile, IAM policy, and remediation. The result comes from the files in the workspace.
 
-**Laboratory.** IAST, DAST, Nmap, Nikto, WAF, firewall, DNS, SD-WAN, EDR, SOC, and threat intel. The badge is LAB. The screen opens, the scenario is fixed, and no packet leaves the machine to scan a target.
+**Laboratory.** IAST, DAST, Nmap, Nikto, WAF, firewall, DNS, SD-WAN, EDR, SOC, and threat intel. The badge is LAB. The screen opens, the scenario is fixed, and no packet leaves the machine to scan a target. The terminal prints that same scenario. Section 7 has the command for each one.
 
 **URL audit.** You provide a public `https://` address. Express on your machine fetches the page, refuses localhost, private IP ranges, cloud metadata, and redirects to those destinations, then returns the extracted files to the workspace. This works only while `npm run dev` (or `npm start`) is running. On the static site, the screen says the route is not up.
 
@@ -127,61 +127,102 @@ Save, stop the server with `Ctrl+C`, and start it again with `npm run dev`. `ser
 
 The ad slots (`VITE_ADSENSE_CLIENT_ID` and `VITE_ADSENSE_SLOT_ID`) can stay empty. Empty, the interface draws no banner.
 
-## 7. A scan from the terminal
+## 7. A terminal workspace, without the interface
 
-The CLI uses the same default rules as the interface (`src/lib/defaultRules.ts`). It reads files from disk. It does not open a browser and it does not need the server on port 3000. It still needs `npm install`, because the launcher uses the `tsx` installed in the project.
+This section does not use the server on port 3000. `npm install` is enough: the launcher calls the `tsx` binary in `node_modules`.
 
-From a folder you want to audit:
+Inside the SecScan repo:
 
 ```bash
-node /path/to/secscan/bin/secscan.js .
+node bin/secscan.js list
 ```
 
-Inside the SecScan repo itself, the current folder is the target:
+The list has one command per module, in the five groups of the interface: code, API, cloud, SOC, and governance. The name shown on screen also works (`scanner`, `jwtinspector`, `ssrfvalidator`, `containerscan`, `cloudiam`).
+
+From another folder, point at the launcher and the target:
 
 ```bash
-node bin/secscan.js .
+node /path/to/secscan/bin/secscan.js /path/to/the/project
 ```
 
-That command, and the equivalent `node bin/secscan.js scan .`, applies the static rules. For one engine:
+### A code folder
+
+With no target, the current directory is used. `node bin/secscan.js .` and `node bin/secscan.js scan .` apply the rules in `src/lib/defaultRules.ts`.
 
 ```bash
+node bin/secscan.js dataflow .
+node bin/secscan.js jsminer .
+node bin/secscan.js apisecurity .
+node bin/secscan.js iast .
+node bin/secscan.js dast .
 node bin/secscan.js sca .
 node bin/secscan.js iac .
 node bin/secscan.js entropy .
 node bin/secscan.js endpoints .
 node bin/secscan.js sbom .
 node bin/secscan.js compliance .
+node bin/secscan.js dashboard .
+node bin/secscan.js autoremediation .
+node bin/secscan.js refactoring .
+node bin/secscan.js threatmodel .
+node bin/secscan.js policyascode .
+node bin/secscan.js frameworks .
+node bin/secscan.js pipelineflow .
+```
+
+`sca` reads `package.json` and `requirements.txt` and does not call OSV. A missing license stays `NOT_IN_CATALOG`. `sbom` builds CycloneDX and says the hashes are placeholders, not file digests. `autoremediation` and `refactoring` print the patch and leave the files unchanged. `iast` reads the local code and does not send traffic. `dast` lists routes found in the code and also does not send a request.
+
+### One file, one token, or one URL
+
+```bash
 node bin/secscan.js dockerfile ./Dockerfile
 node bin/secscan.js iam ./policy.json
 node bin/secscan.js headers ./response.txt
 node bin/secscan.js jwt "eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0."
 node bin/secscan.js ssrf "http://169.254.169.254/"
+node bin/secscan.js llmsecurity ./prompt.txt
 ```
 
-`sca` reads `package.json` and `requirements.txt` and does not call OSV. `ssrf` classifies the URL and does not send a request. `sbom` builds CycloneDX and says the hashes are not file digests. `headers` reads a text file of `Name: value` lines. Nmap, DAST, IAST, EDR, SOC, and threat intel have no subcommand.
+`headers` reads `Name: value` lines and skips an `HTTP/` status line. `ssrf` classifies the URL and does not send a request. `llmsecurity` classifies the prompt text. A path argument is read as a file. A sentence is classified as text. With neither, the command exits 1.
 
-The table prints a summary. `--format json` writes the whole object. The exit code stays 0 when the read finishes.
+### Laboratory scenario
 
-To fail the command when the score goes past 50:
+These commands repeat the screen. The first line says so. They do not scan a network, a host, a feed, or a console.
+
+```bash
+node bin/secscan.js nmap
+node bin/secscan.js nikto
+node bin/secscan.js waf
+node bin/secscan.js ngfw
+node bin/secscan.js idsips
+node bin/secscan.js dnssec
+node bin/secscan.js sdwan
+node bin/secscan.js edr
+node bin/secscan.js soarbuilder
+node bin/secscan.js procyber
+node bin/secscan.js ctihub
+node bin/secscan.js crowdstrike .
+node bin/secscan.js soccommand .
+node bin/secscan.js securityonion .
+```
+
+`ctihub` reads the local catalog. `node bin/secscan.js ctihub log4j` looks up that term in the catalog. `soccommand` and `securityonion` build the queue from findings in the folder. `crowdstrike` shows the sample hosts from the screen when the folder has files. `procyber --file ./artifact.txt` classifies that file in the artifact panel and stays on the sample scenario.
+
+The table is the summary. `--format json` writes the object. `--output file` writes to disk instead of the terminal.
+
+### Quality gate
+
+This applies to `scan`. The score matches the interface: `100 × (1 − e^(−points/50))`, with critical 25, high 15, medium 6, low 2, and info 0.5. Zero findings leave the score at 0.
 
 ```bash
 node bin/secscan.js . --max-risk 50
-```
-
-To fail when a critical finding exists:
-
-```bash
 node bin/secscan.js . --fail-on critical
-```
-
-To write SARIF 2.1.0:
-
-```bash
 node bin/secscan.js . --format sarif --output secscan-results.sarif
 ```
 
-`--ignore` takes comma-separated globs. `--rules file.json` adds extra rules on top of the defaults. `--help` prints the full list.
+`--max-risk` exits 1 when the score passes the limit. `--fail-on critical` (or `high`, or `medium`) exits 1 when a finding of that severity exists. `sarif` and `csv` apply to `scan`. The other modules accept `table` and `json`.
+
+`--ignore` takes comma-separated fragments, for example `tests/,docs/`. `--rules file.json` adds a list of extra rules on `scan` and `compliance`. `--help` shows the scan options.
 
 ## 8. Stop and start again
 

@@ -33,27 +33,18 @@ Leave `SECSCAN_API_TOKEN` unset. The interface does not send that header. `GEMIN
 
 On the entry page, load the demo project or upload your own files. The progress bar reaches 100% in the browser. The footer states that this is a test tool.
 
-`POST /api/url-ingest` refuses localhost, cloud metadata, private networks, and redirects to those destinations. The CLI also runs on the machine, with Node 22 and the dependencies installed. With no subcommand, or with `scan`, it applies `src/lib/defaultRules.ts`. Each other subcommand calls one engine. Laboratory screens have no command.
+`POST /api/url-ingest` refuses localhost, cloud metadata, private networks, and redirects to those destinations. The CLI also runs on the machine and does not need that server. It does need `npm install`. Section 7 of [docs/local-use.md](docs/local-use.md) walks through the three ways to call it: a code folder, one file or token, and a laboratory scenario.
 
 ```bash
+node bin/secscan.js list
 node bin/secscan.js .
 node bin/secscan.js . --max-risk 50
-node bin/secscan.js . --fail-on critical
 node bin/secscan.js . --format sarif --output secscan-results.sarif
-node bin/secscan.js sca .
-node bin/secscan.js iac .
-node bin/secscan.js entropy .
-node bin/secscan.js endpoints .
-node bin/secscan.js sbom .
-node bin/secscan.js compliance .
-node bin/secscan.js dockerfile ./Dockerfile
-node bin/secscan.js iam ./policy.json
-node bin/secscan.js headers ./response.txt
-node bin/secscan.js jwt "eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0."
-node bin/secscan.js ssrf "http://169.254.169.254/"
+node bin/secscan.js dataflow .
+node bin/secscan.js nmap
 ```
 
-`sca` does not call OSV. A missing license stays `NOT_IN_CATALOG`. `ssrf` classifies the URL and does not send a request. `sbom` says its hashes are placeholders, not file digests. `--format json` works for every subcommand. `sarif` and `csv` apply to `scan`. The CLI does not need the server on port 3000. It does need `npm install`.
+`list` prints one command per module, in the same groups as the interface. With no subcommand, or with `scan`, the rules in `src/lib/defaultRules.ts` apply. File commands use the current directory when the target is omitted. Nmap, Nikto, WAF, NGFW, IDS, DNS, SD-WAN, EDR, CrowdStrike, SOC, SOAR, Pro Cyber, and threat intel repeat the on-screen scenario and say so on the first line. `sca` does not call OSV. `ssrf` and `dast` do not send a request. `sbom` says its hashes are placeholders. `--format json` works for every command. `sarif` and `csv` apply to `scan`.
 
 ## What runs where
 
@@ -66,7 +57,7 @@ node bin/secscan.js ssrf "http://169.254.169.254/"
 | Mitigation without that key | Local rule engine |
 | OSV package lookup | Browser, to `api.osv.dev` |
 | LAB screens | Sample scenario |
-| `node bin/secscan.js` | Terminal, on the folder you pass |
+| `node bin/secscan.js list` | Terminal. One command per module. Port 3000 is not required |
 
 The quality gate score is `100 × (1 − e^(−raw/50))`. Critical counts 25, high 15, medium 6, low 2, info 0.5. Zero findings score 0. `--max-risk` exits 1 when the score is above the limit.
 
@@ -74,7 +65,7 @@ The quality gate score is `100 × (1 − e^(−raw/50))`. Critical counts 25, hi
 
 **Your code.** Scanner, entropy, routes, JS Miner, graph, SCA, IaC, headers, JWT, SSRF classifier, Dockerfile, IAM policy, and remediation. IAST is not in this drawer.
 
-**Laboratory.** IAST, DAST, Nmap, Nikto, WAF, NGFW, IDS, DNS, SD-WAN, EDR, SOC, Security Onion, CrowdStrike, SOAR, threat intel, and the Pro suite. The badge is `LAB`. The scenario is an example. IAST applies sample payloads to code excerpts. It does not install an agent in the process.
+**Laboratory.** IAST, DAST, Nmap, Nikto, WAF, NGFW, IDS, DNS, SD-WAN, EDR, SOC, Security Onion, CrowdStrike, SOAR, threat intel, and the Pro suite. The badge is `LAB`. The scenario is an example. The matching terminal command prints that scenario and says so on the first line. IAST applies sample payloads to code excerpts. It does not install an agent in the process.
 
 **Governance.** Dashboard, compliance, OPA, SBOM, quality gate, rules, CLI, and CI.
 
@@ -82,6 +73,6 @@ SCA reads `package.json` and `requirements.txt`, then asks OSV for names and ver
 
 ## Longer notes
 
-Module-by-module notes in Portuguese (risk score, compliance, SCA, IaC, the LAB screens, and the CLI flags) are in [README.md](README.md). The English walkthrough, including what to do when port 3000 is busy, is in [docs/local-use.md](docs/local-use.md).
+Module-by-module notes in Portuguese (risk score, compliance, SCA, IaC, the LAB screens, and the CLI flags) are in [README.md](README.md). The English walkthrough, including the terminal workspace and what to do when port 3000 is busy, is in [docs/local-use.md](docs/local-use.md).
 
 *SecScan AppSec Suite • Static analysis on your machine, with references to OWASP, CWE, and Snyk Learn.*
