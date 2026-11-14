@@ -288,8 +288,8 @@ export function runConsoleModule(id: string, input: ConsoleRunInput): ConsoleRun
     }));
     return {
       lines: [
-        `IAST  status=${emulation.status}  hooks=${emulation.totalHooksTriggered}  achados=${emulation.findings.length}`,
-        'A emulação lê o código local e não envia tráfego.',
+        `Taint  status=${emulation.status}  sinks=${emulation.totalHooksTriggered}  suspeitas=${emulation.findings.length}`,
+        'Análise estática: lê o código local, não executa nada e não envia tráfego.',
         ...cap(safe.map((finding) => `${finding.severity.padEnd(8)} ${finding.title}  ${finding.file}:${finding.line}`)),
       ],
       payload: { status: emulation.status, totalHooksTriggered: emulation.totalHooksTriggered, findings: safe },

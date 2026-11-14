@@ -826,8 +826,8 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     'tab.jsminer_tooltip': 'Mineração de bundles JS, endpoints e source maps',
     'tab.dataflow': 'Fluxo de Dados & Taint',
     'tab.dataflow_tooltip': 'Grafo interativo D3 de fluxo de variáveis e sinks',
-    'tab.iast': 'IAST Runtime',
-    'tab.iast_tooltip': 'Laboratório com payloads de exemplo. Não instrumenta o processo da aplicação',
+    'tab.iast': 'Análise de Taint',
+    'tab.iast_tooltip': 'Segue dados da requisição até chamadas perigosas nos arquivos JS/TS. Estática: nada é executado',
     'tab.sca': 'SCA Dependências',
     'tab.sca_tooltip': 'Software Composition Analysis e inventário de CVEs',
     'tab.iac': 'IaC & Kubernetes',
@@ -950,8 +950,8 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     'tab.jsminer_tooltip': 'Mining of JS bundles, API routes and source maps',
     'tab.dataflow': 'Data Flow & Taint',
     'tab.dataflow_tooltip': 'Interactive D3 taint flow graph from sources to sinks',
-    'tab.iast': 'IAST Runtime',
-    'tab.iast_tooltip': 'Laboratory with sample payloads. It does not instrument the application process',
+    'tab.iast': 'Taint Analysis',
+    'tab.iast_tooltip': 'Follows request data to dangerous calls in JS/TS files. Static: nothing is executed',
     'tab.sca': 'SCA Packages',
     'tab.sca_tooltip': 'Software Composition Analysis and CVE inventory',
     'tab.iac': 'IaC & Kubernetes',
@@ -1074,8 +1074,8 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     'tab.jsminer_tooltip': 'Minería de paquetes JS, rutas de API y mapas de origen',
     'tab.dataflow': 'Flujo de Datos y Taint',
     'tab.dataflow_tooltip': 'Grafo interactivo D3 de flujo de variables y sumideros',
-    'tab.iast': 'IAST Runtime',
-    'tab.iast_tooltip': 'Laboratorio con payloads de ejemplo. No instrumenta el proceso de la aplicación',
+    'tab.iast': 'Análisis de Taint',
+    'tab.iast_tooltip': 'Sigue datos de la petición hasta llamadas peligrosas en archivos JS/TS. Estático: no se ejecuta nada',
     'tab.sca': 'SCA Dependencias',
     'tab.sca_tooltip': 'Software Composition Analysis e inventario de CVEs',
     'tab.iac': 'IaC y Kubernetes',
@@ -1301,23 +1301,22 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
             if (!parent.closest('pre, code, kbd, script, style, noscript, textarea, .prism-code, .monaco-editor, #code-snippet-pre, [data-no-translate="true"]')) {
               const currentVal = node.nodeValue;
               if (currentVal && currentVal.trim()) {
-                // Store pristine original text directly on the node instance
+                // Store pristine original text directly on the node instance.
+                // React reuses text nodes: when the current text is neither the stored
+                // original nor what this walker last wrote, the app rendered new content
+                // and that content becomes the new original.
                 let originalVal = (node as any).__origPtText || originalTextNodeMap.get(node);
-                if (!originalVal) {
+                const lastApplied = (node as any).__i18nApplied;
+                if (!originalVal || (currentVal !== originalVal && currentVal !== lastApplied)) {
                   originalVal = currentVal;
                   (node as any).__origPtText = originalVal;
                   originalTextNodeMap.set(node, originalVal);
                 }
 
-                if (targetLang === 'pt') {
-                  if (node.nodeValue !== originalVal) {
-                    node.nodeValue = originalVal;
-                  }
-                } else {
-                  const translated = translateString(originalVal, targetLang);
-                  if (translated && node.nodeValue !== translated) {
-                    node.nodeValue = translated;
-                  }
+                const wanted = targetLang === 'pt' ? originalVal : (translateString(originalVal, targetLang) || originalVal);
+                (node as any).__i18nApplied = wanted;
+                if (node.nodeValue !== wanted) {
+                  node.nodeValue = wanted;
                 }
               }
             }
@@ -1345,20 +1344,21 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
             originalAttrMap.set(el, stored);
           }
 
+          const applied: Record<string, string> = (el as any).__i18nAppliedAttrs || ((el as any).__i18nAppliedAttrs = {});
           const attrs = ['title', 'placeholder', 'aria-label'] as const;
           for (let j = 0; j < attrs.length; j++) {
             const attr = attrs[j];
+            const current = el.getAttribute(attr);
+            // Same rule as text nodes: a value the walker did not write came from the app.
+            if (current !== null && current !== stored[attr] && current !== applied[attr]) {
+              stored[attr] = current;
+            }
             if (stored[attr] !== undefined && stored[attr].trim()) {
               const original = stored[attr];
-              if (targetLang === 'pt') {
-                if (el.getAttribute(attr) !== original) {
-                  el.setAttribute(attr, original);
-                }
-              } else {
-                const translated = translateString(original, targetLang);
-                if (translated && el.getAttribute(attr) !== translated) {
-                  el.setAttribute(attr, translated);
-                }
+              const wanted = targetLang === 'pt' ? original : (translateString(original, targetLang) || original);
+              applied[attr] = wanted;
+              if (current !== wanted) {
+                el.setAttribute(attr, wanted);
               }
             }
           }

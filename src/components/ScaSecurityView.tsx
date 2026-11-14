@@ -274,7 +274,7 @@ export const ScaSecurityView: React.FC<ScaSecurityViewProps> = ({ files, onNavig
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400">
                           <CheckCircle2 className="w-3 h-3" />
-                          <span>Seguro</span>
+                          <span>{report.osvStatus === 'OK' ? 'Sem CVE no OSV' : 'Não verificado'}</span>
                         </span>
                       )}
                     </div>

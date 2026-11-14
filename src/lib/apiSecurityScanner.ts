@@ -261,7 +261,7 @@ res.set({
 
   return {
     timestamp: new Date().toISOString(),
-    totalEndpointsAudited: Math.max(auditedEndpointsCount, 4),
+    totalEndpointsAudited: auditedEndpointsCount,
     vulnerableEndpointsCount: findings.length,
     apiRiskScore,
     findings,

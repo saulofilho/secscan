@@ -249,7 +249,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'endpoints', category: 'CODE_SAST', label: t('tab.endpoints'), icon: Route, badge: report.apiEndpoints.length, tooltip: t('tab.endpoints_tooltip') },
     { id: 'jsminer', category: 'CODE_SAST', label: t('tab.jsminer'), icon: Boxes, badge: report.jsMiner?.totalAssetsCount, tooltip: t('tab.jsminer_tooltip') },
     { id: 'dataflow', category: 'CODE_SAST', label: t('tab.dataflow'), icon: Network, badge: report.dataFlowGraph?.metrics.totalTaintFlows, tooltip: t('tab.dataflow_tooltip') },
-    { id: 'iast', category: 'API_DAST', label: t('tab.iast'), icon: Activity, badge: 'LAB', tooltip: t('tab.iast_tooltip') },
+    { id: 'iast', category: 'API_DAST', label: t('tab.iast'), icon: Activity, tooltip: t('tab.iast_tooltip') },
     { id: 'dast', category: 'API_DAST', label: t('tab.dast'), icon: Crosshair, badge: 'LAB', tooltip: t('tab.dast_tooltip') },
     { id: 'sca', category: 'CODE_SAST', label: t('tab.sca'), icon: Package, badge: 'SCA', tooltip: t('tab.sca_tooltip') },
     { id: 'iac', category: 'CLOUD_INFRA', label: t('tab.iac'), icon: Container, badge: 'IaC', tooltip: t('tab.iac_tooltip') },

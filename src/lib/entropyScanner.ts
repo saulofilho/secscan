@@ -14,23 +14,9 @@ export interface EntropyFinding {
   recommendation: string;
 }
 
-export interface GitCommitSecretLeak {
-  commitHash: string;
-  author: string;
-  date: string;
-  commitMessage: string;
-  file: string;
-  leakedSecret: string;
-  maskedSecret: string;
-  statusInHead: 'DELETED_FROM_HEAD_BUT_LEAKED_IN_GIT_HISTORY' | 'STILL_IN_SOURCE';
-  dangerLevel: 'CRITICAL' | 'HIGH';
-  gitRemediationCommand: string;
-}
-
 export interface EntropyScanReport {
   totalTokensScanned: number;
   highEntropyFindings: EntropyFinding[];
-  gitHistoryLeaks: GitCommitSecretLeak[];
   averageFileEntropy: number;
   highestEntropyObserved: number;
   entropyDistribution: {
@@ -148,52 +134,11 @@ export function scanWorkspaceEntropy(
     });
   }
 
-  // 2. Simulated Git Commit History Digger: Detects "Ghost Secrets" in past git commits (only if workspace has files)
-  const gitHistoryLeaks: GitCommitSecretLeak[] = files.length > 0 ? [
-    {
-      commitHash: '7c8a1e2',
-      author: 'dev.junior@empresa.com.br',
-      date: '2026-03-12 14:23:01',
-      commitMessage: 'feat(payments): add initial Stripe and AWS integration keys',
-      file: 'config/cloudConfig.js',
-      leakedSecret: 'DEMO_AWS_SECRET_KEY_SAMPLE_TEST_KEY_40',
-      maskedSecret: 'DEMO_AWS_****_KEY_40',
-      statusInHead: 'STILL_IN_SOURCE',
-      dangerLevel: 'CRITICAL',
-      gitRemediationCommand: 'git filter-repo --invert-paths --path config/cloudConfig.js'
-    },
-    {
-      commitHash: '3d9f4b0',
-      author: 'lead.security@empresa.com.br',
-      date: '2026-02-28 09:15:44',
-      commitMessage: 'fix(secrets): remove hardcoded master admin token from source',
-      file: 'src/services/authService.ts',
-      leakedSecret: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.GHOST_KEY_REMOVED_IN_COMMIT_3D9F',
-      maskedSecret: 'eyJhbGciOiJIUzI1Ni****_3D9F',
-      statusInHead: 'DELETED_FROM_HEAD_BUT_LEAKED_IN_GIT_HISTORY',
-      dangerLevel: 'CRITICAL',
-      gitRemediationCommand: 'bfg --replace-text banned-tokens.txt && git push --force --all'
-    },
-    {
-      commitHash: '1a2c5e8',
-      author: 'dev.ops@empresa.com.br',
-      date: '2026-01-15 18:40:12',
-      commitMessage: 'infra: add temporary database root password for migration script',
-      file: 'docker-compose.yml',
-      leakedSecret: 'super_insecure_db_pass_123',
-      maskedSecret: 'super_insecure_****_123',
-      statusInHead: 'STILL_IN_SOURCE',
-      dangerLevel: 'HIGH',
-      gitRemediationCommand: 'git filter-repo --replace-text replacements.txt'
-    }
-  ] : [];
-
   const averageFileEntropy = totalTokensScanned > 0 ? Number((totalEntropySum / totalTokensScanned).toFixed(2)) : 0;
 
   return {
     totalTokensScanned,
     highEntropyFindings: findings.sort((a, b) => b.entropy - a.entropy),
-    gitHistoryLeaks,
     averageFileEntropy,
     highestEntropyObserved,
     entropyDistribution: distribution

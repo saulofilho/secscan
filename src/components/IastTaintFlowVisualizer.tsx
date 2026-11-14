@@ -481,12 +481,12 @@ export const IastTaintFlowVisualizer: React.FC<IastTaintFlowVisualizerProps> = (
             <h3 className="text-sm font-bold text-white font-mono flex items-center gap-2">
               Visualizador Gráfico de Taint Flow (Source &rarr; Sink)
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                IAST Runtime Hooks
+                Análise estática
               </span>
             </h3>
           </div>
           <p className="text-xs text-white/60">
-            Mapeamento dinâmico do vetor de ataque interceptado por sensores em runtime, desde a entrada HTTP até o sink vulnerável.
+            Caminho lido do código: da linha em que o dado da requisição entra até a chamada perigosa. Nada foi executado.
           </p>
         </div>
 

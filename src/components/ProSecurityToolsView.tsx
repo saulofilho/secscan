@@ -169,7 +169,7 @@ New-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run
     { id: 'soar', name: 'SOAR Playbooks', tag: 'Orquestração', icon: Workflow, color: '#00FF41', desc: 'Automação de resposta a incidentes e contenção de credenciais' },
     { id: 'bas', name: 'BAS Purple Teaming', tag: 'Simulação MITRE', icon: Zap, color: '#FF3E00', desc: 'Atomic Red Team e validação de cobertura defensiva' },
     { id: 'sigma', name: 'Sigma Rule Engine', tag: 'Multi-SIEM', icon: FileCode2, color: '#00F0FF', desc: 'Transpiler universal para Splunk, Elastic, Sentinel e LogScale' },
-    { id: 'sandbox', name: 'Malware Sandbox', tag: 'Detonação', icon: Bug, color: '#FF7A00', desc: 'Análise estática, extração forense e emulação de comportamento' },
+    { id: 'sandbox', name: 'Malware Sandbox', tag: 'Estática', icon: Bug, color: '#FF7A00', desc: 'Digests, entropia, indicadores e técnicas MITRE do artefato' },
     { id: 'vault', name: 'Secrets Vault & KMS', tag: 'Envelope KMS', icon: KeyRound, color: '#EAB308', desc: 'Segredos efêmeros, tokens transitórios e rotação de chaves' },
     { id: 'supplychain', name: 'Supply Chain & SLSA', tag: 'Cosign / Sigstore', icon: Layers, color: '#A855F7', desc: 'SLSA Provenance v1.0, atestados in-toto e integridade' },
     { id: 'easm', name: 'EASM & OSINT Recon', tag: 'Superfície Exposta', icon: Globe, color: '#3B82F6', desc: 'Mapeamento de subdomínios, portas abertas e Shadow IT' },
@@ -620,10 +620,10 @@ New-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run
               <div>
                 <h3 className="text-xl font-black uppercase text-white flex items-center gap-2">
                   <Bug className="w-5 h-5 text-[#FF7A00]" />
-                  Detonação Dinâmica & Análise Forense de Malware
+                  Análise Estática de Artefato
                 </h3>
                 <p className="text-xs font-mono text-[#888] mt-0.5">
-                  Isolamento em contêiner descartável, cálculo de entropia de Shannon e traçado de árvore de processos.
+                  Digests MD5/SHA-1/SHA-256, entropia de Shannon, indicadores e chamadas mapeadas para MITRE ATT&CK. O código não é executado.
                 </p>
               </div>
 
@@ -632,14 +632,14 @@ New-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run
                 className="px-4 py-2 bg-[#FF7A00] hover:bg-[#E06B00] text-black text-xs font-mono font-black uppercase flex items-center gap-2 transition-all cursor-pointer shadow-[0_0_15px_rgba(255,122,0,0.3)]"
               >
                 <Play className="w-3.5 h-3.5 fill-black" />
-                <span>Detonar no Sandbox</span>
+                <span>Analisar artefato</span>
               </button>
             </div>
 
             {/* Input payload & Metadata */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <span className="text-xs font-mono text-[#888] uppercase">Script / Payload para Detonação:</span>
+                <span className="text-xs font-mono text-[#888] uppercase">Script / payload para análise:</span>
                 <textarea
                   value={sandboxCode}
                   onChange={(e) => setSandboxCode(e.target.value)}
@@ -651,59 +651,63 @@ New-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run
               {/* Hashes & Entropy */}
               <div className="bg-black border border-[#222] p-4 space-y-3 font-mono text-xs">
                 <div className="flex items-center justify-between pb-2 border-b border-[#222]">
-                  <span className="text-[#888]">VEREDITO DO SANDBOX:</span>
+                  <span className="text-[#888]">VEREDITO ESTÁTICO:</span>
                   <span className={`px-2 py-0.5 font-bold uppercase ${
                     artifactReport.verdict === 'MALICIOUS' ? 'bg-[#FF3E00]/20 text-[#FF3E00] border border-[#FF3E00]/40' :
-                    'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40'
+                    artifactReport.verdict === 'SUSPICIOUS' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40' :
+                    'bg-zinc-500/20 text-zinc-300 border border-zinc-500/40'
                   }`}>
                     {artifactReport.verdict} (Score: {artifactReport.threatScore}/100)
                   </span>
                 </div>
                 <div><span className="text-[#666]">SHA-256: </span><span className="text-[#AAA] break-all">{artifactReport.hashes.sha256}</span></div>
                 <div><span className="text-[#666]">MD5: </span><span className="text-[#AAA]">{artifactReport.hashes.md5}</span></div>
-                <div><span className="text-[#666]">SSDEEP: </span><span className="text-[#AAA]">{artifactReport.hashes.ssdeep}</span></div>
-                <div><span className="text-[#666]">Entropia Shannon: </span><span className="text-yellow-400">{artifactReport.shannonEntropy} bits (Alta Ofuscação)</span></div>
+                <div><span className="text-[#666]">SHA-1: </span><span className="text-[#AAA] break-all">{artifactReport.hashes.sha1}</span></div>
+                <div><span className="text-[#666]">Tipo: </span><span className="text-[#AAA]">{artifactReport.fileType} · {artifactReport.fileSize} bytes</span></div>
+                <div><span className="text-[#666]">Entropia Shannon: </span><span className="text-yellow-400">{artifactReport.shannonEntropy} bits/char{artifactReport.shannonEntropy > 5.5 ? ' (alta, possível ofuscação)' : ''}</span></div>
               </div>
             </div>
 
-            {/* Process Tree & Behavioral Events */}
+            {/* Static findings */}
             <div className="space-y-4 pt-4 border-t border-[#222]">
               <span className="text-xs font-mono text-[#FF7A00] uppercase font-bold block">
-                Comportamento Dinâmico Observado (Process Tree & Network C2):
+                Achados da análise estática (nada foi executado):
               </span>
 
               <div className="bg-black border border-[#222] p-4 font-mono text-xs space-y-4">
                 <div>
-                  <span className="text-[#666] block mb-2">&bull; Árvore de Processos Gerada:</span>
-                  <div className="pl-4 border-l-2 border-[#FF7A00] space-y-2">
-                    {artifactReport.simulatedExecution.processTree.map(p => (
-                      <div key={p.pid} className="space-y-1">
-                        <div className="text-[#FF7A00] font-bold">PID {p.pid} - {p.commandLine}</div>
-                        {p.children?.map(c => (
-                          <div key={c.pid} className="pl-4 text-[#AAA] text-[11px]">
-                            &rarr; PID {c.pid} [{c.processName}] : {c.commandLine}
+                  <span className="text-[#666] block mb-2">&bull; Chamadas associadas a técnicas MITRE ATT&amp;CK:</span>
+                  {artifactReport.sinkMatches.length === 0 ? (
+                    <div className="text-[#888] text-[11px]">Nenhuma chamada conhecida encontrada no texto.</div>
+                  ) : (
+                    <div className="pl-4 border-l-2 border-[#FF7A00] space-y-2">
+                      {artifactReport.sinkMatches.map((match, i) => (
+                        <div key={i} className="space-y-1">
+                          <div className="text-[#FF7A00] font-bold">{match.mitre}</div>
+                          <div className="pl-4 text-[#AAA] text-[11px] break-all">
+                            &rarr; linha {match.line}: {match.evidence}
                           </div>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[#1A1A1A]">
-                  <div>
-                    <span className="text-[#666] block mb-1">&bull; Arquivos Criados no Disco:</span>
-                    {artifactReport.simulatedExecution.droppedFiles.map((df, i) => (
-                      <div key={i} className="text-[#FF3E00] text-[11px]">&bull; {df}</div>
-                    ))}
-                  </div>
-                  <div>
-                    <span className="text-[#666] block mb-1">&bull; Conexões de Rede (C2 Beaconing):</span>
-                    {artifactReport.simulatedExecution.outboundConnections.map((conn, i) => (
-                      <div key={i} className="text-yellow-400 text-[11px]">
-                        &bull; {conn.ip}:{conn.port} ({conn.protocol}) &rarr; {conn.domain}
+                <div className="pt-2 border-t border-[#1A1A1A]">
+                  <span className="text-[#666] block mb-1">&bull; Indicadores extraídos do conteúdo:</span>
+                  {artifactReport.indicators.length === 0 ? (
+                    <div className="text-[#888] text-[11px]">Nenhuma URL, IP, chave de registro ou caminho encontrado.</div>
+                  ) : (
+                    artifactReport.indicators.map((indicator, i) => (
+                      <div key={i} className="text-yellow-400 text-[11px] break-all">
+                        &bull; [{indicator.type}] {indicator.value} <span className="text-[#666]">(linha {indicator.line})</span>
                       </div>
-                    ))}
-                  </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-[#1A1A1A] text-[#888] text-[11px]">
+                  Análise dinâmica: não executada. {artifactReport.dynamicAnalysis.reason}
                 </div>
               </div>
             </div>

@@ -4,6 +4,7 @@ import {
   JwtClaimAudit,
   JwtVulnerability
 } from '../types/securityTools';
+import { base64UrlToBytes, bytesEqual, hmacSha256, utf8Bytes } from './hashes';
 
 export const SAMPLE_TOKENS: { name: string; description: string; token: string }[] = [
   {
@@ -14,11 +15,11 @@ export const SAMPLE_TOKENS: { name: string; description: string; token: string }
   },
   {
     name: 'HMAC com Senha Fraca (Dicionário "secret")',
-    description: 'Assinado com algoritmo HS256 usando o segredo trivial "secret", facilmente quebrável via hashcat.',
+    description: 'Assinado de fato com HS256 e o segredo "secret". O inspetor recalcula o HMAC e confirma o segredo.',
     // Header: {"alg":"HS256","typ":"JWT"}
     // Payload: {"sub":"user_8921","name":"Carlos Dev","email":"carlos@corp.com","exp":1893456000,"role":"developer"}
     // Secret: "secret"
-    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzg5MjEiLCJuYW1lIjoiQ2FybG9zIERldiIsImVtYWlsIjoiY2FybG9zQGNvcnAuY29tIiwiZXhwIjoxODkzNDU2MDAwLCJyb2xlIjoiZGV2ZWxvcGVyIn0.G3s2a4P1E4_bL97JkQ1K9yD83W404N9iYt09y0cK2dY'
+    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzg5MjEiLCJuYW1lIjoiQ2FybG9zIERldiIsImVtYWlsIjoiY2FybG9zQGNvcnAuY29tIiwiZXhwIjoxODkzNDU2MDAwLCJyb2xlIjoiZGV2ZWxvcGVyIn0.VDE82Hb8BzZIqDVeeQtrecBvnK1iqZJmTuBAmqhNYbo'
   },
   {
     name: 'Token Expirado Sem Issuer e Sem Audience',
@@ -36,10 +37,35 @@ export const SAMPLE_TOKENS: { name: string; description: string; token: string }
   }
 ];
 
-const COMMON_WEAK_SECRETS = [
+export const COMMON_WEAK_SECRETS = [
   'secret', '123456', 'password', 'jwt_secret', 'admin', 'root', 'supersecret',
-  'qwerty', '12345678', 'test', 'development', 'secret123', 'app_secret', 'token_secret'
+  'qwerty', '12345678', 'test', 'development', 'secret123', 'app_secret', 'token_secret',
+  'your-256-bit-secret', 'your_jwt_secret', 'your-secret-key', 'yoursecret', 'mysecret', 'my_secret',
+  'my-secret-key', 'secretkey', 'secret_key', 'secret-key', 'jwtsecret', 'jwt-secret', 'jwt', 'jwtkey',
+  'changeme', 'change_me', 'changeit', 'default', 'example', 'key', 'private', 'privatekey', 'token',
+  'shhhhh', 'shhh', 'keyboard cat', 'hmac', 'hs256', 'null', 'undefined', 'none', '', 'dev', 'prod',
+  'production', 'staging', 'local', 'localhost', 'letmein', 'welcome', 'p@ssw0rd', 'passw0rd', 'pass',
+  '1234', '12345', '123456789', '1234567890', 'abc123', 'admin123', 'root123', 'test123', 'demo',
+  'api_secret', 'apisecret', 'apikey', 'api_key', 'session_secret', 'sessionsecret', 'cookie_secret',
+  'access_token_secret', 'refresh_token_secret', 'auth_secret', 'authsecret', 'nextauth_secret',
+  'django-insecure', 'flask_secret', 'rails_secret', 'laravel', 'express', 'node', 'secret1', 'secret12'
 ];
+
+/**
+ * Recomputes the HS256 signature with each candidate and compares it with the
+ * signature in the token. Returns the secret that reproduces it, or null.
+ */
+export function findWeakHs256Secret(token: string, candidates: string[] = COMMON_WEAK_SECRETS): string | null {
+  const parts = token.trim().split('.');
+  if (parts.length !== 3 || !parts[2]) return null;
+  const expected = base64UrlToBytes(parts[2]);
+  if (!expected || expected.length !== 32) return null;
+  const signingInput = utf8Bytes(`${parts[0]}.${parts[1]}`);
+  for (const candidate of candidates) {
+    if (bytesEqual(hmacSha256(utf8Bytes(candidate), signingInput), expected)) return candidate;
+  }
+  return null;
+}
 
 function base64UrlDecode(str: string): string {
   if (typeof Buffer !== 'undefined') {
@@ -65,7 +91,7 @@ function base64UrlDecode(str: string): string {
   }
 }
 
-export function auditJwtToken(tokenString: string): JwtAuditReport {
+export function auditJwtToken(tokenString: string, extraSecrets: string[] = []): JwtAuditReport {
   const clean = tokenString ? tokenString.trim() : '';
 
   if (!clean) {
@@ -139,7 +165,7 @@ export function auditJwtToken(tokenString: string): JwtAuditReport {
   const claimsAudit: JwtClaimAudit[] = [];
 
   // 1. Check alg: none
-  if (String(algorithm).toLowerCase() === 'none' || parts[0].includes('bm9uZSI')) {
+  if (String(algorithm).toLowerCase() === 'none') {
     vulnerabilities.push({
       id: 'jwt-alg-none-critical',
       title: 'Ataque de Bypass de Assinatura (alg: "none")',
@@ -260,16 +286,15 @@ export function auditJwtToken(tokenString: string): JwtAuditReport {
     });
   }
 
-  // 5. Weak HMAC Secret simulation
+  // 5. Weak HMAC secret: real dictionary check against the token signature
   let isWeakSecretDetected = false;
   let guessedSecret: string | undefined = undefined;
 
-  // If token is HS256 and has signature matching known sample
   if (algorithm === 'HS256') {
-    // Check if token matches our sample with "secret" or easily predictable
-    if (tokenString.includes('G3s2a4P1E4_bL97JkQ1K9yD83W404N9iYt09y0cK2dY') || clean.endsWith('secret')) {
+    const cracked = findWeakHs256Secret(clean, [...COMMON_WEAK_SECRETS, ...extraSecrets]);
+    if (cracked !== null) {
       isWeakSecretDetected = true;
-      guessedSecret = 'secret';
+      guessedSecret = cracked;
     }
   }
 
@@ -278,7 +303,7 @@ export function auditJwtToken(tokenString: string): JwtAuditReport {
       id: 'jwt-weak-hmac-secret',
       title: 'Chave Secreta HMAC Extremamente Fraca Detectada',
       severity: 'CRITICAL',
-      description: `O token foi assinado utilizando o segredo trivial "${guessedSecret}", presente em dicionários básicos de força bruta.`,
+      description: `A assinatura HS256 foi reproduzida com o segredo "${guessedSecret}", presente no dicionário testado. O segredo está confirmado, não estimado.`,
       cwe: 'CWE-521',
       exploitScenario: 'Com ferramentas como jwt-cracker ou hashcat, a chave é quebrada em segundos, permitindo assinar qualquer token.',
       remediation: 'Gere um segredo de no mínimo 256 bits criptograficamente seguro (openssl rand -hex 32) e armazene em Secrets Vault.'

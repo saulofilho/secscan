@@ -77,11 +77,19 @@ export interface DockerfileFinding {
 export interface ContainerBaseImageAudit {
   baseImage: string;
   tag: string;
+  /** True only after endoflife.date confirmed the release cycle is past end of life. */
   isOutdated: boolean;
+  /** `latest` or no tag: the build pulls whatever is current. */
+  isFloatingTag: boolean;
+  /** Newest supported LTS cycle reported by endoflife.date. Empty until checked. */
   latestSecureTag: string;
   isPinnedByHash: boolean;
-  knownCveCount: number;
-  criticalCves: string[];
+  eolStatus: 'NOT_CHECKED' | 'SUPPORTED' | 'EOL' | 'UNKNOWN_PRODUCT' | 'UNREACHABLE';
+  eolDate?: string;
+  eolCycle?: string;
+  latestPatch?: string;
+  /** Image CVEs need a real image scanner (Trivy, Grype). This audit never estimates them. */
+  cveScanStatus: 'NOT_SCANNED';
 }
 
 export interface ContainerAuditReport {

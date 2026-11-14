@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Container,
   ShieldAlert,
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import {
   auditDockerfile,
+  enrichContainerAuditWithEol,
   SAMPLE_DOCKERFILES
 } from '../lib/containerSecurityEngine';
 import { ContainerAuditReport, DockerfileFinding } from '../types/securityTools';
@@ -46,9 +47,25 @@ export const ContainerSecurityView: React.FC<ContainerSecurityViewProps> = ({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [appliedNotification, setAppliedNotification] = useState<boolean>(false);
 
-  const report: ContainerAuditReport = useMemo(() => {
+  const localReport: ContainerAuditReport = useMemo(() => {
     return auditDockerfile(customDockerfileText, workspaceDockerFile?.name || 'Dockerfile');
   }, [customDockerfileText, workspaceDockerFile]);
+  const [report, setReport] = useState<ContainerAuditReport>(localReport);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReport(localReport);
+    if (!customDockerfileText.trim()) return;
+    const timer = setTimeout(() => {
+      enrichContainerAuditWithEol(localReport).then((next) => {
+        if (!cancelled) setReport(next);
+      });
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [localReport, customDockerfileText]);
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -181,29 +198,48 @@ export const ContainerSecurityView: React.FC<ContainerSecurityViewProps> = ({
                 </span>
               </div>
               <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
-                report.baseImageAudit.isOutdated 
-                  ? 'bg-rose-500/10 text-rose-300 border-rose-500/30' 
-                  : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                report.baseImageAudit.eolStatus === 'EOL'
+                  ? 'bg-rose-500/10 text-rose-300 border-rose-500/30'
+                  : report.baseImageAudit.eolStatus === 'SUPPORTED'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                  : 'bg-zinc-500/10 text-zinc-300 border-zinc-500/30'
               }`}>
-                {report.baseImageAudit.isOutdated ? 'DESATUALIZADA / VULNERÁVEL' : 'IMAGEM ATUALIZADA'}
+                {report.baseImageAudit.eolStatus === 'EOL' ? 'FIM DE VIDA (EOL)'
+                  : report.baseImageAudit.eolStatus === 'SUPPORTED' ? 'CICLO SUPORTADO'
+                  : report.baseImageAudit.eolStatus === 'UNREACHABLE' ? 'EOL NÃO VERIFICADO'
+                  : report.baseImageAudit.eolStatus === 'UNKNOWN_PRODUCT' ? 'SEM DADO DE EOL'
+                  : 'VERIFICANDO EOL…'}
               </span>
             </div>
 
-            <div className="text-xs text-zinc-400">
-              Recomendação de tag segura: <code className="text-emerald-400 font-mono font-bold">{report.baseImageAudit.latestSecureTag}</code>
-            </div>
-
-            {report.baseImageAudit.criticalCves.length > 0 && (
-              <div className="mt-2 space-y-1">
-                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">CVEs Conhecidas na Versão Base:</span>
-                {report.baseImageAudit.criticalCves.map(cve => (
-                  <div key={cve} className="text-[11px] font-mono text-rose-300 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                    <span>{cve}</span>
-                  </div>
-                ))}
+            <div className="text-xs text-zinc-400 space-y-1">
+              {(report.baseImageAudit.eolStatus === 'EOL' || report.baseImageAudit.eolStatus === 'SUPPORTED') && (
+                <div>
+                  Ciclo {report.baseImageAudit.eolCycle}
+                  {report.baseImageAudit.eolDate ? ` · fim de vida em ${report.baseImageAudit.eolDate}` : ''}
+                  {report.baseImageAudit.latestPatch ? ` · último patch ${report.baseImageAudit.latestPatch}` : ''}
+                  {' '}(fonte: endoflife.date)
+                </div>
+              )}
+              {report.baseImageAudit.latestSecureTag && report.baseImageAudit.eolStatus === 'EOL' && (
+                <div>
+                  Ciclo LTS suportado mais recente: <code className="text-emerald-400 font-mono font-bold">{report.baseImageAudit.latestSecureTag}</code>
+                </div>
+              )}
+              {report.baseImageAudit.eolStatus === 'UNREACHABLE' && (
+                <div>endoflife.date não respondeu. O ciclo de vida da imagem não foi verificado.</div>
+              )}
+              {report.baseImageAudit.eolStatus === 'UNKNOWN_PRODUCT' && (
+                <div>Imagem ou tag sem ciclo conhecido no endoflife.date.</div>
+              )}
+              {report.baseImageAudit.isFloatingTag && (
+                <div className="text-amber-300">Tag flutuante: cada build pode puxar uma imagem diferente.</div>
+              )}
+              <div>{report.baseImageAudit.isPinnedByHash ? 'Fixada por digest sha256.' : 'Sem digest sha256 no FROM.'}</div>
+              <div className="text-zinc-500">
+                CVEs da imagem: não verificadas. Rode um scanner de imagem (ex.: <code>trivy image</code>) para obter a lista real.
               </div>
-            )}
+            </div>
           </div>
 
           {/* Findings List */}

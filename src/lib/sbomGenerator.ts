@@ -1,5 +1,13 @@
 import { ScannedFile } from '../types';
-import { DependencyPackage, scanSoftwareCompositionAnalysis } from './scaScanner';
+import { DependencyPackage, ScaAnalysisReport, scanSoftwareCompositionAnalysis } from './scaScanner';
+
+export type SbomHashAlgorithm = 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512';
+
+export interface SbomHash {
+  alg: SbomHashAlgorithm;
+  /** Hex digest of the published package tarball, as recorded by the lockfile. */
+  content: string;
+}
 
 export interface SbomComponent {
   name: string;
@@ -7,12 +15,9 @@ export interface SbomComponent {
   type: 'application' | 'library' | 'framework' | 'container';
   purl: string;
   license: string;
-  supplier?: string;
   description?: string;
-  hashes: {
-    sha256: string;
-    sha1: string;
-  };
+  /** Empty when the workspace has no lockfile for this package. */
+  hashes: SbomHash[];
   vulnerabilitiesCount: number;
 }
 
@@ -24,60 +29,135 @@ export interface SbomDocument {
   appName: string;
   appVersion: string;
   totalComponents: number;
+  /** How many components carry a digest read from a lockfile. */
+  componentsWithHash: number;
   components: SbomComponent[];
   rawJson: string;
 }
 
-/**
- * Pseudo-random deterministic hash generator for simulated packaging
- */
-function generateDeterministicHash(input: string): { sha256: string; sha1: string } {
-  let hash = 0;
-  for (let i = 0; i < input.length; i++) {
-    hash = ((hash << 5) - hash) + input.charCodeAt(i);
-    hash |= 0;
+const TOOL_NAME = 'SecScan';
+const TOOL_VERSION = '0.1.0';
+const UNKNOWN_LICENSE = 'NOASSERTION';
+
+const SRI_ALGORITHMS: Record<string, SbomHashAlgorithm> = {
+  sha1: 'SHA-1',
+  sha256: 'SHA-256',
+  sha384: 'SHA-384',
+  sha512: 'SHA-512'
+};
+
+function base64ToHex(value: string): string | null {
+  try {
+    const binary = atob(value);
+    let hex = '';
+    for (let i = 0; i < binary.length; i++) {
+      hex += binary.charCodeAt(i).toString(16).padStart(2, '0');
+    }
+    return hex;
+  } catch {
+    return null;
   }
-  const hex = Math.abs(hash).toString(16).padStart(8, '0');
-  const sha256 = (hex + 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855').slice(0, 64);
-  const sha1 = (hex + 'da39a3ee5e6b4b0d3255bfef95601890afd80709').slice(0, 40);
-  return { sha256, sha1 };
 }
 
-export function generateCycloneDxSbom(files: ScannedFile[]): SbomDocument {
-  const sca = scanSoftwareCompositionAnalysis(files);
-  const serialNumber = `urn:uuid:${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
-  const now = new Date().toISOString();
-
-  // Root application package info
-  let appName = 'fintech-enterprise-app';
-  let appVersion = '1.4.2';
-  const pkgJsonFile = files.find(f => f.name.toLowerCase() === 'package.json');
-  if (pkgJsonFile) {
-    try {
-      const parsed = JSON.parse(pkgJsonFile.content);
-      if (parsed.name) appName = parsed.name;
-      if (parsed.version) appVersion = parsed.version;
-    } catch {}
+/**
+ * Converts a Subresource Integrity string from a lockfile ("sha512-<base64>")
+ * into hex digests. It never invents a digest: unknown input yields [].
+ */
+export function integrityToHashes(integrity?: string): SbomHash[] {
+  if (!integrity) return [];
+  const hashes: SbomHash[] = [];
+  for (const token of integrity.trim().split(/\s+/)) {
+    const dash = token.indexOf('-');
+    if (dash === -1) continue;
+    const alg = SRI_ALGORITHMS[token.slice(0, dash).toLowerCase()];
+    const content = base64ToHex(token.slice(dash + 1));
+    if (alg && content) hashes.push({ alg, content });
   }
+  return hashes;
+}
 
-  const components: SbomComponent[] = sca.packages.map(pkg => {
-    const ecosystem = pkg.manifestFile.toLowerCase().endsWith('requirements.txt') ? 'pypi' : 'npm';
-    const purl = `pkg:${ecosystem}/${pkg.name}@${pkg.version}`;
-    const hashes = generateDeterministicHash(purl);
-    return {
-      name: pkg.name,
-      version: pkg.version,
-      type: 'library',
-      purl,
-      license: pkg.license,
-      supplier: 'Open Source Community',
-      description: `Dependency package audited in ${pkg.manifestFile}`,
-      hashes,
-      vulnerabilitiesCount: pkg.vulnerabilities.length
-    };
-  });
+function randomUuid(): string {
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
-  // CycloneDX v1.5 standard JSON payload
+interface RootApp {
+  name: string;
+  version: string;
+  license?: string;
+}
+
+function readRootApp(files: ScannedFile[]): RootApp {
+  const manifests = files
+    .filter((f) => f.name.toLowerCase() === 'package.json')
+    .sort((a, b) => a.path.split('/').length - b.path.split('/').length);
+  for (const manifest of manifests) {
+    try {
+      const parsed = JSON.parse(manifest.content);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          name: typeof parsed.name === 'string' && parsed.name ? parsed.name : 'unnamed-application',
+          version: typeof parsed.version === 'string' && parsed.version ? parsed.version : 'unversioned',
+          license: typeof parsed.license === 'string' && parsed.license ? parsed.license : undefined
+        };
+      }
+    } catch {
+      // Unreadable manifest: try the next one.
+    }
+  }
+  return { name: 'unnamed-application', version: 'unversioned' };
+}
+
+function ecosystemOf(pkg: DependencyPackage): 'pypi' | 'npm' {
+  return pkg.manifestFile.toLowerCase().endsWith('requirements.txt') ? 'pypi' : 'npm';
+}
+
+function purlOf(pkg: DependencyPackage): string {
+  const name = pkg.name.startsWith('@') ? `%40${pkg.name.slice(1)}` : pkg.name;
+  return `pkg:${ecosystemOf(pkg)}/${name}@${pkg.version}`;
+}
+
+function licenseOf(pkg: DependencyPackage): string {
+  return pkg.license === 'NOT_IN_CATALOG' ? UNKNOWN_LICENSE : pkg.license;
+}
+
+function toComponents(sca: ScaAnalysisReport): SbomComponent[] {
+  return sca.packages.map((pkg) => ({
+    name: pkg.name,
+    version: pkg.version,
+    type: 'library',
+    purl: purlOf(pkg),
+    license: licenseOf(pkg),
+    description: `Declarado em ${pkg.manifestFile}`,
+    hashes: integrityToHashes(pkg.integrity),
+    vulnerabilitiesCount: pkg.vulnerabilities.length
+  }));
+}
+
+function advisorySource(id: string): { name: string; url: string } {
+  return id.startsWith('CVE-')
+    ? { name: 'NVD', url: `https://nvd.nist.gov/vuln/detail/${id}` }
+    : { name: 'OSV', url: `https://osv.dev/vulnerability/${id}` };
+}
+
+/**
+ * Pass the OSV-enriched report as `sca` to carry the advisories into the SBOM.
+ * Without it, only the local catalog is consulted.
+ */
+export function generateCycloneDxSbom(
+  files: ScannedFile[],
+  sca: ScaAnalysisReport = scanSoftwareCompositionAnalysis(files)
+): SbomDocument {
+  const serialNumber = `urn:uuid:${randomUuid()}`;
+  const now = new Date().toISOString();
+  const app = readRootApp(files);
+  const components = toComponents(sca);
+  const purlByPackage = new Map(sca.packages.map((pkg) => [`${pkg.name}@${pkg.version}`, purlOf(pkg)]));
+
   const cycloneDxJson = {
     bomFormat: 'CycloneDX',
     specVersion: '1.5',
@@ -85,47 +165,41 @@ export function generateCycloneDxSbom(files: ScannedFile[]): SbomDocument {
     version: 1,
     metadata: {
       timestamp: now,
-      tools: [
-        {
-          vendor: 'SecScan Enterprise Suite',
-          name: 'SecScan SBOM Generator & Signer',
-          version: '2.5.0'
-        }
-      ],
+      tools: [{ vendor: TOOL_NAME, name: `${TOOL_NAME} SBOM Generator`, version: TOOL_VERSION }],
       component: {
         type: 'application',
-        name: appName,
-        version: appVersion,
-        licenses: [{ license: { id: 'Proprietary' } }],
-        purl: `pkg:npm/${appName}@${appVersion}`
+        name: app.name,
+        version: app.version,
+        ...(app.license ? { licenses: [{ license: { id: app.license } }] } : {}),
+        purl: `pkg:npm/${app.name}@${app.version}`
       }
     },
-    components: components.map(c => ({
+    components: components.map((c) => ({
       type: c.type,
       name: c.name,
       version: c.version,
       purl: c.purl,
-      licenses: [{ license: { id: c.license } }],
-      hashes: [
-        { alg: 'SHA-256', content: c.hashes.sha256 },
-        { alg: 'SHA-1', content: c.hashes.sha1 }
-      ],
-      properties: [
-        { name: 'secscan:vulnerabilitiesCount', value: String(c.vulnerabilitiesCount) }
-      ]
+      ...(c.license !== UNKNOWN_LICENSE ? { licenses: [{ license: { id: c.license } }] } : {}),
+      ...(c.hashes.length > 0 ? { hashes: c.hashes } : {}),
+      properties: [{ name: 'secscan:vulnerabilitiesCount', value: String(c.vulnerabilitiesCount) }]
     })),
-    dependencies: components.map(c => ({
-      ref: c.purl,
-      dependsOn: []
-    })),
-    vulnerabilities: sca.allVulnerabilities.map(v => ({
-      id: v.cveId,
-      source: { name: 'NVD', url: `https://nvd.nist.gov/vuln/detail/${v.cveId}` },
-      ratings: [{ score: v.cvssScore, severity: v.severity.toLowerCase(), method: 'CVSSv31' }],
-      cwes: [parseInt(v.cweId.replace('CWE-', ''), 10) || 79],
-      description: v.description,
-      recommendation: `Upgrade to version ${v.fixedVersion} or higher.`
-    }))
+    vulnerabilities: sca.allVulnerabilities.map((v) => {
+      const cwe = parseInt(v.cweId.replace('CWE-', ''), 10);
+      const affectedPurl = purlByPackage.get(v.affectedPackage.replace('==', '@'));
+      return {
+        id: v.cveId,
+        source: advisorySource(v.cveId),
+        ratings: [
+          v.cvssScore > 0
+            ? { score: v.cvssScore, severity: v.severity.toLowerCase(), method: 'CVSSv31' }
+            : { severity: v.severity.toLowerCase() }
+        ],
+        ...(Number.isFinite(cwe) ? { cwes: [cwe] } : {}),
+        description: v.description,
+        ...(/^\d/.test(v.fixedVersion) ? { recommendation: `Upgrade to version ${v.fixedVersion} or higher.` } : {}),
+        ...(affectedPurl ? { affects: [{ ref: affectedPurl }] } : {})
+      };
+    })
   };
 
   return {
@@ -133,63 +207,43 @@ export function generateCycloneDxSbom(files: ScannedFile[]): SbomDocument {
     version: '1.5',
     serialNumber,
     generatedAt: now,
-    appName,
-    appVersion,
+    appName: app.name,
+    appVersion: app.version,
     totalComponents: components.length,
+    componentsWithHash: components.filter((c) => c.hashes.length > 0).length,
     components,
     rawJson: JSON.stringify(cycloneDxJson, null, 2)
   };
 }
 
-export function generateSpdxSbom(files: ScannedFile[]): SbomDocument {
-  const sca = scanSoftwareCompositionAnalysis(files);
+export function generateSpdxSbom(
+  files: ScannedFile[],
+  sca: ScaAnalysisReport = scanSoftwareCompositionAnalysis(files)
+): SbomDocument {
   const now = new Date().toISOString();
-
-  let appName = 'fintech-enterprise-app';
-  let appVersion = '1.4.2';
-  const pkgJsonFile = files.find(f => f.name.toLowerCase() === 'package.json');
-  if (pkgJsonFile) {
-    try {
-      const parsed = JSON.parse(pkgJsonFile.content);
-      if (parsed.name) appName = parsed.name;
-      if (parsed.version) appVersion = parsed.version;
-    } catch {}
-  }
-
-  const components: SbomComponent[] = sca.packages.map(pkg => {
-    const ecosystem = pkg.manifestFile.toLowerCase().endsWith('requirements.txt') ? 'pypi' : 'npm';
-    const purl = `pkg:${ecosystem}/${pkg.name}@${pkg.version}`;
-    const hashes = generateDeterministicHash(purl);
-    return {
-      name: pkg.name,
-      version: pkg.version,
-      type: 'library',
-      purl,
-      license: pkg.license,
-      hashes,
-      vulnerabilitiesCount: pkg.vulnerabilities.length
-    };
-  });
+  const app = readRootApp(files);
+  const components = toComponents(sca);
+  const documentId = randomUuid();
 
   const spdxJson = {
     spdxVersion: 'SPDX-2.3',
     dataLicense: 'CC0-1.0',
     SPDXID: 'SPDXRef-DOCUMENT',
-    name: `${appName}-SBOM`,
-    documentNamespace: `https://secscan.enterprise/spdx/${appName}/${Date.now()}`,
+    name: `${app.name}-SBOM`,
+    documentNamespace: `https://spdx.org/spdxdocs/${encodeURIComponent(app.name)}-${documentId}`,
     creationInfo: {
-      creators: ['Tool: SecScan-AppSec-Suite-2.5', 'Organization: Enterprise AppSec Team'],
+      creators: [`Tool: ${TOOL_NAME}-${TOOL_VERSION}`],
       created: now
     },
     packages: [
       {
-        name: appName,
+        name: app.name,
         SPDXID: 'SPDXRef-Package-Root',
-        versionInfo: appVersion,
+        versionInfo: app.version,
         downloadLocation: 'NOASSERTION',
-        filesAnalyzed: true,
+        filesAnalyzed: false,
         licenseConcluded: 'NOASSERTION',
-        licenseDeclared: 'Proprietary'
+        licenseDeclared: app.license || 'NOASSERTION'
       },
       ...components.map((c, idx) => ({
         name: c.name,
@@ -197,11 +251,11 @@ export function generateSpdxSbom(files: ScannedFile[]): SbomDocument {
         versionInfo: c.version,
         downloadLocation: 'NOASSERTION',
         filesAnalyzed: false,
-        licenseConcluded: c.license,
-        checksums: [
-          { algorithm: 'SHA256', checksumValue: c.hashes.sha256 },
-          { algorithm: 'SHA1', checksumValue: c.hashes.sha1 }
-        ],
+        licenseConcluded: 'NOASSERTION',
+        licenseDeclared: c.license,
+        ...(c.hashes.length > 0
+          ? { checksums: c.hashes.map((h) => ({ algorithm: h.alg.replace('-', ''), checksumValue: h.content })) }
+          : {}),
         externalRefs: [
           {
             referenceCategory: 'PACKAGE-MANAGER',
@@ -210,17 +264,26 @@ export function generateSpdxSbom(files: ScannedFile[]): SbomDocument {
           }
         ]
       }))
+    ],
+    relationships: [
+      { spdxElementId: 'SPDXRef-DOCUMENT', relationshipType: 'DESCRIBES', relatedSpdxElement: 'SPDXRef-Package-Root' },
+      ...components.map((c, idx) => ({
+        spdxElementId: 'SPDXRef-Package-Root',
+        relationshipType: 'DEPENDS_ON',
+        relatedSpdxElement: `SPDXRef-Package-${c.name.replace(/[^a-zA-Z0-9]/g, '-')}-${idx}`
+      }))
     ]
   };
 
   return {
     format: 'SPDX',
     version: '2.3',
-    serialNumber: `SPDXRef-DOCUMENT-${Date.now()}`,
+    serialNumber: `SPDXRef-DOCUMENT-${documentId}`,
     generatedAt: now,
-    appName,
-    appVersion,
+    appName: app.name,
+    appVersion: app.version,
     totalComponents: components.length,
+    componentsWithHash: components.filter((c) => c.hashes.length > 0).length,
     components,
     rawJson: JSON.stringify(spdxJson, null, 2)
   };

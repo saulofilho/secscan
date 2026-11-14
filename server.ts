@@ -13,6 +13,7 @@ import {
 } from './src/lib/osintThreatFeedsData';
 import { fetchPublicUrl, resolvePublicHttpUrl, UrlIngestRejected } from './src/lib/urlIngestGuard';
 import { FEATURE_REGISTRY } from './src/lib/featureRegistry';
+import { collectGitHistoryLeaks } from './server/gitHistory';
 
 dotenv.config();
 
@@ -919,6 +920,30 @@ ${endpointsFound.slice(0, 10).map((ep, i) => `export function handleRoute_${i}(r
       return res.json(auditResult);
     } catch (err: any) {
       return res.status(500).json({ error: 'Erro ao auditar .gitignore do repositório: ' + String(err) });
+    }
+  });
+
+  // Secrets in the git history of a local repository (read-only `git log -p`)
+  app.get('/api/git/secrets', async (req, res) => {
+    try {
+      const loopback = clientIsLoopback(req);
+      if (!process.env.SECSCAN_API_TOKEN && !loopback) {
+        return res.status(403).json({
+          error: 'A leitura do histórico Git do servidor só responde em localhost. Em produção defina SECSCAN_API_TOKEN.'
+        });
+      }
+      const requestedPath = typeof req.query.path === 'string' ? req.query.path.trim() : '';
+      if (requestedPath && !loopback) {
+        return res.status(403).json({ error: 'Escolher outro diretório só é permitido a partir de localhost.' });
+      }
+      const target = requestedPath || process.cwd();
+      if (!fs.existsSync(target) || !fs.statSync(target).isDirectory()) {
+        return res.status(400).json({ error: `Diretório não encontrado: ${target}` });
+      }
+      const limit = Number(req.query.limit) || 1000;
+      return res.json(await collectGitHistoryLeaks(target, limit));
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Erro ao ler o histórico Git: ' + String(err?.message || err) });
     }
   });
 
