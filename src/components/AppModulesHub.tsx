@@ -92,7 +92,6 @@ interface ModuleDefinition {
 export type TestingContextScope = 'ALL' | 'MY_CODE' | 'SANDBOX' | 'GOV_POSTURE';
 
 export const LAB_TOOL_IDS = [
-  'iast',
   'dast',
   'ngfw',
   'idsips',
@@ -289,12 +288,10 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
         {
           id: 'iast',
           nameKey: 'tab.iast',
-          defaultName: 'IAST Runtime',
+          defaultName: 'Análise de Taint',
           descKey: 'tab.iast_tooltip',
-          defaultDesc: 'Laboratório com payloads de exemplo. Não há agente no processo da aplicação.',
-          icon: Activity,
-          badge: 'LAB',
-          badgeType: 'label'
+          defaultDesc: 'Segue dados da requisição até chamadas perigosas nos arquivos JS/TS. Estática: nada é executado.',
+          icon: Activity
         },
         {
           id: 'headers',
@@ -963,7 +960,7 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
                 </div>
                 <p className="text-xs text-zinc-400 mt-1">
                   {files.length > 0 
-                    ? 'SAST, IAST em Runtime, Segredos por Entropia e Rotas LinkFinder são extraídos estritamente dos seus arquivos carregados.' 
+                    ? 'SAST, Análise de Taint, Segredos por Entropia e Rotas LinkFinder são extraídos estritamente dos seus arquivos carregados.' 
                     : 'A plataforma está operando em modo real e limpo. Nenhuma vulnerabilidade falsa ou mockada é gerada.'}
                 </p>
               </div>
@@ -1032,7 +1029,7 @@ export const AppModulesHub: React.FC<AppModulesHubProps> = ({
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
                 <span>
                   {contextFilter === 'MY_CODE' && 'Ferramentas que leem o artefato enviado: código, manifesto, header, JWT, política IAM e Dockerfile.'}
-                  {contextFilter === 'SANDBOX' && 'Laboratório com cenário de exemplo: DAST, IAST, Nmap, Nikto, firewall, SOC, EDR e threat intel.'}
+                  {contextFilter === 'SANDBOX' && 'Laboratório com cenário de exemplo: DAST, Nmap, Nikto, firewall, SOC, EDR e threat intel.'}
                   {contextFilter === 'GOV_POSTURE' && 'Governança derivada do relatório: compliance, OPA, SBOM, quality gate e configuração.'}
                 </span>
               </div>

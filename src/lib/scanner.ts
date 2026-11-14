@@ -1311,16 +1311,8 @@ export async function scanSourceFilesAsync(
     elapsedMs: 0
   });
 
-  // Small pause on start for optical smoothness
-  if (files.length <= 15) {
-    await new Promise(r => setTimeout(r, 40));
-  }
-
   const activeRules = rules.filter(r => r.enabled);
 
-  // Progressive pacing: for small sample workspaces, provide slight pacing so progress is visually tangible;
-  // for large workspaces (> 20 files), yield with 0ms every 1-2 files so execution stays blazing fast.
-  const yieldMs = files.length <= 6 ? 45 : files.length <= 20 ? 15 : 0;
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
@@ -1342,9 +1334,8 @@ export async function scanSourceFilesAsync(
       elapsedMs: Math.round(performance.now() - startTime)
     });
 
-    if (yieldMs > 0) {
-      await new Promise(r => setTimeout(r, yieldMs));
-    } else if (i % 2 === 0) {
+    // Yield to the browser so the progress bar repaints. No artificial delay.
+    if (i % 2 === 0) {
       await new Promise(r => setTimeout(r, 0));
     }
 
@@ -1392,7 +1383,7 @@ export async function scanSourceFilesAsync(
     ignoredCount,
     elapsedMs: Math.round(performance.now() - startTime)
   });
-  await new Promise(r => setTimeout(r, 20));
+  await new Promise(r => setTimeout(r, 0));
 
   // Phase: Data Flow Graph (92%)
   emitProgress({
@@ -1408,7 +1399,7 @@ export async function scanSourceFilesAsync(
     ignoredCount,
     elapsedMs: Math.round(performance.now() - startTime)
   });
-  await new Promise(r => setTimeout(r, 20));
+  await new Promise(r => setTimeout(r, 0));
 
   // Safely compute Data Flow Graph with zero UI block
   let computedDataFlowGraph: DataFlowGraphData | undefined;
@@ -1432,7 +1423,7 @@ export async function scanSourceFilesAsync(
     ignoredCount,
     elapsedMs: Math.round(performance.now() - startTime)
   });
-  await new Promise(r => setTimeout(r, 20));
+  await new Promise(r => setTimeout(r, 0));
 
   // Safely compute IAST Runtime Emulation
   let computedIastReport: any;
@@ -1456,7 +1447,7 @@ export async function scanSourceFilesAsync(
     ignoredCount,
     elapsedMs: Math.round(performance.now() - startTime)
   });
-  await new Promise(r => setTimeout(r, 20));
+  await new Promise(r => setTimeout(r, 0));
 
   let report: ScanReport;
   try {
@@ -1579,7 +1570,7 @@ export async function scanSourceFilesAsync(
     ignoredCount,
     elapsedMs: report.durationMs
   });
-  await new Promise(r => setTimeout(r, 20));
+  await new Promise(r => setTimeout(r, 0));
 
   return report;
 }

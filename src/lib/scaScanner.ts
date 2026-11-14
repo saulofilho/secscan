@@ -1,4 +1,5 @@
 import { ScannedFile } from '../types';
+import { calculateCvssScore, CvssMetrics } from './threatModeler';
 
 export interface ScaVulnerability {
   id: string;
@@ -29,6 +30,10 @@ export interface DependencyPackage {
   typosquattingNote?: string;
   vulnerabilities: ScaVulnerability[];
   recommendedVersion?: string;
+  /** SRI do lockfile (ex.: sha512-...). Ausente quando não há lockfile. */
+  integrity?: string;
+  /** true quando a versão veio do lockfile e não do range do manifesto. */
+  versionFromLockfile?: boolean;
 }
 
 export interface ScaAnalysisReport {
@@ -219,6 +224,66 @@ function isVersionSmaller(v1: string, v2: string): boolean {
   return false;
 }
 
+
+interface LockEntry {
+  name: string;
+  version: string;
+  integrity?: string;
+  dev: boolean;
+  topLevel: boolean;
+}
+
+function dirOf(filePath: string): string {
+  const idx = filePath.lastIndexOf('/');
+  return idx === -1 ? '' : filePath.slice(0, idx);
+}
+
+/**
+ * Reads package-lock.json (v1, v2 and v3). Returns every installed package with
+ * the exact version and the integrity hash npm recorded.
+ */
+export function parsePackageLock(content: string): LockEntry[] {
+  let data: any;
+  try {
+    data = JSON.parse(content);
+  } catch {
+    return [];
+  }
+  const entries: LockEntry[] = [];
+  if (data && typeof data.packages === 'object' && data.packages) {
+    for (const [key, raw] of Object.entries<any>(data.packages)) {
+      if (!key || !raw || typeof raw.version !== 'string' || raw.link) continue;
+      const marker = key.lastIndexOf('node_modules/');
+      if (marker === -1) continue;
+      const name = key.slice(marker + 'node_modules/'.length);
+      entries.push({
+        name,
+        version: raw.version,
+        integrity: typeof raw.integrity === 'string' ? raw.integrity : undefined,
+        dev: raw.dev === true,
+        topLevel: key === `node_modules/${name}`
+      });
+    }
+    return entries;
+  }
+  const walk = (deps: any, topLevel: boolean) => {
+    if (!deps || typeof deps !== 'object') return;
+    for (const [name, raw] of Object.entries<any>(deps)) {
+      if (!raw || typeof raw.version !== 'string') continue;
+      entries.push({
+        name,
+        version: raw.version,
+        integrity: typeof raw.integrity === 'string' ? raw.integrity : undefined,
+        dev: raw.dev === true,
+        topLevel
+      });
+      walk(raw.dependencies, false);
+    }
+  };
+  walk(data?.dependencies, true);
+  return entries;
+}
+
 /**
  * Scans all files in workspace for package manifests and audits dependencies against known CVEs and license risks
  */
@@ -226,6 +291,14 @@ export function scanSoftwareCompositionAnalysis(files: ScannedFile[]): ScaAnalys
   const packages: DependencyPackage[] = [];
   const manifestsFound: string[] = [];
   const allVulnerabilities: ScaVulnerability[] = [];
+
+  const locksByDir = new Map<string, { path: string; entries: LockEntry[] }>();
+  for (const file of files) {
+    if (file.name.toLowerCase() === 'package-lock.json') {
+      const entries = parsePackageLock(file.content);
+      if (entries.length > 0) locksByDir.set(dirOf(file.path), { path: file.path, entries });
+    }
+  }
 
   for (const file of files) {
     const fileName = file.name.toLowerCase();
@@ -238,9 +311,14 @@ export function scanSoftwareCompositionAnalysis(files: ScannedFile[]): ScaAnalys
         const dependencies = pkgData.dependencies || {};
         const devDependencies = pkgData.devDependencies || {};
 
-        const parseEntries = (entries: Record<string, string>, type: 'direct' | 'dev') => {
+        const lock = locksByDir.get(dirOf(file.path));
+        const seen = new Set<string>();
+        const parseEntries = (entries: Record<string, string>, type: 'direct' | 'dev' | 'transitive', lockEntry?: LockEntry) => {
           for (const [name, rawVersion] of Object.entries(entries)) {
-            const cleanVersion = rawVersion.replace(/[\^~>=<]/g, '').trim();
+            const locked = lockEntry || lock?.entries.find((entry) => entry.topLevel && entry.name === name);
+            const cleanVersion = locked ? locked.version : String(rawVersion).replace(/[\^~>=<]/g, '').trim();
+            if (seen.has(`${name}@${cleanVersion}`)) continue;
+            seen.add(`${name}@${cleanVersion}`);
             const dbInfo = KNOWN_CVE_DATABASE[name.toLowerCase()];
             const vulns: ScaVulnerability[] = [];
             let recommendedVersion = cleanVersion;
@@ -281,7 +359,9 @@ export function scanSoftwareCompositionAnalysis(files: ScannedFile[]): ScaAnalys
               name,
               version: cleanVersion,
               type,
-              manifestFile: file.path,
+              manifestFile: lockEntry && lock ? lock.path : file.path,
+              integrity: locked?.integrity,
+              versionFromLockfile: Boolean(locked),
               license,
               licenseRisk,
               licenseExplanation,
@@ -296,6 +376,11 @@ export function scanSoftwareCompositionAnalysis(files: ScannedFile[]): ScaAnalys
 
         parseEntries(dependencies, 'direct');
         parseEntries(devDependencies, 'dev');
+        if (lock) {
+          for (const entry of lock.entries) {
+            parseEntries({ [entry.name]: entry.version }, entry.dev ? 'dev' : 'transitive', entry);
+          }
+        }
       } catch (e) {
         console.warn('Error parsing package.json for SCA:', e);
       }
@@ -384,31 +469,65 @@ function ecosystemForManifest(manifestFile: string): 'npm' | 'PyPI' {
   return manifestFile.toLowerCase().endsWith('requirements.txt') ? 'PyPI' : 'npm';
 }
 
-function osvSeverity(vuln: Record<string, unknown>): { severity: ScaVulnerability['severity']; cvssScore: number } {
-  const databaseSpecific = vuln.database_specific as { severity?: string } | undefined;
-  const label = String(databaseSpecific?.severity || '').toUpperCase();
-  if (label === 'CRITICAL') return { severity: 'CRITICAL', cvssScore: 9 };
-  if (label === 'HIGH') return { severity: 'HIGH', cvssScore: 7.5 };
-  if (label === 'MODERATE' || label === 'MEDIUM') return { severity: 'MEDIUM', cvssScore: 5 };
-  if (label === 'LOW') return { severity: 'LOW', cvssScore: 2 };
+/** CVSS v3.x base score from the vector string. Returns null for other versions. */
+export function cvss3BaseScoreFromVector(vector: string): number | null {
+  if (!/^CVSS:3\.[01]\//.test(vector)) return null;
+  const parts = new Map<string, string>();
+  for (const chunk of vector.split('/').slice(1)) {
+    const [key, value] = chunk.split(':');
+    if (key && value) parts.set(key, value);
+  }
+  const pick = <T extends string>(key: string, table: Record<string, T>): T | null => table[parts.get(key) || ''] || null;
+  const level = { N: 'NONE', L: 'LOW', H: 'HIGH' } as const;
+  const metrics = {
+    attackVector: pick('AV', { N: 'NETWORK', A: 'ADJACENT', L: 'LOCAL', P: 'PHYSICAL' } as const),
+    attackComplexity: pick('AC', { L: 'LOW', H: 'HIGH' } as const),
+    privilegesRequired: pick('PR', level),
+    userInteraction: pick('UI', { N: 'NONE', R: 'REQUIRED' } as const),
+    scope: pick('S', { U: 'UNCHANGED', C: 'CHANGED' } as const),
+    confidentiality: pick('C', level),
+    integrity: pick('I', level),
+    availability: pick('A', level)
+  };
+  if (Object.values(metrics).some((value) => value === null)) return null;
+  return calculateCvssScore(metrics as CvssMetrics).baseScore;
+}
 
+function severityFromScore(score: number): ScaVulnerability['severity'] {
+  if (score >= 9) return 'CRITICAL';
+  if (score >= 7) return 'HIGH';
+  if (score >= 4) return 'MEDIUM';
+  return 'LOW';
+}
+
+function osvSeverity(vuln: Record<string, unknown>): { severity: ScaVulnerability['severity']; cvssScore: number } {
   const scores = Array.isArray(vuln.severity) ? vuln.severity : [];
+  let cvssScore = 0;
   for (const entry of scores) {
     const raw = String((entry as { score?: string }).score || '');
     const numeric = Number(raw);
-    const score = Number.isFinite(numeric) ? numeric : Number((raw.match(/(\d+\.\d+)/) || [])[1]);
-    if (!Number.isFinite(score) || score <= 0) continue;
-    if (score >= 9) return { severity: 'CRITICAL', cvssScore: score };
-    if (score >= 7) return { severity: 'HIGH', cvssScore: score };
-    if (score >= 4) return { severity: 'MEDIUM', cvssScore: score };
-    return { severity: 'LOW', cvssScore: score };
+    const score = Number.isFinite(numeric) && numeric > 0 ? numeric : cvss3BaseScoreFromVector(raw);
+    if (score && score > 0) {
+      cvssScore = score;
+      break;
+    }
   }
+
+  const databaseSpecific = vuln.database_specific as { severity?: string } | undefined;
+  const label = String(databaseSpecific?.severity || '').toUpperCase();
+  if (label === 'CRITICAL') return { severity: 'CRITICAL', cvssScore };
+  if (label === 'HIGH') return { severity: 'HIGH', cvssScore };
+  if (label === 'MODERATE' || label === 'MEDIUM') return { severity: 'MEDIUM', cvssScore };
+  if (label === 'LOW') return { severity: 'LOW', cvssScore };
+  if (cvssScore > 0) return { severity: severityFromScore(cvssScore), cvssScore };
+  // The advisory carries no rating. cvssScore 0 marks it as unrated.
   return { severity: 'MEDIUM', cvssScore: 0 };
 }
 
-function osvFixedVersion(vuln: Record<string, unknown>): string {
+function osvFixedVersion(vuln: Record<string, unknown>, packageName: string): string {
   const affected = Array.isArray(vuln.affected) ? vuln.affected : [];
-  for (const item of affected) {
+  const sameName = affected.filter((item) => (item as { package?: { name?: string } }).package?.name === packageName);
+  for (const item of sameName.length > 0 ? sameName : affected) {
     const ranges = Array.isArray((item as { ranges?: unknown }).ranges) ? (item as { ranges: unknown[] }).ranges : [];
     for (const range of ranges) {
       const events = Array.isArray((range as { events?: unknown }).events) ? (range as { events: unknown[] }).events : [];
@@ -445,7 +564,7 @@ function osvToVulnerability(vuln: Record<string, unknown>, pkg: DependencyPackag
     severity: ranked.severity,
     cvssScore: ranked.cvssScore,
     vulnerableVersions: pkg.version,
-    fixedVersion: osvFixedVersion(vuln),
+    fixedVersion: osvFixedVersion(vuln, pkg.name),
     cweId: String((vuln.database_specific as { cwe_ids?: string[] } | undefined)?.cwe_ids?.[0] || ''),
     affectedPackage: `${pkg.name}@${pkg.version}`,
     references
@@ -468,8 +587,43 @@ function recountSca(packages: DependencyPackage[], base: ScaAnalysisReport, osvS
   };
 }
 
+const OSV_API = 'https://api.osv.dev/v1';
+const OSV_BATCH_SIZE = 1000;
+const OSV_DETAIL_CONCURRENCY = 8;
+const osvDetailCache = new Map<string, Record<string, unknown>>();
+
+type OsvVuln = Record<string, unknown>;
+
+function isBareOsvRecord(vuln: OsvVuln): boolean {
+  return vuln.summary === undefined && vuln.details === undefined && vuln.affected === undefined;
+}
+
 /**
- * Asks api.osv.dev for advisories. Package names and versions leave the browser.
+ * /v1/querybatch answers with id and modified only. The summary, severity and
+ * fixed version come from /v1/vulns/{id}, one request per advisory.
+ */
+async function hydrateOsvRecords(ids: string[], fetchImpl: OsvFetch, signal: AbortSignal): Promise<void> {
+  const pending = ids.filter((id) => !osvDetailCache.has(id));
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < pending.length) {
+      const id = pending[cursor];
+      cursor += 1;
+      try {
+        const response = await fetchImpl(`${OSV_API}/vulns/${encodeURIComponent(id)}`, { signal });
+        if (!response.ok) continue;
+        const detail = await response.json() as Record<string, unknown>;
+        if (detail && typeof detail === 'object' && detail.id) osvDetailCache.set(id, detail);
+      } catch {
+        // A advisory without detail stays listed by id.
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(OSV_DETAIL_CONCURRENCY, pending.length) }, worker));
+}
+
+/**
+ * Asks api.osv.dev for advisories. Package names and versions leave the machine.
  * A failed request leaves the local catalog unchanged.
  */
 export async function enrichScaReportWithOsv(
@@ -478,31 +632,47 @@ export async function enrichScaReportWithOsv(
 ): Promise<ScaAnalysisReport> {
   if (report.packages.length === 0) return report;
 
-  const queried = report.packages.slice(0, 100);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
+  const timer = setTimeout(() => controller.abort(), 30000);
   try {
-    const response = await fetchImpl('https://api.osv.dev/v1/querybatch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        queries: queried.map((pkg) => ({
-          package: { name: pkg.name, ecosystem: ecosystemForManifest(pkg.manifestFile) },
-          version: pkg.version
-        }))
-      }),
-      signal: controller.signal
-    });
-    const contentType = response.headers.get('content-type') || '';
-    if (!response.ok || !contentType.includes('application/json')) {
-      return { ...report, osvStatus: 'UNREACHABLE' };
+    const remoteByIndex: OsvVuln[][] = [];
+    for (let start = 0; start < report.packages.length; start += OSV_BATCH_SIZE) {
+      const chunk = report.packages.slice(start, start + OSV_BATCH_SIZE);
+      const response = await fetchImpl(`${OSV_API}/querybatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          queries: chunk.map((pkg) => ({
+            package: { name: pkg.name, ecosystem: ecosystemForManifest(pkg.manifestFile) },
+            version: pkg.version
+          }))
+        }),
+        signal: controller.signal
+      });
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('application/json')) {
+        return { ...report, osvStatus: 'UNREACHABLE' };
+      }
+      const body = await response.json() as { results?: Array<{ vulns?: OsvVuln[] }> };
+      const results = Array.isArray(body.results) ? body.results : [];
+      chunk.forEach((_, index) => {
+        const vulns = results[index]?.vulns;
+        remoteByIndex[start + index] = Array.isArray(vulns) ? vulns : [];
+      });
     }
-    const body = await response.json() as { results?: Array<{ vulns?: Record<string, unknown>[] }> };
-    const results = Array.isArray(body.results) ? body.results : [];
+
+    const bareIds = new Set<string>();
+    for (const vulns of remoteByIndex) {
+      for (const vuln of vulns) {
+        if (vuln.id && isBareOsvRecord(vuln)) bareIds.add(String(vuln.id));
+      }
+    }
+    if (bareIds.size > 0) await hydrateOsvRecords([...bareIds], fetchImpl, controller.signal);
+
     const packages = report.packages.map((pkg, index) => {
-      const remote = results[index]?.vulns;
-      if (!Array.isArray(remote)) return pkg;
+      const remote = remoteByIndex[index] || [];
       const added = remote
+        .map((vuln) => (isBareOsvRecord(vuln) && osvDetailCache.get(String(vuln.id))) || vuln)
         .map((vuln) => osvToVulnerability(vuln, pkg))
         .filter((vuln): vuln is ScaVulnerability => vuln !== null);
       const licenseExplanation = pkg.license === 'NOT_IN_CATALOG'
@@ -510,10 +680,17 @@ export async function enrichScaReportWithOsv(
           ? 'Licença ausente do catálogo local. Vulnerabilidades desta versão vieram do OSV.'
           : 'Licença ausente do catálogo local. O OSV não publicou vulnerabilidade para esta versão.')
         : pkg.licenseExplanation;
+      const vulnerabilities = [...pkg.vulnerabilities, ...added];
+      const fixes = vulnerabilities.map((vuln) => vuln.fixedVersion).filter((fixed) => /^\d/.test(fixed));
+      const recommendedVersion = fixes.reduce<string | undefined>(
+        (best, fixed) => (!best || isVersionSmaller(best, fixed) ? fixed : best),
+        undefined
+      );
       return {
         ...pkg,
         licenseExplanation,
-        vulnerabilities: [...pkg.vulnerabilities, ...added]
+        vulnerabilities,
+        recommendedVersion: recommendedVersion || pkg.recommendedVersion
       };
     });
     return recountSca(packages, report, 'OK');

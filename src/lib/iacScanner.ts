@@ -33,6 +33,26 @@ export interface IacReport {
   };
 }
 
+/** Every rule this scanner implements. Used to count the checks that passed. */
+const IAC_RULE_IDS = [
+  'IAC-COMPOSE-001',
+  'IAC-COMPOSE-002',
+  'IAC-COMPOSE-003',
+  'IAC-DOCKER-001',
+  'IAC-DOCKER-002',
+  'IAC-DOCKER-003',
+  'IAC-DOCKER-004',
+  'IAC-GHA-001',
+  'IAC-GHA-002',
+  'IAC-K8S-001',
+  'IAC-K8S-002',
+  'IAC-K8S-003',
+  'IAC-TF-001',
+  'IAC-TF-002',
+  'IAC-TF-003',
+  'IAC-TF-004',
+];
+
 export function scanInfrastructureAsCode(files: ScannedFile[]): IacReport {
   if (!files || files.length === 0) {
     return {
@@ -53,6 +73,7 @@ export function scanInfrastructureAsCode(files: ScannedFile[]): IacReport {
 
   const findings: IacFinding[] = [];
   let totalFilesScanned = 0;
+  const scannedAs: Array<{ file: string; prefix: string }> = [];
 
   for (const file of files) {
     const fileName = file.name.toLowerCase();
@@ -64,13 +85,14 @@ export function scanInfrastructureAsCode(files: ScannedFile[]): IacReport {
     // ==========================================
     if (fileName === 'dockerfile' || fileName.endsWith('.dockerfile') || fileName === 'containerfile') {
       totalFilesScanned++;
+      scannedAs.push({ file: file.path, prefix: 'IAC-DOCKER-' });
       let hasUserDirective = false;
 
       lines.forEach((line, idx) => {
         const trimmed = line.trim();
         const lineNum = idx + 1;
 
-        if (trimmed.startsWith('USER ') && !trimmed.includes('root') && !trimmed.includes('0')) {
+        if (/^USER\s+(?!(?:root|0)(?::|\s|$))\S+/i.test(trimmed)) {
           hasUserDirective = true;
         }
 
@@ -152,6 +174,7 @@ export function scanInfrastructureAsCode(files: ScannedFile[]): IacReport {
     // ==========================================
     if (fileName.includes('compose') && (fileName.endsWith('.yml') || fileName.endsWith('.yaml'))) {
       totalFilesScanned++;
+      scannedAs.push({ file: file.path, prefix: 'IAC-COMPOSE-' });
       lines.forEach((line, idx) => {
         const trimmed = line.trim();
         const lineNum = idx + 1;
@@ -211,6 +234,7 @@ export function scanInfrastructureAsCode(files: ScannedFile[]): IacReport {
     // ==========================================
     if ((fileName.endsWith('.yaml') || fileName.endsWith('.yml')) && (file.content.includes('apiVersion:') && (file.content.includes('kind: Deployment') || file.content.includes('kind: Pod')))) {
       totalFilesScanned++;
+      scannedAs.push({ file: file.path, prefix: 'IAC-K8S-' });
       const content = file.content;
 
       if (content.includes('privileged: true')) {
@@ -267,6 +291,7 @@ export function scanInfrastructureAsCode(files: ScannedFile[]): IacReport {
     // ==========================================
     if (filePath.includes('.github/workflows') || filePath.includes('.gitlab-ci')) {
       totalFilesScanned++;
+      scannedAs.push({ file: file.path, prefix: 'IAC-GHA-' });
       lines.forEach((line, idx) => {
         const trimmed = line.trim();
         const lineNum = idx + 1;
@@ -310,6 +335,7 @@ export function scanInfrastructureAsCode(files: ScannedFile[]): IacReport {
     // ==========================================
     if (fileName.endsWith('.tf') || fileName.endsWith('.tfvars') || fileName.endsWith('.tf.json')) {
       totalFilesScanned++;
+      scannedAs.push({ file: file.path, prefix: 'IAC-TF-' });
       const tfContent = file.content;
 
       lines.forEach((line, idx) => {
@@ -390,12 +416,17 @@ export function scanInfrastructureAsCode(files: ScannedFile[]): IacReport {
     }
   }
 
-  const passedChecks = Math.max(0, 15 - findings.length);
+  // A check passes for a file when its rule applies to that file type and raised nothing there.
+  const passedChecks = scannedAs.reduce((total, scanned) => {
+    const applicable = IAC_RULE_IDS.filter((ruleId) => ruleId.startsWith(scanned.prefix));
+    const failed = new Set(findings.filter((f) => f.file === scanned.file && f.ruleId.startsWith(scanned.prefix)).map((f) => f.ruleId));
+    return total + applicable.length - failed.size;
+  }, 0);
   const failedChecks = findings.length;
   const criticalDeduction = findings.filter(f => f.severity === 'CRITICAL').length * 20;
   const highDeduction = findings.filter(f => f.severity === 'HIGH').length * 10;
   const mediumDeduction = findings.filter(f => f.severity === 'MEDIUM').length * 5;
-  const iacPostureScore = Math.max(10, Math.min(100, 100 - (criticalDeduction + highDeduction + mediumDeduction)));
+  const iacPostureScore = Math.max(0, Math.min(100, 100 - (criticalDeduction + highDeduction + mediumDeduction)));
 
   const summaryByTech = {
     DOCKER: {

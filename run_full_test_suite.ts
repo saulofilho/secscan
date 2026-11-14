@@ -441,7 +441,7 @@ async function runTestSuite() {
     assert(spdx.components.length > 0, 'SPDX deve listar pacotes', test);
 
     test.durationMs = Date.now() - t0;
-    test.summary = `Gerou artefatos SBOM CycloneDX v1.5 e SPDX v2.3 com ${cycloneDx.components.length} componentes e hashes de integridade.`;
+    test.summary = `Gerou artefatos SBOM CycloneDX v1.5 e SPDX v2.3 com ${cycloneDx.components.length} componentes (${cycloneDx.componentsWithHash} com digest de lockfile).`;
     test.details = {
       cycloneDxVersion: cycloneDx.version,
       componentsCount: cycloneDx.components.length,

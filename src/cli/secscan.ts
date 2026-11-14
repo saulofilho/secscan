@@ -2,7 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import { DEFAULT_RULES } from '../lib/defaultRules';
-import { scanSoftwareCompositionAnalysis } from '../lib/scaScanner';
+import { enrichScaReportWithOsv, scanSoftwareCompositionAnalysis } from '../lib/scaScanner';
 import { scanInfrastructureAsCode } from '../lib/iacScanner';
 import { scanWorkspaceEntropy } from '../lib/entropyScanner';
 import { extractLinkFinderEndpoints } from '../lib/linkFinderEngine';
@@ -99,7 +99,7 @@ Commands that read your files use the current directory when you omit the target
 Commands marked as a screen scenario repeat that screen. They do not scan a network, host, feed, or console.
 
   scan          Static rules from src/lib/defaultRules.ts. Default when the first argument is a directory.
-  sca           package.json and requirements.txt against the local catalog
+  sca           package.json, package-lock.json and requirements.txt against api.osv.dev (--offline skips it)
   iac           Dockerfile, Compose, Kubernetes and Terraform
   entropy       High-entropy quoted tokens
   endpoints     Paths mined from source
@@ -108,7 +108,7 @@ Commands marked as a screen scenario repeat that screen. They do not scan a netw
   ssrf          One URL, classified without sending a request
   dockerfile    One Dockerfile
   iam           One IAM policy JSON file
-  sbom          CycloneDX from the manifests. Hashes are placeholders, not file digests
+  sbom          CycloneDX from the manifests. Digests come from package-lock.json integrity
   compliance    Readiness from the same static findings as scan
 
 Options:
@@ -118,6 +118,7 @@ Options:
   --fail-on <critical|high|medium>  Exit 1 when a scan finding meets the severity
   --max-risk <score>                Exit 1 when the scan risk score exceeds the threshold
   --output <file>                   Write the report to a file
+  --offline                         sca and sbom: do not query api.osv.dev
   --help                            Show this help message
 `);
 }
@@ -140,7 +141,9 @@ function walkFiles(dir: string, accept: (name: string) => boolean, bucket: strin
   }
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const fullPath = path.join(dir, entry.name);
-    if (shouldIgnore(fullPath)) continue;
+    // The scan ignores lockfiles as noise, but SCA and SBOM read package-lock.json on purpose.
+    const wantedLock = entry.isFile() && entry.name === 'package-lock.json' && accept(entry.name);
+    if (!wantedLock && shouldIgnore(fullPath)) continue;
     if (entry.isDirectory()) walkFiles(fullPath, accept, bucket);
     else if (accept(entry.name)) bucket.push(fullPath);
   }
@@ -188,26 +191,49 @@ function requireTarget(args: string[], usage: string): string {
   return target;
 }
 
+async function runDependencyTool(command: 'sca' | 'sbom', dir: string, args: string[]): Promise<void> {
+  const files = walkFiles(dir, (name) => /^(package\.json|package-lock\.json|requirements\.txt)$/i.test(name)).map(toScanned);
+  const local = scanSoftwareCompositionAnalysis(files);
+  const offline = args.includes('--offline');
+  const report = offline ? local : await enrichScaReportWithOsv(local);
+  const source = offline
+    ? 'OSV não consultado (--offline). Resultado limitado ao catálogo local.'
+    : report.osvStatus === 'OK'
+      ? 'Vulnerabilidades consultadas em api.osv.dev. Nomes e versões dos pacotes saíram desta máquina.'
+      : 'OSV indisponível. Resultado limitado ao catálogo local.';
+
+  if (command === 'sca') {
+    emit([
+      `SCA  pacotes=${report.totalDependencies}  vulneráveis=${report.vulnerableCount}  críticas=${report.criticalCount}  altas=${report.highCount}  fonte=${report.catalogMode}`,
+      source,
+      ...report.packages.map((pkg) => `${pkg.name}@${pkg.version}  ${pkg.type}  vulns=${pkg.vulnerabilities.length}${pkg.recommendedVersion ? `  corrigido_em=${pkg.recommendedVersion}` : ''}  ${pkg.manifestFile}`),
+      ...report.allVulnerabilities.map((vuln) => `${vuln.severity.padEnd(8)} ${vuln.cveId}  ${vuln.affectedPackage}  ${vuln.title}`),
+    ], report, args);
+    return;
+  }
+  const sbom = generateCycloneDxSbom(files, report);
+  emit([
+    `SBOM ${sbom.format} ${sbom.version}  componentes=${sbom.totalComponents}  com_digest=${sbom.componentsWithHash}  ${sbom.appName}@${sbom.appVersion}`,
+    sbom.componentsWithHash > 0
+      ? 'Os digests vêm do campo integrity do package-lock.json.'
+      : 'Nenhum package-lock.json encontrado: o SBOM sai sem digest.',
+    source,
+    ...sbom.components.map((component) => `${component.purl}  license=${component.license}  vulns=${component.vulnerabilitiesCount}`),
+  ], format_payload(sbom, args), args);
+}
+
+function format_payload(sbom: { rawJson: string }, args: string[]): unknown {
+  return flag(args, '--format') === 'json' ? JSON.parse(sbom.rawJson) : sbom;
+}
+
 function runTool(command: string, args: string[]): void {
   if (command === 'sca' || command === 'sbom' || command === 'entropy' || command === 'endpoints' || command === 'iac') {
     const dir = path.resolve(requireTarget(args, `secscan ${command} <diretório>`));
     if (command === 'sca' || command === 'sbom') {
-      const files = walkFiles(dir, (name) => /^(package\.json|requirements\.txt)$/i.test(name)).map(toScanned);
-      if (command === 'sca') {
-        const report = scanSoftwareCompositionAnalysis(files);
-        emit([
-          `SCA  pacotes=${report.totalDependencies}  vulneráveis=${report.vulnerableCount}  catálogo=${report.catalogMode} (${report.catalogSize})`,
-          'A licença ausente do catálogo local fica NOT_IN_CATALOG. Esta chamada não consulta o OSV.',
-          ...report.packages.map((pkg) => `${pkg.name}@${pkg.version}  ${pkg.license}  vulns=${pkg.vulnerabilities.length}  ${pkg.manifestFile}`),
-        ], report, args);
-        return;
-      }
-      const sbom = generateCycloneDxSbom(files);
-      emit([
-        `SBOM ${sbom.format} ${sbom.version}  componentes=${sbom.totalComponents}  ${sbom.appName}@${sbom.appVersion}`,
-        'Os hashes deste SBOM são placeholders determinísticos, não o digest dos arquivos.',
-        ...sbom.components.map((component) => `${component.purl}  license=${component.license}  vulns=${component.vulnerabilitiesCount}`),
-      ], sbom, args);
+      runDependencyTool(command, dir, args).catch((error) => {
+        console.error(`[SecScan] ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+      });
       return;
     }
     if (command === 'iac') {

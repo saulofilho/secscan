@@ -62,10 +62,11 @@ export function auditDockerfile(content: string, fileName: string = 'Dockerfile'
         baseImage: 'none',
         tag: 'latest',
         isOutdated: false,
-        latestSecureTag: 'distroless/static-debian12:nonroot',
-        isPinnedByHash: true,
-        knownCveCount: 0,
-        criticalCves: []
+        isFloatingTag: false,
+        latestSecureTag: '',
+        isPinnedByHash: false,
+        eolStatus: 'NOT_CHECKED',
+        cveScanStatus: 'NOT_SCANNED'
       },
       findings: [],
       summary: {
@@ -98,16 +99,18 @@ export function auditDockerfile(content: string, fileName: string = 'Dockerfile'
     if (line.toUpperCase().startsWith('FROM ')) {
       const parts = line.split(/\s+/);
       if (parts[1]) {
-        const imgParts = parts[1].split(':');
-        baseImage = imgParts[0];
-        baseTag = imgParts[1] || 'latest';
+        const reference = (parts[1].startsWith('--') ? parts[2] || '' : parts[1]).split('@')[0];
+        const tagAt = reference.lastIndexOf(':');
+        const hasTag = tagAt > reference.lastIndexOf('/');
+        baseImage = hasTag ? reference.slice(0, tagAt) : reference;
+        baseTag = hasTag ? reference.slice(tagAt + 1) : 'latest';
       }
     }
 
     // Check 1: USER directive
     if (line.toUpperCase().startsWith('USER ')) {
       hasUserDirective = true;
-      if (line.toLowerCase().includes('root') || line.toLowerCase().includes('0')) {
+      if (/^USER\s+(?:root|0)(?::\S*)?\s*$/i.test(line)) {
         hasRootUserExplicit = true;
         findings.push({
           id: `cont-user-root-${lineNum}`,
@@ -279,23 +282,16 @@ export function auditDockerfile(content: string, fileName: string = 'Dockerfile'
     });
   }
 
-  // Base image audit
-  const isLatest = baseTag === 'latest' || baseTag === '';
-  const isOldNode = baseImage === 'node' && (baseTag.startsWith('10') || baseTag.startsWith('12') || baseTag.startsWith('14') || baseTag.startsWith('16'));
-  const isOldPython = baseImage === 'python' && (baseTag.startsWith('2') || baseTag.startsWith('3.6') || baseTag.startsWith('3.7') || baseTag.startsWith('3.8'));
-
+  // Base image audit. Offline it only states what the Dockerfile shows.
   const baseImageAudit: ContainerBaseImageAudit = {
     baseImage,
     tag: baseTag,
-    isOutdated: isLatest || isOldNode || isOldPython,
-    latestSecureTag: baseImage === 'node' ? '20-alpine' : baseImage === 'python' ? '3.12-slim' : 'distroless/static-debian12:nonroot',
-    isPinnedByHash: content.includes('@sha256:'),
-    knownCveCount: isOldNode ? 38 : isOldPython ? 42 : isLatest ? 14 : 0,
-    criticalCves: isOldNode 
-      ? ['CVE-2023-30589 (OpenSSL Crash)', 'CVE-2022-35256 (HTTP Request Smuggling)', 'CVE-2021-22918 (Buffer Overflow)']
-      : isOldPython 
-      ? ['CVE-2023-24329 (URL Parsing Bypass)', 'CVE-2022-45061 (DoS in CPU float conversion)']
-      : []
+    isOutdated: false,
+    isFloatingTag: baseTag === 'latest' || baseTag === '',
+    latestSecureTag: '',
+    isPinnedByHash: /^\s*FROM\s+\S+@sha256:[0-9a-f]{64}/im.test(content),
+    eolStatus: 'NOT_CHECKED',
+    cveScanStatus: 'NOT_SCANNED'
   };
 
   const summary = {
@@ -308,7 +304,7 @@ export function auditDockerfile(content: string, fileName: string = 'Dockerfile'
   // Calculate score
   let penalty = summary.critical * 30 + summary.high * 15 + summary.medium * 8 + summary.low * 3;
   if (!baseImageAudit.isPinnedByHash) penalty += 5;
-  if (baseImageAudit.isOutdated) penalty += 15;
+  if (baseImageAudit.isFloatingTag) penalty += 10;
 
   const totalScore = Math.max(0, 100 - penalty);
   const status = summary.critical > 0 || totalScore < 50 ? 'CRITICAL_RISK' : totalScore < 80 ? 'NEEDS_REVIEW' : 'SECURE';
@@ -369,4 +365,117 @@ COPY --chown=65532:65532 . .
 USER 65532:65532
 HEALTHCHECK --interval=30s --timeout=3s CMD ["/app/healthcheck"]
 ENTRYPOINT ["/app/main"]`;
+}
+
+/** Docker Hub official image name -> endoflife.date product slug. */
+const EOL_PRODUCTS: Record<string, string> = {
+  node: 'nodejs',
+  python: 'python',
+  golang: 'go',
+  ruby: 'ruby',
+  php: 'php',
+  nginx: 'nginx',
+  postgres: 'postgresql',
+  mysql: 'mysql',
+  mariadb: 'mariadb',
+  mongo: 'mongodb',
+  redis: 'redis',
+  alpine: 'alpine-linux',
+  debian: 'debian',
+  ubuntu: 'ubuntu',
+  centos: 'centos',
+  rockylinux: 'rocky-linux',
+  amazonlinux: 'amazon-linux',
+  'eclipse-temurin': 'eclipse-temurin',
+  httpd: 'apache-http-server',
+  tomcat: 'tomcat',
+  elasticsearch: 'elasticsearch',
+  rabbitmq: 'rabbitmq'
+};
+
+interface EolCycle {
+  cycle: string;
+  eol?: string | boolean;
+  lts?: string | boolean;
+  latest?: string;
+}
+
+const EOL_PENALTY = 15;
+const eolCache = new Map<string, EolCycle[]>();
+
+function officialImageName(baseImage: string): string | null {
+  const name = baseImage.replace(/^(?:docker\.io\/)?(?:library\/)?/, '');
+  return name.includes('/') ? null : name.toLowerCase();
+}
+
+function isPastEol(cycle: EolCycle, today: string): boolean {
+  if (cycle.eol === true) return true;
+  return typeof cycle.eol === 'string' && cycle.eol <= today;
+}
+
+/**
+ * Asks endoflife.date whether the base image release cycle is still supported
+ * and adjusts the score. The image name and tag leave the machine. A failed
+ * request leaves the report unchanged apart from eolStatus.
+ */
+export async function enrichContainerAuditWithEol(
+  report: ContainerAuditReport,
+  fetchImpl: (input: string, init?: RequestInit) => Promise<Response> = fetch,
+  now: Date = new Date()
+): Promise<ContainerAuditReport> {
+  const audit = report.baseImageAudit;
+  const withStatus = (patch: Partial<ContainerBaseImageAudit>): ContainerAuditReport => ({
+    ...report,
+    baseImageAudit: { ...audit, ...patch }
+  });
+
+  const image = officialImageName(audit.baseImage);
+  const product = image ? EOL_PRODUCTS[image] : undefined;
+  const version = (audit.tag.match(/^v?(\d+(?:\.\d+)*)/) || [])[1];
+  if (!product || !version) return withStatus({ eolStatus: 'UNKNOWN_PRODUCT' });
+
+  let cycles = eolCache.get(product);
+  if (!cycles) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetchImpl(`https://endoflife.date/api/${product}.json`, { signal: controller.signal });
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('application/json')) return withStatus({ eolStatus: 'UNREACHABLE' });
+      const body = await response.json();
+      if (!Array.isArray(body)) return withStatus({ eolStatus: 'UNREACHABLE' });
+      cycles = body as EolCycle[];
+      eolCache.set(product, cycles);
+    } catch {
+      return withStatus({ eolStatus: 'UNREACHABLE' });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  const matched = cycles
+    .filter((cycle) => version === String(cycle.cycle) || version.startsWith(`${cycle.cycle}.`))
+    .sort((a, b) => String(b.cycle).length - String(a.cycle).length)[0];
+  if (!matched) return withStatus({ eolStatus: 'UNKNOWN_PRODUCT' });
+
+  const today = now.toISOString().slice(0, 10);
+  const supported = cycles.filter((cycle) => !isPastEol(cycle, today));
+  const recommended = supported.find((cycle) => typeof cycle.lts === 'string' ? cycle.lts <= today : cycle.lts === true) || supported[0];
+  const eol = isPastEol(matched, today);
+  const totalScore = Math.max(0, report.totalScore - (eol ? EOL_PENALTY : 0));
+
+  return {
+    ...report,
+    totalScore,
+    status: report.summary.critical > 0 || totalScore < 50 ? 'CRITICAL_RISK' : totalScore < 80 ? 'NEEDS_REVIEW' : 'SECURE',
+    baseImageAudit: {
+      ...audit,
+      isOutdated: eol,
+      eolStatus: eol ? 'EOL' : 'SUPPORTED',
+      eolDate: typeof matched.eol === 'string' ? matched.eol : undefined,
+      eolCycle: String(matched.cycle),
+      latestPatch: matched.latest,
+      latestSecureTag: recommended ? String(recommended.cycle) : ''
+    }
+  };
 }

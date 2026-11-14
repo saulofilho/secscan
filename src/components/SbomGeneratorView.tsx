@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   FileSpreadsheet, 
   Download, 
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { ScannedFile } from '../types';
 import { generateCycloneDxSbom, generateSpdxSbom, SbomDocument } from '../lib/sbomGenerator';
+import { enrichScaReportWithOsv, scanSoftwareCompositionAnalysis } from '../lib/scaScanner';
 
 interface SbomGeneratorViewProps {
   files: ScannedFile[];
@@ -24,9 +25,24 @@ export const SbomGeneratorView: React.FC<SbomGeneratorViewProps> = ({ files }) =
   const [copiedJson, setCopiedJson] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState(false);
 
+  const localSca = useMemo(() => scanSoftwareCompositionAnalysis(files), [files]);
+  const [sca, setSca] = useState(localSca);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSca(localSca);
+    if (localSca.packages.length === 0) return;
+    enrichScaReportWithOsv(localSca).then((next) => {
+      if (!cancelled) setSca(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [localSca]);
+
   const sbom: SbomDocument = useMemo(() => {
-    return format === 'CycloneDX' ? generateCycloneDxSbom(files) : generateSpdxSbom(files);
-  }, [files, format]);
+    return format === 'CycloneDX' ? generateCycloneDxSbom(files, sca) : generateSpdxSbom(files, sca);
+  }, [files, format, sca]);
 
   const handleDownload = () => {
     const filename = `${sbom.appName}-${sbom.format.toLowerCase()}-sbom-${Date.now()}.json`;
@@ -120,7 +136,11 @@ export const SbomGeneratorView: React.FC<SbomGeneratorViewProps> = ({ files }) =
           <div>
             <span className="text-[10px] text-zinc-500 uppercase block">Componentes Catalogados</span>
             <span className="text-sm font-bold text-indigo-400">{sbom.totalComponents} bibliotecas</span>
-            <span className="text-[11px] text-zinc-500 block">com hashes SHA-256</span>
+            <span className="text-[11px] text-zinc-500 block">
+              {sbom.componentsWithHash > 0
+                ? `${sbom.componentsWithHash} com digest do lockfile`
+                : 'sem lockfile: nenhum digest'}
+            </span>
           </div>
           <div>
             <span className="text-[10px] text-zinc-500 uppercase block">Identificador Único</span>
@@ -167,7 +187,7 @@ export const SbomGeneratorView: React.FC<SbomGeneratorViewProps> = ({ files }) =
                 <th className="px-4 py-2.5">Versão</th>
                 <th className="px-4 py-2.5">Package URL (purl)</th>
                 <th className="px-4 py-2.5">Licença</th>
-                <th className="px-4 py-2.5">Hash SHA-256</th>
+                <th className="px-4 py-2.5">Digest (lockfile)</th>
                 <th className="px-4 py-2.5 text-right">Vulnerabilidades</th>
               </tr>
             </thead>
@@ -186,7 +206,7 @@ export const SbomGeneratorView: React.FC<SbomGeneratorViewProps> = ({ files }) =
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-zinc-500 font-mono text-[10px] max-w-[140px] truncate">
-                    {comp.hashes.sha256}
+                    {comp.hashes[0] ? `${comp.hashes[0].alg}:${comp.hashes[0].content}` : 'sem lockfile'}
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     {comp.vulnerabilitiesCount > 0 ? (

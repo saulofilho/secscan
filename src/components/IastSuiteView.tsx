@@ -36,7 +36,6 @@ import {
 } from '../types/iast';
 import {
   INITIAL_IAST_HOOKS,
-  IAST_SIMULATION_SCENARIOS,
   runIastRuntimeEmulation
 } from '../lib/iastEngine';
 import { IastTaintFlowVisualizer } from './IastTaintFlowVisualizer';
@@ -57,17 +56,9 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
   onSelectFile
 }) => {
   const [hooks, setHooks] = useState<IastHookSensor[]>(INITIAL_IAST_HOOKS);
-  const [scenarios] = useState<IastSimulationScenario[]>(IAST_SIMULATION_SCENARIOS);
-  const [selectedScenarioId, setSelectedScenarioId] = useState<string>(IAST_SIMULATION_SCENARIOS[0].id);
   const [isEmulating, setIsEmulating] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'FINDINGS' | 'TAINT_VISUALIZER' | 'HOOKS_REGISTRY' | 'SIMULATION_LAB' | 'ARCHITECTURE'>('FINDINGS');
+  const [activeTab, setActiveTab] = useState<'FINDINGS' | 'TAINT_VISUALIZER' | 'HOOKS_REGISTRY' | 'ARCHITECTURE'>('FINDINGS');
   
-  // Custom scenario form
-  const [customRoute, setCustomRoute] = useState<string>('/api/v1/orders/checkout');
-  const [customParam, setCustomParam] = useState<string>('voucherCode');
-  const [customPayload, setCustomPayload] = useState<string>("' UNION SELECT 1, cc_number, cvv FROM credit_cards --");
-  const [customSink, setCustomSink] = useState<string>('pgClient.query(`SELECT * FROM vouchers WHERE code = \'${req.body.voucherCode}\'`)');
-
   // Active execution report state
   const [iastReport, setIastReport] = useState<IastExecutionReport>(() => {
     return report.iastReport || runIastRuntimeEmulation(files, INITIAL_IAST_HOOKS, undefined, report.jsMiner?.dangerousSinks, report.apiEndpoints);
@@ -108,30 +99,14 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
     });
   };
 
-  const handleRunSimulation = (scenario?: IastSimulationScenario) => {
+  const handleRunSimulation = () => {
     setIsEmulating(true);
-    setTimeout(() => {
-      const newReport = runIastRuntimeEmulation(files, hooks, scenario, report.jsMiner?.dangerousSinks, report.apiEndpoints);
-      setIastReport(newReport);
-      if (newReport.findings.length > 0) {
-        setSelectedFindingId(newReport.findings[0].id);
-      }
-      setIsEmulating(false);
-    }, 450);
-  };
-
-  const handleRunCustomSimulation = () => {
-    const custom: IastSimulationScenario = {
-      id: `custom-${Date.now()}`,
-      name: `Emulação Interativa Customizada (${customRoute})`,
-      targetRoute: customRoute,
-      httpMethod: 'POST',
-      inputPayload: { [customParam]: customPayload },
-      vulnerabilityTarget: customSink,
-      attackVectorType: 'SQLi',
-      description: 'Execução de cenário customizado com hooks ativos em tempo real.'
-    };
-    handleRunSimulation(custom);
+    const newReport = runIastRuntimeEmulation(files, hooks, undefined, report.jsMiner?.dangerousSinks, report.apiEndpoints);
+    setIastReport(newReport);
+    if (newReport.findings.length > 0) {
+      setSelectedFindingId(newReport.findings[0].id);
+    }
+    setIsEmulating(false);
   };
 
   const copyToClipboard = (text: string, id: string) => {
@@ -150,15 +125,15 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
               <Activity className="w-5 h-5" />
             </span>
             <h1 className="text-xl font-bold text-white tracking-wide flex items-center gap-2">
-              IAST Runtime Emulation Suite
-              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-200 font-bold">
-                Laboratório
+              Análise de Taint (Source → Sink)
+              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 font-bold">
+                Estática
               </span>
             </h1>
           </div>
           <p className="text-xs text-white/70 max-w-2xl leading-relaxed">
-            Aplica payloads de exemplo (SQLi, comando, path traversal, SSRF e XSS) sobre trechos que casam com o padrão.
-            Não há agente dentro do processo da aplicação.
+            Segue dados da requisição (req.body, req.query, req.params…) até chamadas perigosas dentro de cada arquivo JS/TS.
+            É análise estática: nada é executado e não há agente no processo da aplicação. Os achados são suspeitas a confirmar.
           </p>
         </div>
 
@@ -173,12 +148,12 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
             {isEmulating ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Emulando Requisições...</span>
+                <span>Analisando…</span>
               </>
             ) : (
               <>
                 <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Emular Runtime & Hooks</span>
+                <span>Reanalisar workspace</span>
               </>
             )}
           </button>
@@ -203,61 +178,52 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
             Origem dos Dados: <strong className="text-white">{files.length > 0 ? `Seu Workspace Real (${files.length} arquivos analisados)` : 'Workspace Limpo (0 arquivos)'}</strong>
           </span>
           <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 font-bold uppercase">
-            {files.length > 0 ? 'IAST Ativo no Código' : 'Sem Dados Mockados'}
+            {files.length > 0 ? 'Análise estática' : 'Sem arquivos'}
           </span>
         </div>
         <span className="text-[11px] text-zinc-400">
           {files.length > 0
-            ? 'Rastreando sinks e endpoints reais detectados no seu código fonte.'
-            : 'Nenhum dado mockado carregado. Faça upload ou audite uma URL para analisar.'}
+            ? 'Sinks e origens lidos do seu código fonte.'
+            : 'Faça upload ou audite uma URL para analisar.'}
         </span>
       </div>
 
       {/* Metric Cards Row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         <div className="p-3.5 rounded-xl border border-white/10 bg-black/40 space-y-1">
-          <span className="text-[10px] font-mono text-white/50 uppercase tracking-wider block">Achados Confirmados</span>
+          <span className="text-[10px] font-mono text-white/50 uppercase tracking-wider block">Fluxos Suspeitos</span>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-bold text-rose-400 font-mono">{iastReport.findings.length}</span>
-            <span className="text-[11px] text-rose-400/80 font-mono font-medium">100% Execução</span>
+            <span className="text-[11px] text-rose-400/80 font-mono font-medium">source → sink</span>
           </div>
-          <span className="text-[10px] text-white/40 block">Zero falsos positivos via AST</span>
+          <span className="text-[10px] text-white/40 block">Estático, a confirmar em teste</span>
         </div>
 
         <div className="p-3.5 rounded-xl border border-white/10 bg-black/40 space-y-1">
-          <span className="text-[10px] font-mono text-white/50 uppercase tracking-wider block">Hooks Ativos</span>
+          <span className="text-[10px] font-mono text-white/50 uppercase tracking-wider block">Regras de Sink Ativas</span>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-bold text-cyan-400 font-mono">{hooks.filter(h => h.active).length}</span>
-            <span className="text-[11px] text-white/40 font-mono">/ {hooks.length} sensores</span>
+            <span className="text-[11px] text-white/40 font-mono">/ {hooks.length} regras</span>
           </div>
           <span className="text-[10px] text-white/40 block">Drivers SQL, fs, child_process</span>
         </div>
 
         <div className="p-3.5 rounded-xl border border-white/10 bg-black/40 space-y-1">
-          <span className="text-[10px] font-mono text-white/50 uppercase tracking-wider block">Chamadas Interceptadas</span>
+          <span className="text-[10px] font-mono text-white/50 uppercase tracking-wider block">Sinks no Código</span>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-bold text-emerald-400 font-mono">{iastReport.totalHooksTriggered}</span>
-            <span className="text-[11px] text-emerald-400/80 font-mono">interceptações</span>
+            <span className="text-[11px] text-emerald-400/80 font-mono">chamadas</span>
           </div>
-          <span className="text-[10px] text-white/40 block">Emulação com overhead de ~1.4ms</span>
+          <span className="text-[10px] text-white/40 block">Chamadas perigosas encontradas</span>
         </div>
 
-        <div className="p-3.5 rounded-xl border border-white/10 bg-black/40 space-y-1">
-          <span className="text-[10px] font-mono text-white/50 uppercase tracking-wider block">Redução Falsos Positivos</span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-amber-400 font-mono">{iastReport.coverageMetrics.falsePositiveReductionPercent}%</span>
-            <span className="text-[11px] text-amber-400/80 font-mono">vs SAST puro</span>
-          </div>
-          <span className="text-[10px] text-white/40 block">Validação no sink real</span>
-        </div>
-
-        <div className="p-3.5 rounded-xl border border-white/10 bg-black/40 space-y-1 col-span-2 sm:col-span-1">
-          <span className="text-[10px] font-mono text-white/50 uppercase tracking-wider block">Taxa Sucesso Taint</span>
+        <div className="p-3.5 rounded-xl border border-white/10 bg-black/40 space-y-1 col-span-2">
+          <span className="text-[10px] font-mono text-white/50 uppercase tracking-wider block">Sinks com dado da requisição</span>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-bold text-purple-400 font-mono">{iastReport.coverageMetrics.taintPropagationSuccessRate}%</span>
-            <span className="text-[11px] text-purple-400/80 font-mono">rastreabilidade</span>
+            <span className="text-[11px] text-purple-400/80 font-mono">dos sinks encontrados</span>
           </div>
-          <span className="text-[10px] text-white/40 block">Origem HTTP até o Sink</span>
+          <span className="text-[10px] text-white/40 block">Alcance por arquivo: chamadas entre arquivos não são seguidas</span>
         </div>
       </div>
 
@@ -272,7 +238,7 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
           }`}
         >
           <Bug className="w-3.5 h-3.5" />
-          <span>Vulnerabilidades em Runtime ({iastReport.findings.length})</span>
+          <span>Fluxos suspeitos ({iastReport.findings.length})</span>
         </button>
 
         <button
@@ -293,18 +259,6 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveTab('SIMULATION_LAB')}
-          className={`px-4 py-2 text-xs font-mono font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
-            activeTab === 'SIMULATION_LAB'
-              ? 'border-cyan-400 text-cyan-400 bg-cyan-500/5'
-              : 'border-transparent text-white/60 hover:text-white'
-          }`}
-        >
-          <Zap className="w-3.5 h-3.5" />
-          <span>Laboratório de Emulação Interativa</span>
-        </button>
-
-        <button
           onClick={() => setActiveTab('HOOKS_REGISTRY')}
           className={`px-4 py-2 text-xs font-mono font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
             activeTab === 'HOOKS_REGISTRY'
@@ -313,7 +267,7 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
           }`}
         >
           <Cpu className="w-3.5 h-3.5" />
-          <span>Sensores & Hooks Instalados ({hooks.length})</span>
+          <span>Regras de sink ({hooks.length})</span>
         </button>
 
         <button
@@ -325,7 +279,7 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
           }`}
         >
           <Info className="w-3.5 h-3.5" />
-          <span>Arquitetura IAST vs SAST</span>
+          <span>Estático vs IAST real</span>
         </button>
       </div>
 
@@ -357,9 +311,9 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
               {filteredFindings.length === 0 ? (
                 <div className="p-8 text-center bg-black/40 border border-dashed border-white/10 rounded-xl space-y-2">
                   <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
-                  <h3 className="text-sm font-bold text-white">Nenhuma vulnerabilidade em Runtime</h3>
+                  <h3 className="text-sm font-bold text-white">Nenhum fluxo suspeito encontrado</h3>
                   <p className="text-xs text-zinc-500">
-                    O workspace está limpo ou nenhum hook detectou propagação de taint insegura.
+                    Nenhum dado da requisição chega a um sink nos arquivos JS/TS analisados. Fluxos que cruzam arquivos não são seguidos.
                   </p>
                 </div>
               ) : (
@@ -405,7 +359,7 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
                         <Globe className="w-3 h-3 text-cyan-400 shrink-0" />
                         <span>{finding.httpMethod} {finding.sourceEndpoint}</span>
                       </span>
-                      <span className="text-emerald-400 font-semibold">{finding.confidence}% Confiança</span>
+                      <span className="text-emerald-400 font-semibold">{finding.status === 'SUSPECTED' ? 'Suspeita estática' : `${finding.confidence}%`}</span>
                     </div>
                   </div>
                 );
@@ -430,7 +384,7 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
                     </div>
 
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-                      Status: {selectedFinding.status} (Dynamic Interception)
+                      Status: {selectedFinding.status === 'SUSPECTED' ? 'suspeita estática, não confirmada em execução' : selectedFinding.status}
                     </span>
                   </div>
 
@@ -447,20 +401,17 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono uppercase text-cyan-300 font-bold flex items-center gap-1.5">
                       <Terminal className="w-3.5 h-3.5 text-cyan-400" />
-                      Evidência de Execução Capturada pelo Hook
-                    </span>
-                    <span className="text-[10px] font-mono text-white/50">
-                      Duração do Sink: {selectedFinding.runtimeEvidence.runtimeDurationMs}ms
+                      Linha do código onde o dado chega ao sink
                     </span>
                   </div>
 
                   <div className="p-2.5 rounded bg-black/80 font-mono text-[11px] text-white/90 border border-white/10 break-all space-y-1.5">
                     <div>
-                      <span className="text-white/40 block text-[10px]">Chamada Executada no Sink em Runtime:</span>
+                      <span className="text-white/40 block text-[10px]">Chamada no código:</span>
                       <span className="text-rose-300 font-semibold">{selectedFinding.runtimeEvidence.executedQueryOrCommand}</span>
                     </div>
                     <div>
-                      <span className="text-white/40 block text-[10px]">Substring Tainted Injetada:</span>
+                      <span className="text-white/40 block text-[10px]">Variável com dado da requisição:</span>
                       <span className="text-amber-300 bg-amber-950/40 px-1 py-0.5 rounded border border-amber-800/40">
                         {selectedFinding.runtimeEvidence.unfilteredTaintSubstring}
                       </span>
@@ -478,7 +429,7 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-xs font-mono font-bold text-white flex items-center gap-2 uppercase tracking-wider">
                       <Activity className="w-3.5 h-3.5 text-purple-400" />
-                      Mapeamento de Propagação (Taint Flow em Runtime)
+                      Mapeamento de Propagação (source → sink, estático)
                     </h3>
                     
                     <div className="flex items-center gap-2">
@@ -559,20 +510,6 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
                       ))}
                     </div>
                   )}
-                </div>
-
-                {/* Call Stack Inspection */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-mono font-bold text-white/80 uppercase">
-                    Call Stack de Execução no Momento do Sink
-                  </h4>
-                  <div className="p-2.5 rounded-lg bg-black/80 border border-white/10 font-mono text-[10.5px] text-white/70 space-y-1 max-h-32 overflow-y-auto">
-                    {selectedFinding.runtimeCallStack.map((frame, fIdx) => (
-                      <div key={fIdx} className="text-white/60 hover:text-white transition-colors">
-                        {frame}
-                      </div>
-                    ))}
-                  </div>
                 </div>
 
                 {/* Remediation & Code Diff */}
@@ -672,129 +609,11 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
               <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
               <h3 className="text-sm font-bold text-white">Nenhum Fluxo de Taint Inseguro no Workspace</h3>
               <p className="text-xs text-zinc-400 max-w-md mx-auto">
-                O workspace está limpo ou nenhum hook detectou propagação de taint vulnerável.
+                Nenhum dado da requisição chega a um sink nos arquivos JS/TS analisados.
                 {files.length === 0 && ' Envie arquivos de código ou audite uma URL para analisar chamadas dinâmicas.'}
               </p>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Tab 2: Simulation Lab */}
-      {activeTab === 'SIMULATION_LAB' && (
-        <div className="space-y-6">
-          <div className="p-5 rounded-xl border border-white/10 bg-black/60 space-y-4">
-            <h2 className="text-sm font-bold font-mono text-white flex items-center gap-2">
-              <Zap className="w-4 h-4 text-cyan-400" />
-              Cenários Predefinidos de Emulação Dinâmica
-            </h2>
-            <p className="text-xs text-white/70">
-              Dispare requisições simuladas através dos controllers do workspace. Os sensores IAST monitoram a AST das queries, parâmetros de shell e chamadas de arquivo em tempo real.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-              {scenarios.map(sc => (
-                <div
-                  key={sc.id}
-                  className={`p-4 rounded-xl border transition-all space-y-2.5 ${
-                    selectedScenarioId === sc.id
-                      ? 'bg-cyan-950/30 border-cyan-500/50'
-                      : 'bg-black/40 border-white/10 hover:border-white/20'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">
-                      {sc.attackVectorType}
-                    </span>
-                    <span className="text-[10px] font-mono text-white/50">{sc.httpMethod} {sc.targetRoute}</span>
-                  </div>
-
-                  <h4 className="text-xs font-bold text-white leading-snug">{sc.name}</h4>
-                  <p className="text-[11px] text-white/60 leading-relaxed line-clamp-2">{sc.description}</p>
-
-                  <div className="p-2 rounded bg-black/60 border border-white/5 font-mono text-[10px] text-amber-300/90 truncate">
-                    Payload: {JSON.stringify(sc.inputPayload)}
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setSelectedScenarioId(sc.id);
-                      handleRunSimulation(sc);
-                    }}
-                    disabled={isEmulating}
-                    className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-mono text-xs font-semibold cursor-pointer transition-colors"
-                  >
-                    <Play className="w-3 h-3 fill-current" />
-                    <span>Executar Emulação</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom Simulation Form */}
-          <div className="p-5 rounded-xl border border-white/10 bg-black/60 space-y-4">
-            <h3 className="text-sm font-bold font-mono text-white flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-purple-400" />
-              Injetor Customizado de Requisição em Runtime
-            </h3>
-            <p className="text-xs text-white/70">
-              Defina uma rota arbitrária e payload de teste para avaliar se os hooks IAST interceptam a propagação no sink de destino.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono text-white/70">Rota HTTP de Origem:</label>
-                <input
-                  type="text"
-                  value={customRoute}
-                  onChange={(e) => setCustomRoute(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-black border border-white/15 text-white font-mono text-xs focus:border-cyan-400 outline-none"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono text-white/70">Nome do Parâmetro de Entrada:</label>
-                <input
-                  type="text"
-                  value={customParam}
-                  onChange={(e) => setCustomParam(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-black border border-white/15 text-white font-mono text-xs focus:border-cyan-400 outline-none"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono text-white/70">Payload Simulado (Tainted String):</label>
-                <input
-                  type="text"
-                  value={customPayload}
-                  onChange={(e) => setCustomPayload(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-black border border-white/15 text-white font-mono text-xs focus:border-cyan-400 outline-none"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono text-white/70">Sink Alvo Simulado:</label>
-                <input
-                  type="text"
-                  value={customSink}
-                  onChange={(e) => setCustomSink(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-black border border-white/15 text-white font-mono text-xs focus:border-cyan-400 outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={handleRunCustomSimulation}
-                disabled={isEmulating}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs font-mono transition-all shadow-md shadow-purple-600/30 cursor-pointer"
-              >
-                <Zap className="w-3.5 h-3.5 fill-current" />
-                <span>Disparar Injeção Customizada</span>
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
@@ -870,7 +689,7 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
         <div className="p-5 rounded-xl border border-white/10 bg-black/60 space-y-5">
           <h2 className="text-sm font-bold font-mono text-white flex items-center gap-2">
             <Info className="w-4 h-4 text-cyan-400" />
-            Como o IAST Complementa o SAST Existente no SecScan
+            O que esta análise faz e o que um IAST de verdade faria
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -888,21 +707,21 @@ export const IastSuiteView: React.FC<IastSuiteViewProps> = ({
 
             <div className="p-4 rounded-xl border border-cyan-500/30 bg-cyan-950/20 space-y-2.5">
               <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider block">
-                IAST (Interactive Application Security Testing)
+                IAST real (não é o que roda aqui)
               </span>
               <ul className="space-y-2 text-xs text-white/80 list-disc list-inside">
                 <li>Opera dentro da aplicação através de agentes/hooks de instrumentação.</li>
                 <li>Rastreia variáveis com tags Taint desde a entrada HTTP até o driver SQL/OS.</li>
-                <li>Garante zero falsos positivos ao verificar se a árvore sintática do comando foi alterada no runtime.</li>
-                <li>Identifica falhas que só ocorrem mediante encadeamento dinâmico de dados.</li>
+                <li>Confirma a falha observando a chamada real, com o valor que chegou ao driver.</li>
+                <li>Exige um agente instalado no processo da aplicação em execução. O SecScan não instala esse agente.</li>
               </ul>
             </div>
           </div>
 
           <div className="p-4 rounded-xl border border-white/10 bg-black/40 space-y-2">
-            <h4 className="text-xs font-mono font-bold text-white uppercase">Fluxo Integrado DevSecOps</h4>
+            <h4 className="text-xs font-mono font-bold text-white uppercase">Como ler os achados desta tela</h4>
             <p className="text-xs text-white/70 leading-relaxed">
-              O SecScan executa primeiro a varredura SAST para mapear a superfície de ataque (endpoints de API, segredos e sinks perigosos) e, em seguida, engaja o motor IAST para emular fluxos de dados reais através dos pontos críticos identificados, fornecendo relatórios com call stacks reais e evidências determinísticas.
+              O SecScan faz análise estática: lê cada arquivo JS/TS, marca as variáveis que recebem dados da requisição e aponta quando uma delas chega a uma consulta SQL, comando do sistema, caminho de arquivo, chamada HTTP de saída ou avaliador de código. O resultado mostra as linhas reais de origem e de destino. Como nada é executado, cada achado é uma suspeita: valide em ambiente de teste ou com um agente IAST.
             </p>
           </div>
         </div>

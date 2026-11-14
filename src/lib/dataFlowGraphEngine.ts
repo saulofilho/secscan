@@ -435,52 +435,28 @@ export function buildDataFlowGraph(
   }
 
   // 8. Taint Analysis: Propagate taint from Endpoints to Sinks and track tainted variables
-  const extractTaintedVariable = (sinkNode: DataFlowNode): { variableName: string; sourceField: string } => {
+  // The variable is read from the sink's own line. The source is the endpoint
+  // that reaches the sink in the graph: no field name is inferred.
+  const SINK_ARGUMENT_PATTERNS: RegExp[] = [
+    /eval\s*\(\s*([a-zA-Z0-9_$.]+)/,
+    /innerHTML\s*=\s*([a-zA-Z0-9_$.]+)/,
+    /document\.write(?:ln)?\s*\(\s*([a-zA-Z0-9_$.]+)/,
+    /(?:localStorage|sessionStorage)\.setItem\s*\(\s*['"`][^'"`]+['"`]\s*,\s*([a-zA-Z0-9_$.]+)/,
+    /postMessage\s*\(\s*\{[^}]*:\s*([a-zA-Z0-9_$.]+)/,
+    /postMessage\s*\(\s*([a-zA-Z0-9_$.]+)/,
+    /Function\s*\([^)]*,\s*([a-zA-Z0-9_$.]+)\s*\)/
+  ];
+  const extractTaintedVariable = (sinkNode: DataFlowNode, endpointNode: DataFlowNode): { variableName: string; sourceField: string } => {
     const snippet = sinkNode.snippet || '';
-
-    // eval(payload.code) or eval(code)
-    const evalMatch = /eval\s*\(\s*([a-zA-Z0-9_$.]+)/.exec(snippet);
-    if (evalMatch && evalMatch[1]) {
-      return { variableName: evalMatch[1], sourceField: 'req.body.code' };
+    let variableName = 'valor não resolvido';
+    for (const pattern of SINK_ARGUMENT_PATTERNS) {
+      const match = pattern.exec(snippet);
+      if (match && match[1]) {
+        variableName = match[1];
+        break;
+      }
     }
-
-    // innerHTML = metadata.bioHtml or elem.innerHTML = val
-    const innerHtmlMatch = /innerHTML\s*=\s*([a-zA-Z0-9_$.]+)/.exec(snippet);
-    if (innerHtmlMatch && innerHtmlMatch[1]) {
-      return { variableName: innerHtmlMatch[1], sourceField: 'res.json().bioHtml' };
-    }
-
-    // document.write(x)
-    const docWriteMatch = /document\.write(?:ln)?\s*\(\s*([a-zA-Z0-9_$.]+)/.exec(snippet);
-    if (docWriteMatch && docWriteMatch[1]) {
-      return { variableName: docWriteMatch[1], sourceField: 'req.query.q' };
-    }
-
-    // localStorage.setItem("session_token", metadata.token)
-    const storageMatch = /(?:localStorage|sessionStorage)\.setItem\s*\(\s*['"`][^'"`]+['"`]\s*,\s*([a-zA-Z0-9_$.]+)/.exec(snippet);
-    if (storageMatch && storageMatch[1]) {
-      return { variableName: storageMatch[1], sourceField: 'res.json().token' };
-    }
-
-    // window.postMessage({ session: payload.token }, "*")
-    const postMsgMatch = /postMessage\s*\(\s*\{[^}]*:\s*([a-zA-Z0-9_$.]+)/.exec(snippet);
-    if (postMsgMatch && postMsgMatch[1]) {
-      return { variableName: postMsgMatch[1], sourceField: 'req.body.token' };
-    }
-
-    // Function(..., code)
-    const fnMatch = /Function\s*\([^)]*,\s*([a-zA-Z0-9_$.]+)\s*\)/.exec(snippet);
-    if (fnMatch && fnMatch[1]) {
-      return { variableName: fnMatch[1], sourceField: 'req.body.script' };
-    }
-
-    // Heuristics by sink type
-    if (sinkNode.sinkType === 'EVAL') return { variableName: 'payload.code', sourceField: 'req.body.code' };
-    if (sinkNode.sinkType === 'INNER_HTML') return { variableName: 'metadata.bioHtml', sourceField: 'res.data.bioHtml' };
-    if (sinkNode.sinkType === 'INSECURE_STORAGE') return { variableName: 'metadata.token', sourceField: 'res.data.token' };
-    if (sinkNode.sinkType === 'POST_MESSAGE') return { variableName: 'payload.token', sourceField: 'payload.token' };
-    if (sinkNode.sinkType === 'DOCUMENT_WRITE') return { variableName: 'searchQuery', sourceField: 'req.query.search' };
-    return { variableName: 'untrustedInput', sourceField: 'req.body' };
+    return { variableName, sourceField: endpointNode.label || endpointNode.id };
   };
 
   const adjacency: Map<string, string[]> = new Map();
@@ -525,7 +501,7 @@ export function buildDataFlowGraph(
           // If next is a sink, the entire path is a Tainted Flow!
           const nextNode = nodesMap.get(next);
           if (nextNode && nextNode.type === 'SINK') {
-            const { variableName, sourceField } = extractTaintedVariable(nextNode);
+            const { variableName, sourceField } = extractTaintedVariable(nextNode, epNode);
             const pathLinkIds: string[] = [];
 
             for (let i = 0; i < newPath.length - 1; i++) {

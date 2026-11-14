@@ -15,7 +15,9 @@ import {
   Search
 } from 'lucide-react';
 import { ScannedFile } from '../types';
-import { scanWorkspaceEntropy, EntropyFinding, GitCommitSecretLeak } from '../lib/entropyScanner';
+import { scanWorkspaceEntropy, EntropyFinding } from '../lib/entropyScanner';
+import { GitHistoryScanResult } from '../lib/gitHistoryScanner';
+import { readServerJson } from '../lib/serverApi';
 
 interface EntropySecretsViewProps {
   files: ScannedFile[];
@@ -31,6 +33,28 @@ export const EntropySecretsView: React.FC<EntropySecretsViewProps> = ({ files, o
   const report = useMemo(() => {
     return scanWorkspaceEntropy(files, entropyThreshold);
   }, [files, entropyThreshold]);
+
+  const [gitPath, setGitPath] = useState('');
+  const [gitScan, setGitScan] = useState<GitHistoryScanResult | null>(null);
+  const [gitError, setGitError] = useState<string | null>(null);
+  const [isScanningGit, setIsScanningGit] = useState(false);
+
+  const scanGitHistory = async () => {
+    setIsScanningGit(true);
+    setGitError(null);
+    try {
+      const query = gitPath.trim() ? `?path=${encodeURIComponent(gitPath.trim())}` : '';
+      const response = await fetch(`/api/git/secrets${query}`);
+      const data = await readServerJson<GitHistoryScanResult & { error?: string }>(response);
+      if (!response.ok) throw new Error(data.error || `Servidor respondeu HTTP ${response.status}.`);
+      setGitScan(data);
+    } catch (err) {
+      setGitScan(null);
+      setGitError(err instanceof Error ? err.message : 'Falha ao consultar o servidor.');
+    } finally {
+      setIsScanningGit(false);
+    }
+  };
 
   const toggleReveal = (id: string) => {
     setRevealedIds(prev => ({ ...prev, [id]: !prev[id] }));
@@ -82,7 +106,7 @@ export const EntropySecretsView: React.FC<EntropySecretsViewProps> = ({ files, o
                 : 'bg-[#141414] text-zinc-400 border-[#2A2A2A] hover:text-white'
             }`}
           >
-            Histórico Git &amp; Fantasmas ({report.gitHistoryLeaks.length})
+            Histórico Git{gitScan?.isGitRepository ? ` (${gitScan.leaks.length})` : ''}
           </button>
         </div>
       </div>
@@ -222,17 +246,69 @@ export const EntropySecretsView: React.FC<EntropySecretsViewProps> = ({ files, o
             </div>
           </div>
 
+          <div className="p-4 bg-[#0C0C0C] border border-[#222] rounded-xl space-y-3">
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              A varredura roda <code className="text-zinc-200">git log -p</code> no servidor Secscan desta máquina e aplica as regras de segredo
+              às linhas adicionadas em cada commit. Os arquivos carregados no workspace não têm histórico: informe o
+              diretório do repositório ou deixe em branco para usar o diretório onde o servidor foi iniciado.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={gitPath}
+                onChange={(e) => setGitPath(e.target.value)}
+                placeholder="/caminho/do/repositorio (vazio = diretório do servidor)"
+                aria-label="Diretório do repositório Git"
+                className="flex-1 bg-black border border-[#333] text-white px-3 py-2 text-xs rounded-lg focus:outline-none focus:border-pink-500"
+              />
+              <button
+                onClick={scanGitHistory}
+                disabled={isScanningGit}
+                className="px-4 py-2 rounded-lg text-xs font-bold bg-pink-600 text-white border border-pink-500 hover:bg-pink-500 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <GitCommit className="w-3.5 h-3.5" />
+                <span>{isScanningGit ? 'Lendo histórico…' : 'Varrer histórico Git'}</span>
+              </button>
+            </div>
+            {gitScan?.isGitRepository && (
+              <p className="text-[11px] text-zinc-500">
+                {gitScan.repoRoot} · {gitScan.commitsScanned} commits lidos
+                {gitScan.truncated ? ' (histórico maior que o limite: os mais antigos ficaram de fora)' : ''}
+              </p>
+            )}
+          </div>
+
           <div className="space-y-3">
-            {report.gitHistoryLeaks.length === 0 ? (
+            {gitError ? (
+              <div className="p-6 text-center bg-black/40 border border-dashed border-rose-900/50 rounded-xl space-y-2">
+                <ShieldAlert className="w-8 h-8 text-rose-400 mx-auto" />
+                <h3 className="text-sm font-bold text-white">Não foi possível ler o histórico</h3>
+                <p className="text-xs text-zinc-400 max-w-md mx-auto">{gitError}</p>
+              </div>
+            ) : !gitScan ? (
+              <div className="p-12 text-center bg-black/40 border border-dashed border-[#222] rounded-xl space-y-2">
+                <GitCommit className="w-8 h-8 text-zinc-500 mx-auto" />
+                <h3 className="text-sm font-bold text-white">Histórico ainda não varrido</h3>
+                <p className="text-xs text-zinc-500 max-w-md mx-auto">
+                  Nenhum resultado é exibido antes da leitura real do repositório.
+                </p>
+              </div>
+            ) : !gitScan.isGitRepository ? (
+              <div className="p-12 text-center bg-black/40 border border-dashed border-[#222] rounded-xl space-y-2">
+                <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto" />
+                <h3 className="text-sm font-bold text-white">Este diretório não é um repositório Git</h3>
+                <p className="text-xs text-zinc-500 max-w-md mx-auto">{gitScan.repoRoot}</p>
+              </div>
+            ) : gitScan.leaks.length === 0 ? (
               <div className="p-12 text-center bg-black/40 border border-dashed border-[#222] rounded-xl space-y-2">
                 <Check className="w-8 h-8 text-emerald-400 mx-auto" />
-                <h3 className="text-sm font-bold text-white">Nenhum segredo no histórico Git</h3>
+                <h3 className="text-sm font-bold text-white">Nenhum segredo encontrado no histórico</h3>
                 <p className="text-xs text-zinc-500 max-w-md mx-auto">
-                  Nenhum commit com credenciais ou chaves residuais detectado. O repositório está limpo.
+                  {gitScan.commitsScanned} commits lidos com as regras padrão. Regras customizadas do workspace não entram nesta varredura.
                 </p>
               </div>
             ) : (
-              report.gitHistoryLeaks.map((leak, idx) => (
+              gitScan.leaks.map((leak, idx) => (
               <div key={idx} className="p-4 bg-[#0A0A0A] border border-rose-900/40 rounded-xl space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
@@ -246,7 +322,7 @@ export const EntropySecretsView: React.FC<EntropySecretsViewProps> = ({ files, o
                       <span className="text-xs text-zinc-400">{leak.date}</span>
                     </div>
                     <h3 className="font-bold text-sm text-white">{leak.commitMessage}</h3>
-                    <span className="text-xs text-zinc-500">Autor: {leak.author} | Arquivo: {leak.file}</span>
+                    <span className="text-xs text-zinc-500">Autor: {leak.author} | Arquivo: {leak.file} | Regra: {leak.ruleName}</span>
                   </div>
 
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
@@ -266,7 +342,7 @@ export const EntropySecretsView: React.FC<EntropySecretsViewProps> = ({ files, o
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] text-zinc-400 uppercase font-bold flex items-center gap-1">
                       <Terminal className="w-3 h-3 text-emerald-400" />
-                      Comando de Limpeza de Histórico (git-filter-repo / BFG):
+                      Rotação e limpeza de histórico (git-filter-repo):
                     </span>
                     <button
                       onClick={() => handleCopy(leak.gitRemediationCommand, `cmd-${idx}`)}
@@ -276,7 +352,7 @@ export const EntropySecretsView: React.FC<EntropySecretsViewProps> = ({ files, o
                       <span>{copiedId === `cmd-${idx}` ? 'Copiado' : 'Copiar'}</span>
                     </button>
                   </div>
-                  <code className="text-emerald-300 block text-[11px] overflow-x-auto">
+                  <code className="text-emerald-300 block text-[11px] overflow-x-auto whitespace-pre">
                     {leak.gitRemediationCommand}
                   </code>
                 </div>

@@ -19,7 +19,7 @@ export const FEATURE_REGISTRY: FeatureRegistryItem[] = [
 
   { id: 'apisecurity', name: 'OWASP API Security Top 10', category: 'API_DAST' },
   { id: 'dast', name: 'DAST Active Dynamic Scan', category: 'API_DAST' },
-  { id: 'iast', name: 'IAST Simulated Payloads', category: 'API_DAST' },
+  { id: 'iast', name: 'Static Taint Analysis', category: 'API_DAST' },
   { id: 'headers', name: 'HTTP Security Headers', category: 'API_DAST' },
   { id: 'jwtinspector', name: 'JWT Token Inspector', category: 'API_DAST' },
   { id: 'ssrfvalidator', name: 'SSRF Gateway Validator', category: 'API_DAST' },
